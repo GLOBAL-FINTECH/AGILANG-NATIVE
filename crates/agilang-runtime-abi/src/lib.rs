@@ -287,15 +287,9 @@ pub unsafe extern "C" fn agi_value_len(handle: u64, out: *mut usize) -> u32 {
 pub unsafe extern "C" fn agi_value_is_empty(handle: u64, out: *mut bool) -> u32 {
     ffi_status(|| {
         if out.is_null() {
-            return Err(AgilangError::invalid_argument(
-                "output pointer is null",
-            ));
+            return Err(AgilangError::invalid_argument("output pointer is null"));
         }
-
-        *out = REGISTRY
-            .get_value(HandleId(handle))?
-            .is_empty()?;
-
+        *out = REGISTRY.get_value(HandleId(handle))?.is_empty()?;
         Ok(())
     })
 }

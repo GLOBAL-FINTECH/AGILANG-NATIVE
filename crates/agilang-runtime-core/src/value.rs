@@ -150,10 +150,10 @@ impl AgilangValue {
 
     pub fn is_empty(&self) -> RuntimeResult<bool> {
         match self {
-            Self::String(value) => Ok(value.is_empty()),
-            Self::Bytes(value) => Ok(value.is_empty()),
-            Self::Array(value) => Ok(value.is_empty()),
-            Self::Map(value) => Ok(value.is_empty()),
+            Self::String(v) => Ok(v.is_empty()),
+            Self::Bytes(v) => Ok(v.is_empty()),
+            Self::Array(v) => Ok(v.is_empty()),
+            Self::Map(v) => Ok(v.is_empty()),
             _ => Err(self.mismatch("string, bytes, array, or map")),
         }
     }

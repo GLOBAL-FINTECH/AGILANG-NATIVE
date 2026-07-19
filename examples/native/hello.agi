@@ -1,0 +1,4 @@
+fn main() -> i32:
+    let chain_id: i64 = 1990
+    print("AGILANG Native")
+    return 0

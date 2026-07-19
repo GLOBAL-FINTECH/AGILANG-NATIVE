@@ -1,5 +1,5 @@
 [package]
-name = "agilang-parser"
+name = "agilang-compiler"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,3 +10,4 @@ agilang-source = { path = "../agilang-source" }
 agilang-diagnostics = { path = "../agilang-diagnostics" }
 agilang-lexer = { path = "../agilang-lexer" }
 agilang-ast = { path = "../agilang-ast" }
+agilang-parser = { path = "../agilang-parser" }
