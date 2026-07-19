@@ -1,0 +1,20 @@
+[package]
+name = "agilang-runtime-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "agilang-runtime"
+path = "src/main.rs"
+
+[dependencies]
+agilang-runtime-core = { path = "../agilang-runtime-core" }
+agilang-runtime-abi = { path = "../agilang-runtime-abi" }
+agilang-runtime-async = { path = "../agilang-runtime-async" }
+agilang-runtime-platform = { path = "../agilang-runtime-platform" }
+anyhow.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
