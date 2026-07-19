@@ -1,0 +1,104 @@
+use agilang_source::Span;
+use agilang_types::Type;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirProgram {
+    pub functions: Vec<HirFunction>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirFunction {
+    pub name: String,
+    pub params: Vec<HirParameter>,
+    pub return_type: Type,
+    pub body: Vec<HirStmt>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirParameter {
+    pub name: String,
+    pub ty: Type,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HirStmt {
+    Let {
+        name: String,
+        ty: Type,
+        value: HirExpr,
+        mutable: bool,
+        span: Span,
+    },
+    Return {
+        value: Option<HirExpr>,
+        span: Span,
+    },
+    Expr(HirExpr),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirBinaryOp {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Equal,
+    NotEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    And,
+    Or,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HirExpr {
+    Identifier(String, Type, Span),
+    Integer(i64, Span),
+    Float(f64, Span),
+    String(String, Span),
+    Bool(bool, Span),
+    Call {
+        callee: Box<HirExpr>,
+        args: Vec<HirExpr>,
+        ty: Type,
+        span: Span,
+    },
+    Binary {
+        left: Box<HirExpr>,
+        op: HirBinaryOp,
+        right: Box<HirExpr>,
+        ty: Type,
+        span: Span,
+    },
+}
+
+impl HirExpr {
+    pub fn ty(&self) -> &Type {
+        match self {
+            Self::Identifier(_, ty, _) => ty,
+            Self::Integer(_, _) => &Type::I64,
+            Self::Float(_, _) => &Type::F64,
+            Self::String(_, _) => &Type::String,
+            Self::Bool(_, _) => &Type::Bool,
+            Self::Call { ty, .. } => ty,
+            Self::Binary { ty, .. } => ty,
+        }
+    }
+
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Identifier(_, _, span) => *span,
+            Self::Integer(_, span) => *span,
+            Self::Float(_, span) => *span,
+            Self::String(_, span) => *span,
+            Self::Bool(_, span) => *span,
+            Self::Call { span, .. } => *span,
+            Self::Binary { span, .. } => *span,
+        }
+    }
+}

@@ -12,5 +12,22 @@ pub fn parse(source: &SourceFile) -> Result<Program, Vec<Diagnostic>> {
     agilang_parser::parse(&tokens)
 }
 pub fn check(source: &SourceFile) -> Result<Program, Vec<Diagnostic>> {
-    parse(source)
+    let ast = parse(source)?;
+    let analyser = agilang_semantic::Analyser::new();
+    let _ = analyser.analyse(&ast)?;
+    Ok(ast)
+}
+
+pub fn symbols(source: &SourceFile) -> Result<Vec<agilang_symbols::SymbolTable>, Vec<Diagnostic>> {
+    let ast = parse(source)?;
+    let analyser = agilang_semantic::Analyser::new();
+    let (_, scopes) = analyser.analyse(&ast)?;
+    Ok(scopes)
+}
+
+pub fn hir(source: &SourceFile) -> Result<agilang_ir::HirProgram, Vec<Diagnostic>> {
+    let ast = parse(source)?;
+    let analyser = agilang_semantic::Analyser::new();
+    let (hir_prog, _) = analyser.analyse(&ast)?;
+    Ok(hir_prog)
 }

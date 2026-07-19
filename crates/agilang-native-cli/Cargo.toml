@@ -6,9 +6,12 @@ license.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "agilang-native"
+name = "agilang"
 path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
 agilang-compiler = { path = "../agilang-compiler" }
+agilang-types = { path = "../agilang-types" }
+agilang-symbols = { path = "../agilang-symbols" }
+agilang-ir = { path = "../agilang-ir" }

@@ -1,9 +1,11 @@
 [package]
-name = "agilang-source"
+name = "agilang-ir"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+agilang-source = { path = "../agilang-source" }
+agilang-types = { path = "../agilang-types" }
 serde = { workspace = true, features = ["derive"] }

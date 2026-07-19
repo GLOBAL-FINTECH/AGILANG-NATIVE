@@ -13,6 +13,10 @@ members = [
   "crates/agilang-parser",
   "crates/agilang-compiler",
   "crates/agilang-native-cli",
+  "crates/agilang-types",
+  "crates/agilang-symbols",
+  "crates/agilang-ir",
+  "crates/agilang-semantic",
 ]
 
 [workspace.package]

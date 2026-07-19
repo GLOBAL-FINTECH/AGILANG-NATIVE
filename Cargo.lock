@@ -15,9 +15,13 @@ version = "0.3.0"
 dependencies = [
  "agilang-ast",
  "agilang-diagnostics",
+ "agilang-ir",
  "agilang-lexer",
  "agilang-parser",
+ "agilang-semantic",
  "agilang-source",
+ "agilang-symbols",
+ "agilang-types",
 ]
 
 [[package]]
@@ -25,6 +29,15 @@ name = "agilang-diagnostics"
 version = "0.3.0"
 dependencies = [
  "agilang-source",
+]
+
+[[package]]
+name = "agilang-ir"
+version = "0.3.0"
+dependencies = [
+ "agilang-source",
+ "agilang-types",
+ "serde",
 ]
 
 [[package]]
@@ -40,6 +53,9 @@ name = "agilang-native-cli"
 version = "0.3.0"
 dependencies = [
  "agilang-compiler",
+ "agilang-ir",
+ "agilang-symbols",
+ "agilang-types",
  "anyhow",
 ]
 
@@ -106,8 +122,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-semantic"
+version = "0.3.0"
+dependencies = [
+ "agilang-ast",
+ "agilang-diagnostics",
+ "agilang-ir",
+ "agilang-lexer",
+ "agilang-parser",
+ "agilang-source",
+ "agilang-symbols",
+ "agilang-types",
+ "serde",
+]
+
+[[package]]
 name = "agilang-source"
 version = "0.3.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "agilang-symbols"
+version = "0.3.0"
+dependencies = [
+ "agilang-source",
+ "agilang-types",
+ "serde",
+]
+
+[[package]]
+name = "agilang-types"
+version = "0.3.0"
+dependencies = [
+ "agilang-source",
+ "serde",
+]
 
 [[package]]
 name = "aho-corasick"
