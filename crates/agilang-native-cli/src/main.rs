@@ -5,6 +5,36 @@ use std::{
     path::{Path, PathBuf},
 };
 
+const TARGET: &str = if cfg!(target_arch = "x86_64") {
+    "x86_64-pc-windows-msvc"
+} else {
+    "aarch64-pc-windows-msvc"
+};
+
+fn find_conflicting_installations() -> Vec<PathBuf> {
+    let mut conflicts = vec![];
+    let active_exe = env::current_exe().ok();
+    if let Some(path_var) = env::var_os("Path") {
+        for dir in env::split_paths(&path_var) {
+            let exe = dir.join("agilang.exe");
+            if exe.exists() {
+                if let Some(ref active) = active_exe {
+                    if let (Ok(p1), Ok(p2)) = (exe.canonicalize(), active.canonicalize()) {
+                        if p1 != p2 {
+                            conflicts.push(exe);
+                        }
+                    } else if exe != *active {
+                        conflicts.push(exe);
+                    }
+                } else {
+                    conflicts.push(exe);
+                }
+            }
+        }
+    }
+    conflicts
+}
+
 fn main() -> Result<()> {
     let mut args = env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "help".into());
@@ -147,13 +177,44 @@ fn main() -> Result<()> {
             println!("Formatting is not yet implemented in Phase 2");
         }
         "doctor" => {
-            println!("AGILANG native runtime status: healthy");
+            let active_exe = env::current_exe()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_else(|_| "unknown".to_string());
+            println!("CLI resolution");
+            println!("  active: {}", active_exe);
+            println!("  status: native");
+            println!("  AGILANG native runtime status: healthy");
+
+            let conflicts = find_conflicting_installations();
+            if !conflicts.is_empty() {
+                println!("\nConflicting installations");
+                for c in conflicts {
+                    println!("  found: {}", c.display());
+                    println!("  implementation: legacy Python");
+                    println!("  recommendation: rename to agilang-python or remove it from PATH");
+                }
+            } else {
+                println!("\nNo conflicting installations found.");
+            }
         }
         "--version" | "version" | "-V" => {
-            println!(
-                "AGILANG Native Compiler Frontend {}",
-                env!("CARGO_PKG_VERSION")
-            );
+            let verbose = args.next().as_deref() == Some("--verbose");
+            if verbose {
+                let exe_path = env::current_exe()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_else(|_| "unknown".to_string());
+                println!("AGILANG Native Compiler {}", env!("CARGO_PKG_VERSION"));
+                println!("Runtime: {}", env!("CARGO_PKG_VERSION"));
+                println!("ABI: 1.0.0");
+                println!("Implementation: Rust native");
+                println!("Executable: {}", exe_path);
+                println!("Target: {}", TARGET);
+            } else {
+                println!(
+                    "AGILANG Native Compiler Frontend {}",
+                    env!("CARGO_PKG_VERSION")
+                );
+            }
         }
         "help" | "--help" | "-h" => {
             print_help();
