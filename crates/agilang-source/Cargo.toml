@@ -1,0 +1,8 @@
+[package]
+name = "agilang-source"
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.70"
+
+[dependencies]
+thiserror = "1.0"

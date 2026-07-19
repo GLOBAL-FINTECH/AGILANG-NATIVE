@@ -416,9 +416,12 @@ pub extern "C" fn agi_runtime_identity() -> *const c_char {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use once_cell::sync::Lazy;
+    static TEST_MUTEX: Lazy<std::sync::Mutex<()>> = Lazy::new(|| std::sync::Mutex::new(()));
 
     #[test]
     fn collection_round_trip_and_stale_handle_rejection() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         agi_runtime_reset();
         let array = agi_value_array();
         let number = agi_value_int(1990);
@@ -435,6 +438,7 @@ mod tests {
 
     #[test]
     fn is_empty_abi_test() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         agi_runtime_reset();
         let array = agi_value_array();
 

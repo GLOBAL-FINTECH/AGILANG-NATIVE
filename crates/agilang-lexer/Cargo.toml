@@ -1,0 +1,9 @@
+[package]
+name = "agilang-lexer"
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.70"
+
+[dependencies]
+agilang-source = { path = "../agilang-source" }
+agilang-diagnostics = { path = "../agilang-diagnostics" }

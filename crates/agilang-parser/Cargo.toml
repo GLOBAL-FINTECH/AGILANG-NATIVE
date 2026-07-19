@@ -1,0 +1,11 @@
+[package]
+name = "agilang-parser"
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.70"
+
+[dependencies]
+agilang-source = { path = "../agilang-source" }
+agilang-diagnostics = { path = "../agilang-diagnostics" }
+agilang-lexer = { path = "../agilang-lexer" }
+agilang-ast = { path = "../agilang-ast" }

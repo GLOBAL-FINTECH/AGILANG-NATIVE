@@ -6,10 +6,14 @@ members = [
   "crates/agilang-runtime-platform",
   "crates/agilang-runtime-abi",
   "crates/agilang-runtime-cli",
+  "crates/agilang-source",
+  "crates/agilang-diagnostics",
+  "crates/agilang-lexer",
+  "crates/agilang-ast",
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["AGILANG Project"]
