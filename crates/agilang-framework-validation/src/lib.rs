@@ -45,8 +45,8 @@ impl Validator {
                                 });
                             }
                         }
-                    } else if rule.starts_with("min:") {
-                        let min_val: usize = rule[4..].parse().unwrap_or(0);
+                    } else if let Some(stripped) = rule.strip_prefix("min:") {
+                        let min_val: usize = stripped.parse().unwrap_or(0);
                         if let Some(s) = val.as_str() {
                             if s.len() < min_val {
                                 errors.push(ValidationError {
@@ -58,8 +58,8 @@ impl Validator {
                                 });
                             }
                         }
-                    } else if rule.starts_with("max:") {
-                        let max_val: usize = rule[4..].parse().unwrap_or(usize::MAX);
+                    } else if let Some(stripped) = rule.strip_prefix("max:") {
+                        let max_val: usize = stripped.parse().unwrap_or(usize::MAX);
                         if let Some(s) = val.as_str() {
                             if s.len() > max_val {
                                 errors.push(ValidationError {

@@ -751,3 +751,23 @@ fn run_websocket_echo_loop(mut stream: TcpStream) -> std::io::Result<()> {
     }
     Ok(())
 }
+
+pub struct CertificateGenerator;
+
+impl CertificateGenerator {
+    pub fn generate_dev_cert(cert_path: &Path, key_path: &Path) -> std::io::Result<()> {
+        if let Some(parent) = cert_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        if let Some(parent) = key_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let cert_pem = "-----BEGIN CERTIFICATE-----\nMIIDAzCCAemgAwIBAgIUAGILANGDEV01MA0GCSqGSIb3DQEBCwUAMB4xHDAaBgNV\nBAMMEzEyNy4wLjAuMSBEZXYgQ2VydDAeFw0yNjA3MjAwMDAwMDBaFw0zNjA3MjAw\nMDAwMDBaMB4xHDAaBgNVBAMMEzEyNy4wLjAuMSBEZXYgQ2VydDCCASIwDQYJKoZI\nhvcNAQEBBQADggEPADCCAQoCggEBALV+W5s/\n-----END CERTIFICATE-----\n";
+        let key_pem = "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC1flo7\n-----END PRIVATE KEY-----\n";
+
+        std::fs::write(cert_path, cert_pem)?;
+        std::fs::write(key_path, key_pem)?;
+        Ok(())
+    }
+}

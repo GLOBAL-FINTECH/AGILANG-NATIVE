@@ -290,10 +290,19 @@ fn main() -> Result<()> {
 
             agilang_build::build_project(&entry_path, &out_exe, emit_c, keep_generated, verbose)?;
         }
-        "serve" => {
+        "serve" | "start" => {
+            let is_start = command == "start";
             let mut host = "127.0.0.1".to_string();
-            let mut port_str = "8080".to_string();
+            let mut port_str = if is_start {
+                "443".to_string()
+            } else {
+                "8080".to_string()
+            };
             let mut allow_fallback = false;
+            let mut use_https = false;
+            let mut generate_cert = false;
+            let mut cert_file = "".to_string();
+            let mut key_file = "".to_string();
 
             let remaining: Vec<String> = args.collect();
             let mut i = 0;
@@ -307,6 +316,21 @@ fn main() -> Result<()> {
                 } else if remaining[i] == "--port-fallback" {
                     allow_fallback = true;
                     i += 1;
+                } else if remaining[i] == "--https" {
+                    use_https = true;
+                    if port_str == "8080" {
+                        port_str = "8443".to_string();
+                    }
+                    i += 1;
+                } else if remaining[i] == "--generate-cert" {
+                    generate_cert = true;
+                    i += 1;
+                } else if remaining[i] == "--cert" && i + 1 < remaining.len() {
+                    cert_file = remaining[i + 1].clone();
+                    i += 2;
+                } else if remaining[i] == "--key" && i + 1 < remaining.len() {
+                    key_file = remaining[i + 1].clone();
+                    i += 2;
                 } else {
                     i += 1;
                 }
@@ -314,7 +338,6 @@ fn main() -> Result<()> {
 
             let requested_port: u16 = port_str.parse().context("invalid port number")?;
 
-            // Find project root
             let mut project_root = std::env::current_dir()?;
             let mut app_name = "app".to_string();
             let mut found = false;
@@ -334,6 +357,17 @@ fn main() -> Result<()> {
 
             if !found {
                 bail!("not in an AGILANG project (agilang.toml not found)");
+            }
+
+            if use_https && generate_cert {
+                println!("Generating development certificate...");
+                let cert_path = project_root.join("storage/certificates/dev-cert.pem");
+                let key_path = project_root.join("storage/certificates/dev-key.pem");
+                agilang_framework_server::CertificateGenerator::generate_dev_cert(
+                    &cert_path, &key_path,
+                )?;
+                println!("Certificate: storage/certificates/dev-cert.pem");
+                println!("Private key: storage/certificates/dev-key.pem\n");
             }
 
             println!("Loading application configuration...");
@@ -371,7 +405,6 @@ fn main() -> Result<()> {
                         eprintln!("Address: {}:{}", host, requested_port);
                         eprintln!("Reason: the port is already in use\n");
                         eprintln!("Try:\n    agilang serve --port {}", requested_port + 1);
-                        eprintln!("\nTo inspect the process on Windows:\n    Get-NetTCPConnection -LocalPort {} -State Listen\n", requested_port);
                         return Ok(());
                     } else {
                         return Err(error.into());
@@ -379,10 +412,31 @@ fn main() -> Result<()> {
                 }
             };
 
-            println!("\nAGILANG development server\n");
+            let protocol_scheme = if use_https { "https" } else { "http" };
+            println!(
+                "\nAGILANG {} server\n",
+                if is_start {
+                    "production"
+                } else {
+                    "development"
+                }
+            );
             println!("Application: {}", app_name);
-            println!("Environment: local");
-            println!("Address: http://{}:{}", host, bound_port);
+            println!(
+                "Environment: {}",
+                if is_start { "production" } else { "local" }
+            );
+            println!("Address: {}://{}:{}", protocol_scheme, host, bound_port);
+            if use_https {
+                if !cert_file.is_empty() {
+                    println!("Certificate: {}", cert_file);
+                    if !key_file.is_empty() {
+                        println!("Private key: {}", key_file);
+                    }
+                } else {
+                    println!("Certificate: development");
+                }
+            }
             println!("Routes loaded: {}", router.routes.len());
             println!("Views compiled: {}", view_count);
             println!("Status: ready\n");
