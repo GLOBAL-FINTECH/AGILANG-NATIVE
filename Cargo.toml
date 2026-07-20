@@ -45,6 +45,12 @@ members = [
   "crates/agilang-database-mysql",
   "crates/agilang-database-pool",
   "crates/agilang-database-transactions",
+  "crates/agilang-database-agidb",
+  "crates/agilang-database-storage",
+  "crates/agilang-database-wal",
+  "crates/agilang-database-recovery",
+  "crates/agilang-database-index",
+  "crates/agilang-database-agtp",
 ]
 
 [workspace.package]

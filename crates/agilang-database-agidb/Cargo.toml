@@ -1,0 +1,15 @@
+[package]
+name = "agilang-database-agidb"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+once_cell = { workspace = true }
+agilang-database-driver = { path = "../agilang-database-driver" }
+agilang-database-storage = { path = "../agilang-database-storage" }
+agilang-database-wal = { path = "../agilang-database-wal" }
+agilang-database-recovery = { path = "../agilang-database-recovery" }
+agilang-database-index = { path = "../agilang-database-index" }
+agilang-database-agtp = { path = "../agilang-database-agtp" }
