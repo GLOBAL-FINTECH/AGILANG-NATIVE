@@ -66,6 +66,8 @@ impl MigrationRepository {
                     current_checksum
                 );
             }
+        } else {
+            bail!("E6104 Migration record not found for `{}`", name);
         }
         Ok(())
     }

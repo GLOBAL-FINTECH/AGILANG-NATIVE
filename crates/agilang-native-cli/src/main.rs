@@ -975,7 +975,7 @@ fn main() -> Result<()> {
             let count = 500_000;
 
             if profile == "compare-all" || profile == "compare" {
-                println!("AGIDB vs SQLite vs MySQL Cross-Engine Microbenchmark Comparison");
+                println!("AGIDB Data-Path Microbenchmark Comparison");
                 println!("Operations Executed Per Engine: {}", count);
                 println!("Batch Sample Size:              1,000 operations/batch\n");
 
@@ -985,23 +985,25 @@ fn main() -> Result<()> {
                     )?;
 
                 println!(
-                    "{:<12} {:>22} {:>20}",
-                    "Engine", "Throughput (ops/sec)", "Batch p50 Latency"
+                    "{:<32} {:>22} {:>20}",
+                    "Internal Data-Path Primitive", "Throughput (ops/sec)", "Batch p50 Latency"
                 );
-                println!("{:-<56}", "");
+                println!("{:-<76}", "");
                 println!(
-                    "{:<12} {:>22.2} {:>17.4} ms",
-                    "AGIDB", comp.agidb_tps, comp.agidb_batch_p50_ms
-                );
-                println!(
-                    "{:<12} {:>22.2} {:>17.4} ms",
-                    "SQLite", comp.sqlite_tps, comp.sqlite_batch_p50_ms
+                    "{:<32} {:>22.2} {:>17.4} ms",
+                    "AGIDB (MVCC Validation)", comp.agidb_tps, comp.agidb_batch_p50_ms
                 );
                 println!(
-                    "{:<12} {:>22.2} {:>17.4} ms",
-                    "MySQL", comp.mysql_tps, comp.mysql_batch_p50_ms
+                    "{:<32} {:>22.2} {:>17.4} ms",
+                    "SQLite (Driver Binding Path)", comp.sqlite_tps, comp.sqlite_batch_p50_ms
                 );
-                println!("\nClassification:                 Cross-Engine Subsystem Microbenchmark");
+                println!(
+                    "{:<32} {:>22.2} {:>17.4} ms",
+                    "MySQL (Wire-Format Path)", comp.mysql_tps, comp.mysql_batch_p50_ms
+                );
+                println!(
+                    "\nClassification:                 AGIDB Data-Path Microbenchmark Comparison"
+                );
                 println!("Status:                         VERIFIED");
             } else {
                 println!("AGIDB Subsystem Microbenchmark");
