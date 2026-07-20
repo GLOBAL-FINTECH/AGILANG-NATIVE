@@ -17,6 +17,17 @@ impl MySqlConnection {
             in_transaction: false,
         }
     }
+
+    pub fn ping(&self) -> bool {
+        use std::net::{SocketAddr, TcpStream};
+        use std::time::Duration;
+        let addr_str = format!("{}:{}", self.host, self.port);
+        if let Ok(addr) = addr_str.parse::<SocketAddr>() {
+            TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_ok()
+        } else {
+            false
+        }
+    }
 }
 
 impl DatabaseConnection for MySqlConnection {

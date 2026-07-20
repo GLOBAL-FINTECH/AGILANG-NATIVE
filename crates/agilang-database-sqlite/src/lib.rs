@@ -16,6 +16,14 @@ impl SqliteConnection {
             store: HashMap::new(),
         }
     }
+
+    pub fn file_exists(&self) -> bool {
+        if self.path == ":memory:" {
+            true
+        } else {
+            std::path::Path::new(&self.path).exists()
+        }
+    }
 }
 
 impl DatabaseConnection for SqliteConnection {

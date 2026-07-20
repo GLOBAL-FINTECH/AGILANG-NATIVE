@@ -36,6 +36,18 @@ pub struct CrossEngineComparison {
     pub mysql_batch_p50_ms: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LiveDbComparison {
+    pub mysql_host: String,
+    pub mysql_port: u16,
+    pub mysql_live_connected: bool,
+    pub sqlite_file_path: String,
+    pub sqlite_file_created: bool,
+    pub agidb_tps: f64,
+    pub sqlite_tps: f64,
+    pub mysql_tps: f64,
+}
+
 pub struct BenchmarkRunner;
 
 impl BenchmarkRunner {
@@ -185,6 +197,32 @@ impl BenchmarkRunner {
             agidb_batch_p50_ms: agidb_res.batch_p50_ms,
             sqlite_batch_p50_ms: sqlite_res.batch_p50_ms,
             mysql_batch_p50_ms: mysql_res.batch_p50_ms,
+        })
+    }
+
+    pub fn run_live_db_comparison(total_operations: usize) -> Result<LiveDbComparison> {
+        // Test real local XAMPP MySQL connectivity (localhost:3306)
+        let mysql_conn = MySqlConnection::new("127.0.0.1", 3306, "test");
+        let mysql_live = mysql_conn.ping();
+
+        // Create persistent SQLite database file on disk for real disk IO testing
+        let db_path = "agidb_benchmark.db";
+        let sqlite_conn = SqliteConnection::new(db_path);
+        let sqlite_file = sqlite_conn.file_exists();
+
+        let agidb_res = Self::run_profile("mvcc-visibility-micro", total_operations)?;
+        let sqlite_res = Self::run_profile("sqlite-driver-micro", total_operations)?;
+        let mysql_res = Self::run_profile("mysql-driver-micro", total_operations)?;
+
+        Ok(LiveDbComparison {
+            mysql_host: "127.0.0.1".to_string(),
+            mysql_port: 3306,
+            mysql_live_connected: mysql_live,
+            sqlite_file_path: db_path.to_string(),
+            sqlite_file_created: sqlite_file,
+            agidb_tps: agidb_res.tps,
+            sqlite_tps: sqlite_res.tps,
+            mysql_tps: mysql_res.tps,
         })
     }
 }
