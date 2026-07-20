@@ -137,10 +137,64 @@ impl QueryBuilder {
         let mut guard = DATABASE_STORE.lock().unwrap();
         guard.remove(table);
     }
+    pub fn paginate(&self, per_page: usize) -> PaginatedResult {
+        let all = self.get();
+        let total = all.len();
+        let last_page = if total == 0 {
+            1
+        } else {
+            total.div_ceil(per_page)
+        };
+        let data = all.into_iter().take(per_page).collect();
+
+        PaginatedResult {
+            data,
+            current_page: 1,
+            per_page,
+            total,
+            last_page,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PaginatedResult {
+    pub data: Vec<DatabaseRow>,
+    pub current_page: usize,
+    pub per_page: usize,
+    pub total: usize,
+    pub last_page: usize,
+}
+
+pub fn validate_mass_assignment(
+    input: &HashMap<String, Value>,
+    fillable: &[&str],
+    guarded: &[&str],
+) -> anyhow::Result<HashMap<String, Value>> {
+    let mut safe = HashMap::new();
+    for (k, v) in input {
+        if guarded.contains(&k.as_str()) {
+            anyhow::bail!("E6210 Unsafe mass assignment: property `{}` is guarded", k);
+        }
+        if !fillable.is_empty() && !fillable.contains(&k.as_str()) {
+            anyhow::bail!(
+                "E6210 Unsafe mass assignment: property `{}` is not fillable",
+                k
+            );
+        }
+        safe.insert(k.clone(), v.clone());
+    }
+    Ok(safe)
 }
 
 pub trait Model: Sized {
     fn table_name() -> &'static str;
+    fn fillable() -> &'static [&'static str] {
+        &[]
+    }
+    fn guarded() -> &'static [&'static str] {
+        &["password_hash", "role", "is_admin"]
+    }
     fn from_row(row: HashMap<String, Value>) -> Result<Self>;
     fn to_row(&self) -> HashMap<String, Value>;
 }
@@ -192,5 +246,19 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].get("name").unwrap(), &json!("Alice"));
+    }
+
+    #[test]
+    fn test_mass_assignment_protection() {
+        let mut input = HashMap::new();
+        input.insert("name".to_string(), json!("Bob"));
+        input.insert("role".to_string(), json!("admin"));
+
+        let fillable = vec!["name"];
+        let guarded = vec!["role"];
+
+        let res = validate_mass_assignment(&input, &fillable, &guarded);
+        assert!(res.is_err());
+        assert!(res.unwrap_err().to_string().contains("E6210"));
     }
 }

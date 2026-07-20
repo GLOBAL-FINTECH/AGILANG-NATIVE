@@ -39,6 +39,12 @@ members = [
   "crates/agilang-framework-schema",
   "crates/agilang-framework-migrations",
   "crates/agilang-framework-seeding",
+  "crates/agilang-database-driver",
+  "crates/agilang-database-sqlite",
+  "crates/agilang-database-postgres",
+  "crates/agilang-database-mysql",
+  "crates/agilang-database-pool",
+  "crates/agilang-database-transactions",
 ]
 
 [workspace.package]

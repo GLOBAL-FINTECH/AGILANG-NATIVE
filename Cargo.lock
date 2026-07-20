@@ -51,6 +51,61 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-database-driver"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "agilang-database-mysql"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-driver",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-pool"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-driver",
+ "agilang-database-sqlite",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-postgres"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-driver",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-sqlite"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-driver",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-transactions"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-driver",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-diagnostics"
 version = "0.3.0"
 dependencies = [
