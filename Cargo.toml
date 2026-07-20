@@ -51,6 +51,11 @@ members = [
   "crates/agilang-database-recovery",
   "crates/agilang-database-index",
   "crates/agilang-database-agtp",
+  "crates/agilang-database-security-kernel",
+  "crates/agilang-database-vault",
+  "crates/agilang-database-crypto",
+  "crates/agilang-database-keyring",
+  "crates/agilang-database-audit",
 ]
 
 [workspace.package]

@@ -74,6 +74,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-database-audit"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-crypto"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "agilang-database-driver"
 version = "0.3.0"
 dependencies = [
@@ -84,6 +101,14 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-index"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-keyring"
 version = "0.3.0"
 dependencies = [
  "anyhow",
@@ -129,6 +154,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-database-security-kernel"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-database-sqlite"
 version = "0.3.0"
 dependencies = [
@@ -152,6 +185,20 @@ dependencies = [
  "agilang-database-driver",
  "anyhow",
  "serde",
+]
+
+[[package]]
+name = "agilang-database-vault"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-audit",
+ "agilang-database-crypto",
+ "agilang-database-keyring",
+ "agilang-database-security-kernel",
+ "anyhow",
+ "once_cell",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
