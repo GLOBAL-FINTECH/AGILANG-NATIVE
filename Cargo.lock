@@ -582,6 +582,7 @@ version = "0.3.0"
 dependencies = [
  "agilang-build",
  "agilang-compiler",
+ "agilang-database-benchmark",
  "agilang-framework-http",
  "agilang-framework-migrations",
  "agilang-framework-routing",

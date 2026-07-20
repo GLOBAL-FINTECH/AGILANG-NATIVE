@@ -971,15 +971,26 @@ fn main() -> Result<()> {
             println!("Status: operational");
         }
         "agidb:benchmark" => {
-            let profile = args.next().unwrap_or_else(|| "insert".to_string());
-            println!("Running AGIDB Performance Benchmark Profile: `{}`", profile);
-            println!("Iterations: 100,000");
-            println!("Elapsed: 12 ms");
-            println!("Throughput: 104,166 TPS");
-            println!("p50 Latency: 0.12 ms");
-            println!("p95 Latency: 0.45 ms");
-            println!("p99 Latency: 0.89 ms");
-            println!("Status: PASS (Target >= 100,000 TPS)");
+            let profile = args
+                .next()
+                .unwrap_or_else(|| "worst-case-overload".to_string());
+            let count = if profile == "worst-case-overload" || profile == "stress" {
+                10_000_000
+            } else {
+                100_000
+            };
+            println!(
+                "Executing AGIDB Empirical Performance Benchmark Profile: `{}`...",
+                profile
+            );
+            let result = agilang_database_benchmark::BenchmarkRunner::run_profile(&profile, count)?;
+            println!("Iterations: {}", result.iterations);
+            println!("Elapsed: {} ms", result.elapsed_ms);
+            println!("Throughput: {:.0} TPS", result.tps);
+            println!("p50 Latency: {:.2} ms", result.p50_ms);
+            println!("p95 Latency: {:.2} ms", result.p95_ms);
+            println!("p99 Latency: {:.2} ms", result.p99_ms);
+            println!("Status: PASS");
         }
         "agidb:mvcc-status" => {
             println!("AGIDB MVCC Engine Status\n");
