@@ -300,11 +300,15 @@ pub fn bind_with_fallback(
     let first = SocketAddr::new(host, requested_port);
 
     match TcpListener::bind(first) {
-        Ok(listener) => Ok((listener, requested_port)),
+        Ok(listener) => {
+            start_stun_server();
+            Ok((listener, requested_port))
+        }
         Err(error) if allow_fallback && error.kind() == std::io::ErrorKind::AddrInUse => {
             for port in requested_port.saturating_add(1)..=requested_port.saturating_add(100) {
                 let candidate = SocketAddr::new(host, port);
                 if let Ok(listener) = TcpListener::bind(candidate) {
+                    start_stun_server();
                     return Ok((listener, port));
                 }
             }
@@ -337,6 +341,37 @@ pub fn handle_client(
             req_path = req.path.clone();
             let path = req.path();
             let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S");
+
+            let is_websocket = req
+                .headers
+                .get("upgrade")
+                .or_else(|| req.headers.get("Upgrade"))
+                .map(|v| v.to_lowercase() == "websocket")
+                .unwrap_or(false);
+
+            if is_websocket {
+                if let Some(key) = req
+                    .headers
+                    .get("Sec-WebSocket-Key")
+                    .or_else(|| req.headers.get("sec-websocket-key"))
+                {
+                    let accept_key = handle_websocket_upgrade(key);
+                    let handshake_response = format!(
+                        "HTTP/1.1 101 Switching Protocols\r\n\
+                         Upgrade: websocket\r\n\
+                         Connection: Upgrade\r\n\
+                         Sec-WebSocket-Accept: {}\r\n\r\n",
+                        accept_key
+                    );
+                    let _ = stream.write_all(handshake_response.as_bytes());
+                    let _ = stream.flush();
+
+                    if let Err(e) = run_websocket_echo_loop(stream) {
+                        eprintln!("websocket error: {}", e);
+                    }
+                    return Ok(());
+                }
+            }
 
             // Serves static files from public/ first
             let public_path = project_root
@@ -487,4 +522,232 @@ fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf>
         }
     }
     None
+}
+
+pub fn start_stun_server() {
+    std::thread::spawn(|| {
+        let socket = match std::net::UdpSocket::bind("0.0.0.0:3478") {
+            Ok(s) => s,
+            Err(_) => {
+                // If port 3478 is occupied (e.g. by another test/server), fail silently in dev
+                return;
+            }
+        };
+
+        let mut buf = [0u8; 1024];
+        loop {
+            if let Ok((amt, src)) = socket.recv_from(&mut buf) {
+                if amt < 20 {
+                    continue;
+                }
+
+                let msg_type = u16::from_be_bytes([buf[0], buf[1]]);
+                let magic_cookie = &buf[4..8];
+                let transaction_id = &buf[8..20];
+
+                if msg_type == 0x0001 {
+                    let mut response = Vec::new();
+                    response.extend_from_slice(&0x0101u16.to_be_bytes());
+                    response.extend_from_slice(&12u16.to_be_bytes());
+                    response.extend_from_slice(magic_cookie);
+                    response.extend_from_slice(transaction_id);
+
+                    // XOR-MAPPED-ADDRESS Attribute (Type: 0x0020, Length: 8)
+                    response.extend_from_slice(&0x0020u16.to_be_bytes());
+                    response.extend_from_slice(&8u16.to_be_bytes());
+                    response.push(0x00);
+                    response.push(0x01); // IPv4 Family
+
+                    let port = src.port();
+                    let xor_port = port ^ 0x2112;
+                    response.extend_from_slice(&xor_port.to_be_bytes());
+
+                    if let std::net::SocketAddr::V4(addr) = src {
+                        let ip_octets = addr.ip().octets();
+                        let mut xor_ip = [0u8; 4];
+                        xor_ip[0] = ip_octets[0] ^ 0x21;
+                        xor_ip[1] = ip_octets[1] ^ 0x12;
+                        xor_ip[2] = ip_octets[2] ^ 0xA4;
+                        xor_ip[3] = ip_octets[3] ^ 0x42;
+                        response.extend_from_slice(&xor_ip);
+                    } else {
+                        response.extend_from_slice(&[127 ^ 0x21, 0x12, 0xA4, 1 ^ 0x42]);
+                    }
+
+                    let _ = socket.send_to(&response, src);
+                }
+            }
+        }
+    });
+}
+
+fn handle_websocket_upgrade(key: &str) -> String {
+    let mut concatenated = key.to_string();
+    concatenated.push_str("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+    let hashed = sha1_hash(concatenated.as_bytes());
+    base64_encode(&hashed)
+}
+
+fn base64_encode(input: &[u8]) -> String {
+    const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity(input.len().div_ceil(3) * 4);
+    let mut i = 0;
+    while i < input.len() {
+        let chunk = &input[i..std::cmp::min(i + 3, input.len())];
+        let mut b = 0u32;
+        for (j, val) in chunk.iter().enumerate() {
+            b |= (*val as u32) << (16 - j * 8);
+        }
+
+        result.push(CHARSET[((b >> 18) & 63) as usize] as char);
+        result.push(CHARSET[((b >> 12) & 63) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARSET[((b >> 6) & 63) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARSET[(b & 63) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        i += 3;
+    }
+    result
+}
+
+#[allow(clippy::needless_range_loop)]
+fn sha1_hash(data: &[u8]) -> [u8; 20] {
+    let mut h0: u32 = 0x67452301;
+    let mut h1: u32 = 0xEFCDAB89;
+    let mut h2: u32 = 0x98BADCFE;
+    let mut h3: u32 = 0x10325476;
+    let mut h4: u32 = 0xC3D2E1F0;
+
+    let mut padded = data.to_vec();
+    let original_len_bits = (data.len() as u64) * 8;
+
+    padded.push(0x80);
+
+    while (padded.len() % 64) != 56 {
+        padded.push(0x00);
+    }
+
+    padded.extend_from_slice(&original_len_bits.to_be_bytes());
+
+    for chunk in padded.chunks_exact(64) {
+        let mut w = [0u32; 80];
+        for i in 0..16 {
+            w[i] = u32::from_be_bytes([
+                chunk[i * 4],
+                chunk[i * 4 + 1],
+                chunk[i * 4 + 2],
+                chunk[i * 4 + 3],
+            ]);
+        }
+        for i in 16..80 {
+            w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]).rotate_left(1);
+        }
+
+        let mut a = h0;
+        let mut b = h1;
+        let mut c = h2;
+        let mut d = h3;
+        let mut e = h4;
+
+        for i in 0..80 {
+            let (f, k) = match i {
+                0..=19 => ((b & c) | (!b & d), 0x5A827999),
+                20..=39 => (b ^ c ^ d, 0x6ED9EBA1),
+                40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDC),
+                _ => (b ^ c ^ d, 0xCA62C1D6),
+            };
+
+            let temp = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(k)
+                .wrapping_add(w[i]);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = temp;
+        }
+
+        h0 = h0.wrapping_add(a);
+        h1 = h1.wrapping_add(b);
+        h2 = h2.wrapping_add(c);
+        h3 = h3.wrapping_add(d);
+        h4 = h4.wrapping_add(e);
+    }
+
+    let mut result = [0u8; 20];
+    result[0..4].copy_from_slice(&h0.to_be_bytes());
+    result[4..8].copy_from_slice(&h1.to_be_bytes());
+    result[8..12].copy_from_slice(&h2.to_be_bytes());
+    result[12..16].copy_from_slice(&h3.to_be_bytes());
+    result[16..20].copy_from_slice(&h4.to_be_bytes());
+    result
+}
+
+fn run_websocket_echo_loop(mut stream: TcpStream) -> std::io::Result<()> {
+    let mut buf = [0u8; 4096];
+    loop {
+        stream.read_exact(&mut buf[..2])?;
+        let byte0 = buf[0];
+        let byte1 = buf[1];
+
+        let opcode = byte0 & 0x0F;
+        if opcode == 0x8 {
+            break;
+        }
+
+        let is_masked = (byte1 & 0x80) != 0;
+        let mut payload_len = (byte1 & 0x7F) as usize;
+
+        if payload_len == 126 {
+            stream.read_exact(&mut buf[2..4])?;
+            payload_len = u16::from_be_bytes([buf[2], buf[3]]) as usize;
+        } else if payload_len == 127 {
+            stream.read_exact(&mut buf[2..10])?;
+            let mut len_bytes = [0u8; 8];
+            len_bytes.copy_from_slice(&buf[2..10]);
+            payload_len = u64::from_be_bytes(len_bytes) as usize;
+        }
+
+        let mut mask_key = [0u8; 4];
+        if is_masked {
+            stream.read_exact(&mut mask_key)?;
+        }
+
+        let mut payload = vec![0u8; payload_len];
+        stream.read_exact(&mut payload)?;
+
+        if is_masked {
+            for i in 0..payload_len {
+                payload[i] ^= mask_key[i % 4];
+            }
+        }
+
+        if opcode == 0x1 {
+            let mut response_frame = Vec::new();
+            response_frame.push(0x81);
+
+            if payload_len <= 125 {
+                response_frame.push(payload_len as u8);
+            } else if payload_len <= 65535 {
+                response_frame.push(126);
+                response_frame.extend_from_slice(&(payload_len as u16).to_be_bytes());
+            } else {
+                response_frame.push(127);
+                response_frame.extend_from_slice(&(payload_len as u64).to_be_bytes());
+            }
+            response_frame.extend_from_slice(&payload);
+            stream.write_all(&response_frame)?;
+            stream.flush()?;
+        }
+    }
+    Ok(())
 }

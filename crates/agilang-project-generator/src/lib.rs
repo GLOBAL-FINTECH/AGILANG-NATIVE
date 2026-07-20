@@ -338,6 +338,22 @@ fn register_console() -> void:
         <span class="eyebrow">AGILANG Native Framework</span>
         <h1>{{ title }}</h1>
         <p>{{ message }}</p>
+
+        <div class="network-matrix">
+            <div class="matrix-item">
+                <span class="label">WebSocket</span>
+                <span id="ws-status" class="badge warning">Connecting...</span>
+            </div>
+            <div class="matrix-item">
+                <span class="label">WebRTC</span>
+                <span id="rtc-status" class="badge warning">Negotiating...</span>
+            </div>
+            <div class="matrix-item">
+                <span class="label">Local STUN</span>
+                <span class="badge success">Active (Port 3478)</span>
+            </div>
+        </div>
+
         <div class="actions">
             <a class="button primary" href="/about">Explore framework</a>
             <a class="button secondary" href="/api/health">Check API</a>
@@ -433,6 +449,56 @@ p {
     font-size: 19px;
 }
 
+.network-matrix {
+    display: flex;
+    gap: 16px;
+    margin: 24px 0;
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.matrix-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.matrix-item .label {
+    font-size: 13px;
+    color: #8fa0b5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.badge.warning {
+    color: #ffe082;
+    background: rgba(255, 224, 130, 0.15);
+    border: 1px solid rgba(255, 224, 130, 0.3);
+}
+
+.badge.success {
+    color: #81c784;
+    background: rgba(129, 199, 132, 0.15);
+    border: 1px solid rgba(129, 199, 132, 0.3);
+}
+
+.badge.error {
+    color: #e57373;
+    background: rgba(229, 115, 115, 0.15);
+    border: 1px solid rgba(229, 115, 115, 0.3);
+}
+
 .actions {
     display: flex;
     gap: 12px;
@@ -460,6 +526,61 @@ p {
             "resources/assets/js/app.js",
             r#"document.documentElement.dataset.agilang = "ready";
 console.info("AGILANG application assets loaded");
+
+// 1. WebSocket integration
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const socket = new WebSocket(`${wsProtocol}//${window.location.host}`);
+
+socket.onopen = () => {
+    console.info("WebSocket connected successfully to AGILANG Native Server!");
+    const wsBadge = document.getElementById("ws-status");
+    if (wsBadge) {
+        wsBadge.textContent = "Connected";
+        wsBadge.className = "badge success";
+    }
+};
+
+socket.onmessage = (event) => {
+    console.log("WebSocket message received:", event.data);
+};
+
+socket.onerror = (error) => {
+    console.error("WebSocket error:", error);
+    const wsBadge = document.getElementById("ws-status");
+    if (wsBadge) {
+        wsBadge.textContent = "Error";
+        wsBadge.className = "badge error";
+    }
+};
+
+// 2. WebRTC integration with built-in STUN
+const configuration = {
+    iceServers: [
+        { urls: `stun:${window.location.hostname}:3478` }
+    ]
+};
+
+const peerConnection = new RTCPeerConnection(configuration);
+
+peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+        console.info("Local STUN server resolved ICE candidate:", event.candidate.candidate);
+        const rtcBadge = document.getElementById("rtc-status");
+        if (rtcBadge) {
+            rtcBadge.textContent = "ICE Resolved";
+            rtcBadge.className = "badge success";
+        }
+    }
+};
+
+peerConnection.onconnectionstatechange = () => {
+    console.info("WebRTC Connection State changed to:", peerConnection.connectionState);
+};
+
+peerConnection.createDataChannel("agi-sync");
+peerConnection.createOffer()
+    .then(offer => peerConnection.setLocalDescription(offer))
+    .catch(err => console.error("WebRTC offer error:", err));
 "#,
         ),
         (
@@ -1590,6 +1711,22 @@ fn register_console() -> void:
         <span class="eyebrow">AGILANG Native Framework</span>
         <h1>{{ title }}</h1>
         <p>{{ message }}</p>
+
+        <div class="network-matrix">
+            <div class="matrix-item">
+                <span class="label">WebSocket</span>
+                <span id="ws-status" class="badge warning">Connecting...</span>
+            </div>
+            <div class="matrix-item">
+                <span class="label">WebRTC</span>
+                <span id="rtc-status" class="badge warning">Negotiating...</span>
+            </div>
+            <div class="matrix-item">
+                <span class="label">Local STUN</span>
+                <span class="badge success">Active (Port 3478)</span>
+            </div>
+        </div>
+
         <div class="actions">
             <a class="button primary" href="/about">Explore framework</a>
             <a class="button secondary" href="/api/health">Check API</a>
@@ -1685,6 +1822,56 @@ p {
     font-size: 19px;
 }
 
+.network-matrix {
+    display: flex;
+    gap: 16px;
+    margin: 24px 0;
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.matrix-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.matrix-item .label {
+    font-size: 13px;
+    color: #8fa0b5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.badge.warning {
+    color: #ffe082;
+    background: rgba(255, 224, 130, 0.15);
+    border: 1px solid rgba(255, 224, 130, 0.3);
+}
+
+.badge.success {
+    color: #81c784;
+    background: rgba(129, 199, 132, 0.15);
+    border: 1px solid rgba(129, 199, 132, 0.3);
+}
+
+.badge.error {
+    color: #e57373;
+    background: rgba(229, 115, 115, 0.15);
+    border: 1px solid rgba(229, 115, 115, 0.3);
+}
+
 .actions {
     display: flex;
     gap: 12px;
@@ -1712,6 +1899,61 @@ p {
             "resources/assets/js/app.js",
             r#"document.documentElement.dataset.agilang = "ready";
 console.info("AGILANG application assets loaded");
+
+// 1. WebSocket integration
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const socket = new WebSocket(`${wsProtocol}//${window.location.host}`);
+
+socket.onopen = () => {
+    console.info("WebSocket connected successfully to AGILANG Native Server!");
+    const wsBadge = document.getElementById("ws-status");
+    if (wsBadge) {
+        wsBadge.textContent = "Connected";
+        wsBadge.className = "badge success";
+    }
+};
+
+socket.onmessage = (event) => {
+    console.log("WebSocket message received:", event.data);
+};
+
+socket.onerror = (error) => {
+    console.error("WebSocket error:", error);
+    const wsBadge = document.getElementById("ws-status");
+    if (wsBadge) {
+        wsBadge.textContent = "Error";
+        wsBadge.className = "badge error";
+    }
+};
+
+// 2. WebRTC integration with built-in STUN
+const configuration = {
+    iceServers: [
+        { urls: `stun:${window.location.hostname}:3478` }
+    ]
+};
+
+const peerConnection = new RTCPeerConnection(configuration);
+
+peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+        console.info("Local STUN server resolved ICE candidate:", event.candidate.candidate);
+        const rtcBadge = document.getElementById("rtc-status");
+        if (rtcBadge) {
+            rtcBadge.textContent = "ICE Resolved";
+            rtcBadge.className = "badge success";
+        }
+    }
+};
+
+peerConnection.onconnectionstatechange = () => {
+    console.info("WebRTC Connection State changed to:", peerConnection.connectionState);
+};
+
+peerConnection.createDataChannel("agi-sync");
+peerConnection.createOffer()
+    .then(offer => peerConnection.setLocalDescription(offer))
+    .catch(err => console.error("WebRTC offer error:", err));
 "#,
         ),
         (
