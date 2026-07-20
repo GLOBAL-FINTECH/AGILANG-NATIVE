@@ -58,6 +58,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-framework-auth"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "agilang-framework-config"
 version = "0.3.0"
 
@@ -84,10 +93,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-framework-rate-limit"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-framework-routing"
 version = "0.3.0"
 dependencies = [
  "agilang-framework-http",
+]
+
+[[package]]
+name = "agilang-framework-security"
+version = "0.3.0"
+dependencies = [
+ "agilang-framework-rate-limit",
+ "agilang-framework-session",
+ "anyhow",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -100,6 +128,24 @@ dependencies = [
  "agilang-framework-routing",
  "agilang-framework-view",
  "chrono",
+]
+
+[[package]]
+name = "agilang-framework-session"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "agilang-framework-validation"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
