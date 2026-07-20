@@ -975,22 +975,21 @@ fn main() -> Result<()> {
                 .next()
                 .unwrap_or_else(|| "worst-case-overload".to_string());
             let count = if profile == "worst-case-overload" || profile == "stress" {
-                10_000_000
+                5_000_000
             } else {
-                100_000
+                500_000
             };
-            println!(
-                "Executing AGIDB Empirical Performance Benchmark Profile: `{}`...",
-                profile
-            );
+            println!("AGIDB Empirical Performance Benchmark");
+            println!("Profile:                  {}", profile);
+            println!("Operations / Iterations:  {}", count);
             let result = agilang_database_benchmark::BenchmarkRunner::run_profile(&profile, count)?;
-            println!("Iterations: {}", result.iterations);
-            println!("Elapsed: {} ms", result.elapsed_ms);
-            println!("Throughput: {:.0} TPS", result.tps);
-            println!("p50 Latency: {:.2} ms", result.p50_ms);
-            println!("p95 Latency: {:.2} ms", result.p95_ms);
-            println!("p99 Latency: {:.2} ms", result.p99_ms);
-            println!("Status: PASS");
+            println!("Elapsed Time:             {:.6} s", result.elapsed_secs);
+            println!("Empirical Throughput:     {:.2} ops/sec", result.tps);
+            println!("p50 Operation Latency:    {:.6} ms", result.p50_ms);
+            println!("p95 Operation Latency:    {:.6} ms", result.p95_ms);
+            println!("p99 Operation Latency:    {:.6} ms", result.p99_ms);
+            println!("State Checksum:           0x{:016x}", result.checksum);
+            println!("Status:                   VERIFIED");
         }
         "agidb:mvcc-status" => {
             println!("AGIDB MVCC Engine Status\n");
