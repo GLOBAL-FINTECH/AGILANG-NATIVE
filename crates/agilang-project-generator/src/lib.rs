@@ -1029,28 +1029,40 @@ pub fn generate_auth(roles: Vec<String>, force: bool, repair: bool) -> Result<()
             "app/Controllers/Auth/LoginController.agi",
             r#"module App.Controllers.Auth
 
-use Framework.Auth.Auth
+use Framework.Auth.AuthManager
 use Framework.Http.Request
 use Framework.Http.Response
+use Framework.Security.CsrfTokenManager
+use Framework.Security.RateLimiter
+use Framework.Session.SessionStore
 use Framework.Validation.Validator
 use Framework.View
 
 class LoginController:
     fn show(request: Request) -> Response:
-        return View.render("auth/login")
+        return View.render("auth/login", {
+            "csrf_field": CsrfTokenManager.generate_field(request.session().csrf_secret)
+        })
 
     fn login(request: Request) -> Response:
+        let rate_status = RateLimiter.check("login:" + request.ip())
+        if not rate_status.allowed:
+            return Response.status(429).json({"error": "Too many failed login attempts. Please try again later."})
+
         let input = Validator.validate(request.body(), {
             "email": ["required", "email"],
             "password": ["required", "string"]
         })
 
-        if Auth.attempt(input.email, input.password):
-            request.session().regenerate()
-            return Response.redirect("/dashboard")
+        let user = AuthManager.authenticate(input.email, input.password)
+        if user.is_some():
+            let session = request.session().rotate()
+            let cookie_header = session.build_cookie_header()
+            return Response.redirect("/dashboard").header("Set-Cookie", cookie_header)
 
         return View.render("auth/login", {
-            "error": "Invalid email or password."
+            "error": "The supplied credentials are invalid.",
+            "csrf_field": CsrfTokenManager.generate_field(request.session().csrf_secret)
         }).status(422)
 "#,
         ),
@@ -1058,61 +1070,128 @@ class LoginController:
             "app/Controllers/Auth/RegisterController.agi",
             r#"module App.Controllers.Auth
 
+use Framework.Auth.AuthManager
+use Framework.Auth.HmacSha256PasswordHasher
+use Framework.Database.DB
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.Security.CsrfTokenManager
+use Framework.Validation.Validator
+use Framework.View
+
 class RegisterController:
-    fn show() -> void:
-        pass
+    fn show(request: Request) -> Response:
+        return View.render("auth/register", {
+            "csrf_field": CsrfTokenManager.generate_field(request.session().csrf_secret)
+        })
+
+    fn register(request: Request) -> Response:
+        let input = Validator.validate(request.body(), {
+            "name": ["required", "string", "min:2"],
+            "email": ["required", "email"],
+            "password": ["required", "string", "min:8", "confirmed"]
+        })
+
+        let existing = DB.table("users").where("email", "=", input.email).first()
+        if existing.is_some():
+            return View.render("auth/register", {
+                "error": "The email address is already registered.",
+                "csrf_field": CsrfTokenManager.generate_field(request.session().csrf_secret)
+            }).status(422)
+
+        let hasher = HmacSha256PasswordHasher.new()
+        let password_hash = hasher.hash(input.password)
+
+        let user = DB.table("users").insert({
+            "name": input.name,
+            "email": input.email,
+            "password_hash": password_hash,
+            "role": "user"
+        })
+
+        let session = request.session().rotate()
+        let cookie_header = session.build_cookie_header()
+        return Response.redirect("/dashboard").header("Set-Cookie", cookie_header)
 "#,
         ),
         (
             "app/Controllers/Auth/LogoutController.agi",
             r#"module App.Controllers.Auth
 
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.Session.CookieConfig
+
 class LogoutController:
-    fn logout() -> void:
-        pass
+    fn logout(request: Request) -> Response:
+        request.session().invalidate()
+        let logout_cookie = CookieConfig.default().build_logout_header()
+        return Response.redirect("/login").header("Set-Cookie", logout_cookie)
 "#,
         ),
         (
             "app/Controllers/Auth/PasswordController.agi",
             r#"module App.Controllers.Auth
 
+use Framework.Http.Request
+use Framework.Http.Response
+
 class PasswordController:
-    fn reset() -> void:
-        pass
+    fn reset(request: Request) -> Response:
+        return Response.json({"message": "If the account exists, a password reset link has been dispatched."})
 "#,
         ),
         (
             "app/Middleware/Authenticate.agi",
             r#"module App.Middleware
 
+use Framework.Http.Request
+use Framework.Http.Response
+
 class Authenticate:
-    fn handle() -> void:
-        pass
+    fn handle(request: Request) -> Response:
+        if not request.session().is_authenticated():
+            return Response.redirect("/login")
+        return null
 "#,
         ),
         (
             "app/Middleware/GuestOnly.agi",
             r#"module App.Middleware
 
+use Framework.Http.Request
+use Framework.Http.Response
+
 class GuestOnly:
-    fn handle() -> void:
-        pass
+    fn handle(request: Request) -> Response:
+        if request.session().is_authenticated():
+            return Response.redirect("/dashboard")
+        return null
 "#,
         ),
         (
             "app/Middleware/RequireRole.agi",
             r#"module App.Middleware
 
+use Framework.Http.Request
+use Framework.Http.Response
+
 class RequireRole:
-    fn handle() -> void:
-        pass
+    let required_role: string
+
+    fn handle(request: Request) -> Response:
+        if not request.user().has_role(self.required_role):
+            return Response.status(403).json({"error": "Forbidden: insufficient permissions."})
+        return null
 "#,
         ),
         (
             "app/Models/User.agi",
             r#"module App.Models
 
-class User:
+use Framework.Database.Model
+
+class User extends Model:
     let id: i64
     let name: string
     let email: string
@@ -1127,7 +1206,9 @@ class User:
             "app/Models/Role.agi",
             r#"module App.Models
 
-class Role:
+use Framework.Database.Model
+
+class Role extends Model:
     let id: i64
     let name: string
 "#,
@@ -1136,47 +1217,88 @@ class Role:
             "app/Services/AuthService.agi",
             r#"module App.Services
 
+use Framework.Auth.AuthManager
+
 class AuthService:
     fn check() -> bool:
-        return true
+        return AuthManager.check()
 "#,
         ),
         (
             "app/Services/PasswordHasher.agi",
             r#"module App.Services
 
+use Framework.Auth.HmacSha256PasswordHasher
+
 class PasswordHasher:
     fn hash(password: string) -> string:
-        return password
+        return HmacSha256PasswordHasher.new().hash(password)
 "#,
         ),
         (
             "app/Services/SessionService.agi",
             r#"module App.Services
 
+use Framework.Session.SessionStore
+
 class SessionService:
     fn regenerate() -> void:
-        pass
+        SessionStore.rotate()
 "#,
         ),
         (
             "resources/views/auth/login.ags",
-            r#"<h1>Login</h1>
+            r#"<h1>Log In to AGILANG</h1>
 <form method="POST" action="/login">
-    <input type="email" name="email" required>
-    <input type="password" name="password" required>
-    <button type="submit">Log in</button>
+    {{ csrf_field }}
+    <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" required placeholder="you@example.com">
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+    </div>
+    <button type="submit" class="button primary">Log In</button>
 </form>
 "#,
         ),
         (
             "resources/views/auth/register.ags",
-            r#"<h1>Register</h1>
+            r#"<h1>Create your AGILANG Account</h1>
+<form method="POST" action="/register">
+    {{ csrf_field }}
+    <div class="form-group">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" name="name" required placeholder="Jane Doe">
+    </div>
+    <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" required placeholder="jane@example.com">
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+    </div>
+    <div class="form-group">
+        <label for="password_confirmation">Confirm Password</label>
+        <input type="password" id="password_confirmation" name="password_confirmation" required>
+    </div>
+    <button type="submit" class="button primary">Create Account</button>
+</form>
 "#,
         ),
         (
             "resources/views/auth/forgot-password.ags",
-            r#"<h1>Forgot Password</h1>
+            r#"<h1>Reset Password</h1>
+<form method="POST" action="/forgot-password">
+    {{ csrf_field }}
+    <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" required>
+    </div>
+    <button type="submit" class="button primary">Send Reset Link</button>
+</form>
 "#,
         ),
         (

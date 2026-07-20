@@ -82,6 +82,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-framework-database"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "agilang-framework-http"
 version = "0.3.0"
 
