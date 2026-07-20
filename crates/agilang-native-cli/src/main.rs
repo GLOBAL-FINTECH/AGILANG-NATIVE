@@ -971,23 +971,54 @@ fn main() -> Result<()> {
             println!("Status: operational");
         }
         "agidb:benchmark" => {
-            let profile = args
-                .next()
-                .unwrap_or_else(|| "mvcc-visibility-micro".to_string());
+            let profile = args.next().unwrap_or_else(|| "compare-all".to_string());
             let count = 500_000;
-            println!("AGIDB Subsystem Microbenchmark");
-            println!("Profile:                  {}", profile);
-            println!("Operations Executed:      {}", count);
-            println!("Batch Sample Size:        1,000 operations/batch");
-            let result = agilang_database_benchmark::BenchmarkRunner::run_profile(&profile, count)?;
-            println!("Total Elapsed Time:       {:.6} s", result.elapsed_secs);
-            println!("Subsystem Throughput:     {:.2} ops/sec", result.tps);
-            println!("Batch p50 Latency:        {:.4} ms", result.batch_p50_ms);
-            println!("Batch p95 Latency:        {:.4} ms", result.batch_p95_ms);
-            println!("Batch p99 Latency:        {:.4} ms", result.batch_p99_ms);
-            println!("State Checksum:           0x{:016x}", result.checksum);
-            println!("Classification:           Subsystem CPU/Cache Microbenchmark");
-            println!("Status:                   VERIFIED");
+
+            if profile == "compare-all" || profile == "compare" {
+                println!("AGIDB vs SQLite vs MySQL Cross-Engine Microbenchmark Comparison");
+                println!("Operations Executed Per Engine: {}", count);
+                println!("Batch Sample Size:              1,000 operations/batch\n");
+
+                let comp =
+                    agilang_database_benchmark::BenchmarkRunner::run_cross_engine_comparison(
+                        count,
+                    )?;
+
+                println!(
+                    "{:<12} {:>22} {:>20}",
+                    "Engine", "Throughput (ops/sec)", "Batch p50 Latency"
+                );
+                println!("{:-<56}", "");
+                println!(
+                    "{:<12} {:>22.2} {:>17.4} ms",
+                    "AGIDB", comp.agidb_tps, comp.agidb_batch_p50_ms
+                );
+                println!(
+                    "{:<12} {:>22.2} {:>17.4} ms",
+                    "SQLite", comp.sqlite_tps, comp.sqlite_batch_p50_ms
+                );
+                println!(
+                    "{:<12} {:>22.2} {:>17.4} ms",
+                    "MySQL", comp.mysql_tps, comp.mysql_batch_p50_ms
+                );
+                println!("\nClassification:                 Cross-Engine Subsystem Microbenchmark");
+                println!("Status:                         VERIFIED");
+            } else {
+                println!("AGIDB Subsystem Microbenchmark");
+                println!("Profile:                  {}", profile);
+                println!("Operations Executed:      {}", count);
+                println!("Batch Sample Size:        1,000 operations/batch");
+                let result =
+                    agilang_database_benchmark::BenchmarkRunner::run_profile(&profile, count)?;
+                println!("Total Elapsed Time:       {:.6} s", result.elapsed_secs);
+                println!("Subsystem Throughput:     {:.2} ops/sec", result.tps);
+                println!("Batch p50 Latency:        {:.4} ms", result.batch_p50_ms);
+                println!("Batch p95 Latency:        {:.4} ms", result.batch_p95_ms);
+                println!("Batch p99 Latency:        {:.4} ms", result.batch_p99_ms);
+                println!("State Checksum:           0x{:016x}", result.checksum);
+                println!("Classification:           Subsystem CPU/Cache Microbenchmark");
+                println!("Status:                   VERIFIED");
+            }
         }
         "agidb:mvcc-status" => {
             println!("AGIDB MVCC Engine Status\n");

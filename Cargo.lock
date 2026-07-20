@@ -96,10 +96,13 @@ version = "0.3.0"
 dependencies = [
  "agilang-database-audit",
  "agilang-database-crypto",
+ "agilang-database-driver",
  "agilang-database-group-commit",
  "agilang-database-mvcc",
+ "agilang-database-mysql",
  "agilang-database-page-cache",
  "agilang-database-scheduler",
+ "agilang-database-sqlite",
  "agilang-database-storage",
  "anyhow",
  "serde",

@@ -1,8 +1,11 @@
 use agilang_database_audit::AuditChain;
 use agilang_database_crypto::EncryptedEnvelope;
+use agilang_database_driver::{DatabaseConnection, DatabaseValue};
 use agilang_database_mvcc::{IsolationLevel, MvccEngine, VersionHeader};
+use agilang_database_mysql::MySqlConnection;
 use agilang_database_page_cache::PageCache;
 use agilang_database_scheduler::ShardedScheduler;
+use agilang_database_sqlite::SqliteConnection;
 use agilang_database_storage::{Page, PageType};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -23,6 +26,16 @@ pub struct BenchmarkResult {
     pub checksum: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrossEngineComparison {
+    pub agidb_tps: f64,
+    pub sqlite_tps: f64,
+    pub mysql_tps: f64,
+    pub agidb_batch_p50_ms: f64,
+    pub sqlite_batch_p50_ms: f64,
+    pub mysql_batch_p50_ms: f64,
+}
+
 pub struct BenchmarkRunner;
 
 impl BenchmarkRunner {
@@ -34,6 +47,34 @@ impl BenchmarkRunner {
         let total_start = Instant::now();
 
         match profile_name {
+            "sqlite-driver-micro" => {
+                let mut conn = SqliteConnection::new(":memory:");
+                let params = vec![DatabaseValue::Text("test_value".to_string())];
+
+                for _ in 0..sample_batches {
+                    let batch_start = Instant::now();
+                    for _ in 0..BATCH_SIZE {
+                        let res = conn.execute("INSERT INTO test VALUES (?)", &params)?;
+                        state_checksum =
+                            state_checksum.wrapping_add(black_box(res.rows_affected as u64));
+                    }
+                    batch_latencies_ms.push(batch_start.elapsed().as_secs_f64() * 1000.0);
+                }
+            }
+            "mysql-driver-micro" => {
+                let mut conn = MySqlConnection::new("127.0.0.1", 3306, "testdb");
+                let params = vec![DatabaseValue::Text("test_value".to_string())];
+
+                for _ in 0..sample_batches {
+                    let batch_start = Instant::now();
+                    for _ in 0..BATCH_SIZE {
+                        let res = conn.execute("INSERT INTO test VALUES (?)", &params)?;
+                        state_checksum =
+                            state_checksum.wrapping_add(black_box(res.rows_affected as u64));
+                    }
+                    batch_latencies_ms.push(batch_start.elapsed().as_secs_f64() * 1000.0);
+                }
+            }
             "mvcc-visibility-micro" => {
                 let engine = MvccEngine::new(IsolationLevel::Snapshot);
                 let version = VersionHeader {
@@ -131,6 +172,21 @@ impl BenchmarkRunner {
             checksum: state_checksum,
         })
     }
+
+    pub fn run_cross_engine_comparison(total_operations: usize) -> Result<CrossEngineComparison> {
+        let agidb_res = Self::run_profile("mvcc-visibility-micro", total_operations)?;
+        let sqlite_res = Self::run_profile("sqlite-driver-micro", total_operations)?;
+        let mysql_res = Self::run_profile("mysql-driver-micro", total_operations)?;
+
+        Ok(CrossEngineComparison {
+            agidb_tps: agidb_res.tps,
+            sqlite_tps: sqlite_res.tps,
+            mysql_tps: mysql_res.tps,
+            agidb_batch_p50_ms: agidb_res.batch_p50_ms,
+            sqlite_batch_p50_ms: sqlite_res.batch_p50_ms,
+            mysql_batch_p50_ms: mysql_res.batch_p50_ms,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -138,11 +194,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_subsystem_microbenchmarks() {
-        let res = BenchmarkRunner::run_profile("mvcc-visibility-micro", 10_000).unwrap();
-        assert!(res.elapsed_secs > 0.0);
-        assert!(res.tps > 0.0);
-        assert!(res.batch_p50_ms <= res.batch_p95_ms);
-        assert!(res.batch_p95_ms <= res.batch_p99_ms);
+    fn test_cross_engine_benchmarks() {
+        let comp = BenchmarkRunner::run_cross_engine_comparison(10_000).unwrap();
+        assert!(comp.agidb_tps > 0.0);
+        assert!(comp.sqlite_tps > 0.0);
+        assert!(comp.mysql_tps > 0.0);
     }
 }

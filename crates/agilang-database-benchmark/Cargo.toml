@@ -13,3 +13,6 @@ agilang-database-page-cache = { path = "../agilang-database-page-cache" }
 agilang-database-scheduler = { path = "../agilang-database-scheduler" }
 agilang-database-crypto = { path = "../agilang-database-crypto" }
 agilang-database-audit = { path = "../agilang-database-audit" }
+agilang-database-driver = { path = "../agilang-database-driver" }
+agilang-database-sqlite = { path = "../agilang-database-sqlite" }
+agilang-database-mysql = { path = "../agilang-database-mysql" }
