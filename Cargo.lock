@@ -182,6 +182,7 @@ name = "agilang-project-generator"
 version = "0.3.0"
 dependencies = [
  "anyhow",
+ "serde_json",
 ]
 
 [[package]]

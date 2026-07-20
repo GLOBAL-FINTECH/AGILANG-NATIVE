@@ -2274,3 +2274,59 @@ Build pipeline and feature/unit testing guides.
         ),
     ]
 }
+
+pub fn validate_ai_context() -> Result<()> {
+    let mut dir = std::env::current_dir()?;
+    let mut root = None;
+    loop {
+        if dir.join("agilang.toml").exists() {
+            root = Some(dir.clone());
+            break;
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+
+    let project_root = match root {
+        Some(r) => r,
+        None => bail!("not in an AGILANG project (agilang.toml not found)"),
+    };
+
+    println!("AGILANG AI context validation\n");
+
+    let required_files = get_ai_docs();
+    let mut all_valid = true;
+
+    for (relative_path, _) in &required_files {
+        let path = project_root.join(relative_path);
+        let name = relative_path;
+        let mut status = "PASS".to_string();
+
+        if !path.exists() {
+            status = "FAIL (Missing)".to_string();
+            all_valid = false;
+        } else if let Ok(metadata) = std::fs::metadata(&path) {
+            if metadata.len() == 0 {
+                status = "FAIL (Empty)".to_string();
+                all_valid = false;
+            } else if relative_path.ends_with(".json") {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if serde_json::from_str::<serde_json::Value>(&content).is_err() {
+                        status = "FAIL (Invalid JSON)".to_string();
+                        all_valid = false;
+                    }
+                }
+            }
+        }
+
+        println!("{:<32} {}", name, status);
+    }
+
+    if all_valid {
+        println!("\nStatus: valid");
+        Ok(())
+    } else {
+        bail!("\nStatus: invalid AI context");
+    }
+}
