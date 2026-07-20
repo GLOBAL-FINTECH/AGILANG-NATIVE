@@ -69,6 +69,13 @@ members = [
   "crates/agilang-database-ipc",
   "crates/agilang-database-tcp",
   "crates/agilang-database-mysql-gateway",
+  "crates/agilang-database-mvcc",
+  "crates/agilang-database-scheduler",
+  "crates/agilang-database-group-commit",
+  "crates/agilang-database-page-cache",
+  "crates/agilang-database-blockchain-store",
+  "crates/agilang-database-snapshot",
+  "crates/agilang-database-benchmark",
 ]
 
 [workspace.package]

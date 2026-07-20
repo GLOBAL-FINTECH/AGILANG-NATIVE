@@ -1,0 +1,12 @@
+[package]
+name = "agilang-database-benchmark"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+agilang-database-storage = { path = "../agilang-database-storage" }
+agilang-database-mvcc = { path = "../agilang-database-mvcc" }
+agilang-database-group-commit = { path = "../agilang-database-group-commit" }
+agilang-database-page-cache = { path = "../agilang-database-page-cache" }
