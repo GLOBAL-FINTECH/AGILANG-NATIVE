@@ -94,9 +94,12 @@ dependencies = [
 name = "agilang-database-benchmark"
 version = "0.3.0"
 dependencies = [
+ "agilang-database-audit",
+ "agilang-database-crypto",
  "agilang-database-group-commit",
  "agilang-database-mvcc",
  "agilang-database-page-cache",
+ "agilang-database-scheduler",
  "agilang-database-storage",
  "anyhow",
  "serde",

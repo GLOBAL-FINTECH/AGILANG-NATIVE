@@ -10,3 +10,6 @@ agilang-database-storage = { path = "../agilang-database-storage" }
 agilang-database-mvcc = { path = "../agilang-database-mvcc" }
 agilang-database-group-commit = { path = "../agilang-database-group-commit" }
 agilang-database-page-cache = { path = "../agilang-database-page-cache" }
+agilang-database-scheduler = { path = "../agilang-database-scheduler" }
+agilang-database-crypto = { path = "../agilang-database-crypto" }
+agilang-database-audit = { path = "../agilang-database-audit" }
