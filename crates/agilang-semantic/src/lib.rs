@@ -9,6 +9,7 @@ pub struct Analyser {
     scopes: Vec<SymbolTable>,
     errors: Vec<Diagnostic>,
     current_return_type: Option<Type>,
+    current_local_symbols: Vec<Symbol>,
 }
 
 impl Analyser {
@@ -33,6 +34,7 @@ impl Analyser {
             scopes: vec![global_scope],
             errors: vec![],
             current_return_type: None,
+            current_local_symbols: vec![],
         }
     }
 
@@ -137,6 +139,7 @@ impl Analyser {
 
     fn analyse_function(&mut self, func: &Function) -> Option<HirFunction> {
         self.enter_scope();
+        self.current_local_symbols = vec![];
 
         let mut hir_params = vec![];
         let mut param_types = vec![];
@@ -223,12 +226,14 @@ impl Analyser {
 
         self.exit_scope();
         self.current_return_type = None;
+        let local_syms = std::mem::take(&mut self.current_local_symbols);
 
         Some(HirFunction {
             name: func.name.clone(),
             params: hir_params,
             return_type: ret_type,
             body: hir_body,
+            local_symbols: local_syms,
             span: func.span,
         })
     }
@@ -242,7 +247,6 @@ impl Analyser {
                 mutable,
                 span,
             } => {
-                let val_expr = self.analyse_expr(value)?;
                 let declared_ty = match type_ref {
                     Some(tr) => {
                         let t = Type::from_str(&tr.name);
@@ -257,36 +261,51 @@ impl Analyser {
                             t
                         }
                     }
-                    None => val_expr.ty().clone(),
+                    None => Type::Unknown,
                 };
 
-                if !declared_ty.is_compatible(val_expr.ty()) {
+                let val_expr = if declared_ty != Type::Unknown {
+                    self.analyse_expr(value, Some(&declared_ty))?
+                } else {
+                    self.analyse_expr(value, None)?
+                };
+
+                let final_ty = if declared_ty != Type::Unknown {
+                    declared_ty
+                } else {
+                    val_expr.ty().clone()
+                };
+
+                if final_ty != Type::Unknown && !final_ty.is_compatible(val_expr.ty()) {
                     self.errors.push(Diagnostic::error(
                         "E2001",
                         format!(
                             "type mismatch: expected `{}`, found `{}`",
-                            declared_ty,
+                            final_ty,
                             val_expr.ty()
                         ),
                         value.span(),
                     ));
                 }
 
-                self.declare(Symbol {
+                let local_sym = Symbol {
                     name: name.clone(),
                     kind: if *mutable {
                         SymbolKind::Local
                     } else {
                         SymbolKind::Constant
                     },
-                    ty: declared_ty.clone(),
+                    ty: final_ty.clone(),
                     span: *span,
                     mutable: *mutable,
-                });
+                };
+
+                self.declare(local_sym.clone());
+                self.current_local_symbols.push(local_sym);
 
                 Some(HirStmt::Let {
                     name: name.clone(),
-                    ty: declared_ty,
+                    ty: final_ty,
                     value: val_expr,
                     mutable: *mutable,
                     span: *span,
@@ -295,7 +314,8 @@ impl Analyser {
             Stmt::Return { value, span } => {
                 let hir_val = match value {
                     Some(expr) => {
-                        let val_expr = self.analyse_expr(expr)?;
+                        let ret_ty = self.current_return_type.clone();
+                        let val_expr = self.analyse_expr(expr, ret_ty.as_ref())?;
                         if let Some(expected_ty) = &self.current_return_type {
                             if expected_ty == &Type::Void {
                                 self.errors.push(Diagnostic::error(
@@ -339,13 +359,13 @@ impl Analyser {
                 })
             }
             Stmt::Expr(expr) => {
-                let val_expr = self.analyse_expr(expr)?;
+                let val_expr = self.analyse_expr(expr, None)?;
                 Some(HirStmt::Expr(val_expr))
             }
         }
     }
 
-    fn analyse_expr(&mut self, expr: &Expr) -> Option<HirExpr> {
+    fn analyse_expr(&mut self, expr: &Expr, expected_ty: Option<&Type>) -> Option<HirExpr> {
         match expr {
             Expr::Identifier(name, span) => match self.lookup(name) {
                 Some(sym) => Some(HirExpr::Identifier(name.clone(), sym.ty.clone(), *span)),
@@ -358,68 +378,101 @@ impl Analyser {
                     Some(HirExpr::Identifier(name.clone(), Type::Error, *span))
                 }
             },
-            Expr::Integer(val, span) => Some(HirExpr::Integer(*val, *span)),
-            Expr::Float(val, span) => Some(HirExpr::Float(*val, *span)),
-            Expr::String(val, span) => Some(HirExpr::String(val.clone(), *span)),
-            Expr::Bool(val, span) => Some(HirExpr::Bool(*val, *span)),
+            Expr::Integer(val, span) => {
+                let ty = match expected_ty {
+                    Some(t) if t.is_integer() => t.clone(),
+                    _ => Type::I64,
+                };
+                Some(HirExpr::Integer(*val, ty, *span))
+            }
+            Expr::Float(val, span) => {
+                let ty = match expected_ty {
+                    Some(t) if t.is_float() => t.clone(),
+                    _ => Type::F64,
+                };
+                Some(HirExpr::Float(*val, ty, *span))
+            }
+            Expr::String(val, span) => Some(HirExpr::String(val.clone(), Type::String, *span)),
+            Expr::Bool(val, span) => Some(HirExpr::Bool(*val, Type::Bool, *span)),
             Expr::Call { callee, args, span } => {
-                let hir_callee = self.analyse_expr(callee)?;
+                let hir_callee = self.analyse_expr(callee, None)?;
                 let mut hir_args = vec![];
-                for arg in args {
-                    if let Some(hir_arg) = self.analyse_expr(arg) {
-                        hir_args.push(hir_arg);
-                    }
-                }
 
-                let ret_ty = match hir_callee.ty() {
+                let callee_ty = hir_callee.ty().clone();
+                match callee_ty {
                     Type::Function(ft) => {
-                        if ft.params.len() != hir_args.len() {
+                        if ft.params.len() != args.len() {
                             self.errors.push(Diagnostic::error(
                                 "E2002",
                                 format!(
                                     "argument count mismatch: function expects {} arguments, but {} were provided",
                                     ft.params.len(),
-                                    hir_args.len()
+                                    args.len()
                                 ),
                                 *span,
                             ));
+                            for arg in args {
+                                if let Some(hir_arg) = self.analyse_expr(arg, None) {
+                                    hir_args.push(hir_arg);
+                                }
+                            }
                         } else {
-                            for (i, (expected, arg)) in
-                                ft.params.iter().zip(hir_args.iter()).enumerate()
-                            {
-                                if !expected.is_compatible(arg.ty()) {
-                                    self.errors.push(Diagnostic::error(
-                                        "E2003",
-                                        format!(
-                                            "argument type mismatch at position {}: expected `{}`, found `{}`",
-                                            i + 1,
-                                            expected,
-                                            arg.ty()
-                                        ),
-                                        arg.span(),
-                                    ));
+                            for (expected, arg) in ft.params.iter().zip(args.iter()) {
+                                if let Some(hir_arg) = self.analyse_expr(arg, Some(expected)) {
+                                    if !expected.is_compatible(hir_arg.ty()) {
+                                        self.errors.push(Diagnostic::error(
+                                            "E2003",
+                                            format!(
+                                                "argument type mismatch: expected `{}`, found `{}`",
+                                                expected,
+                                                hir_arg.ty()
+                                            ),
+                                            hir_arg.span(),
+                                        ));
+                                    }
+                                    hir_args.push(hir_arg);
                                 }
                             }
                         }
-                        *ft.ret.clone()
+                        Some(HirExpr::Call {
+                            callee: Box::new(hir_callee),
+                            args: hir_args,
+                            ty: *ft.ret,
+                            span: *span,
+                        })
                     }
-                    Type::Error => Type::Error,
+                    Type::Error => {
+                        for arg in args {
+                            if let Some(hir_arg) = self.analyse_expr(arg, None) {
+                                hir_args.push(hir_arg);
+                            }
+                        }
+                        Some(HirExpr::Call {
+                            callee: Box::new(hir_callee),
+                            args: hir_args,
+                            ty: Type::Error,
+                            span: *span,
+                        })
+                    }
                     _ => {
                         self.errors.push(Diagnostic::error(
                             "E2009",
                             "cannot call non-function symbol",
                             callee.span(),
                         ));
-                        Type::Error
+                        for arg in args {
+                            if let Some(hir_arg) = self.analyse_expr(arg, None) {
+                                hir_args.push(hir_arg);
+                            }
+                        }
+                        Some(HirExpr::Call {
+                            callee: Box::new(hir_callee),
+                            args: hir_args,
+                            ty: Type::Error,
+                            span: *span,
+                        })
                     }
-                };
-
-                Some(HirExpr::Call {
-                    callee: Box::new(hir_callee),
-                    args: hir_args,
-                    ty: ret_ty,
-                    span: *span,
-                })
+                }
             }
             Expr::Binary {
                 left,
@@ -427,8 +480,13 @@ impl Analyser {
                 right,
                 span,
             } => {
-                let hir_left = self.analyse_expr(left)?;
-                let hir_right = self.analyse_expr(right)?;
+                let hir_left = self.analyse_expr(left, expected_ty)?;
+                let expected_right_ty = if hir_left.ty() != &Type::Error {
+                    Some(hir_left.ty())
+                } else {
+                    expected_ty
+                };
+                let hir_right = self.analyse_expr(right, expected_right_ty)?;
 
                 let (hir_op, ret_ty) = match op {
                     BinaryOp::Add => {

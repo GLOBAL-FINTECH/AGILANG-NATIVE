@@ -1,4 +1,5 @@
 use agilang_source::Span;
+use agilang_symbols::Symbol;
 use agilang_types::Type;
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +14,7 @@ pub struct HirFunction {
     pub params: Vec<HirParameter>,
     pub return_type: Type,
     pub body: Vec<HirStmt>,
+    pub local_symbols: Vec<Symbol>,
     pub span: Span,
 }
 
@@ -58,10 +60,10 @@ pub enum HirBinaryOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HirExpr {
     Identifier(String, Type, Span),
-    Integer(i64, Span),
-    Float(f64, Span),
-    String(String, Span),
-    Bool(bool, Span),
+    Integer(i64, Type, Span),
+    Float(f64, Type, Span),
+    String(String, Type, Span),
+    Bool(bool, Type, Span),
     Call {
         callee: Box<HirExpr>,
         args: Vec<HirExpr>,
@@ -81,10 +83,10 @@ impl HirExpr {
     pub fn ty(&self) -> &Type {
         match self {
             Self::Identifier(_, ty, _) => ty,
-            Self::Integer(_, _) => &Type::I64,
-            Self::Float(_, _) => &Type::F64,
-            Self::String(_, _) => &Type::String,
-            Self::Bool(_, _) => &Type::Bool,
+            Self::Integer(_, ty, _) => ty,
+            Self::Float(_, ty, _) => ty,
+            Self::String(_, ty, _) => ty,
+            Self::Bool(_, ty, _) => ty,
             Self::Call { ty, .. } => ty,
             Self::Binary { ty, .. } => ty,
         }
@@ -93,10 +95,10 @@ impl HirExpr {
     pub fn span(&self) -> Span {
         match self {
             Self::Identifier(_, _, span) => *span,
-            Self::Integer(_, span) => *span,
-            Self::Float(_, span) => *span,
-            Self::String(_, span) => *span,
-            Self::Bool(_, span) => *span,
+            Self::Integer(_, _, span) => *span,
+            Self::Float(_, _, span) => *span,
+            Self::String(_, _, span) => *span,
+            Self::Bool(_, _, span) => *span,
             Self::Call { span, .. } => *span,
             Self::Binary { span, .. } => *span,
         }

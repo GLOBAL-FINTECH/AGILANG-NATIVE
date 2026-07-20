@@ -1,4 +1,4 @@
-use agilang_compiler::{check, hir, parse, symbols, tokenize, SourceFile};
+use agilang_compiler::{check, hir, parse, tokenize, SourceFile};
 use anyhow::{bail, Context, Result};
 use std::{
     env, fs,
@@ -61,36 +61,32 @@ fn main() -> Result<()> {
         }
         "symbols" => {
             let source = load_optional(args.next())?;
-            match symbols(&source) {
-                Ok(scopes) => {
+            match hir(&source) {
+                Ok(hir_prog) => {
                     println!("module");
-                    // Print symbols in global scope first, then subsequent scopes if any
-                    for scope in &scopes {
-                        for sym in scope.symbols.values() {
-                            match sym.kind {
-                                agilang_symbols::SymbolKind::Function => {
-                                    if sym.name == "print" {
-                                        continue; // Skip builtin print for clean output
-                                    }
-                                    println!(
-                                        "└── fn {}() -> {}",
-                                        sym.name,
-                                        match &sym.ty {
-                                            agilang_types::Type::Function(f) =>
-                                                format!("{}", f.ret),
-                                            t => format!("{}", t),
-                                        }
-                                    );
-                                }
-                                agilang_symbols::SymbolKind::Local
-                                | agilang_symbols::SymbolKind::Constant => {
-                                    println!("    ├── {}: {}", sym.name, sym.ty);
-                                }
-                                agilang_symbols::SymbolKind::Parameter => {
-                                    println!("    ├── (param) {}: {}", sym.name, sym.ty);
-                                }
-                                _ => {}
-                            }
+                    println!("├── builtin print(string) -> void");
+                    for (i, func) in hir_prog.functions.iter().enumerate() {
+                        let is_last_func = i == hir_prog.functions.len() - 1;
+                        let prefix = if is_last_func {
+                            "└── "
+                        } else {
+                            "├── "
+                        };
+                        println!("{}fn {}() -> {}", prefix, func.name, func.return_type);
+
+                        let child_prefix = if is_last_func { "    " } else { "│   " };
+                        for (j, sym) in func.local_symbols.iter().enumerate() {
+                            let is_last_sym = j == func.local_symbols.len() - 1;
+                            let sym_prefix = if is_last_sym {
+                                "└── "
+                            } else {
+                                "├── "
+                            };
+                            let mut_str = if sym.mutable { "mutable" } else { "constant" };
+                            println!(
+                                "{}{}local {} {}: {}",
+                                child_prefix, sym_prefix, mut_str, sym.name, sym.ty
+                            );
                         }
                     }
                 }
@@ -98,34 +94,75 @@ fn main() -> Result<()> {
             }
         }
         "hir" => {
-            let source = load_optional(args.next())?;
+            let mut file_arg = None;
+            let mut debug = false;
+            for arg in args.by_ref() {
+                if arg == "--debug" {
+                    debug = true;
+                } else if file_arg.is_none() {
+                    file_arg = Some(arg);
+                }
+            }
+            let source = load_optional(file_arg)?;
             match hir(&source) {
                 Ok(hir_prog) => {
-                    println!("HirProgram");
-                    for func in &hir_prog.functions {
-                        println!("└── HirFunction {}() -> {}", func.name, func.return_type);
-                        for stmt in &func.body {
-                            match stmt {
-                                agilang_ir::HirStmt::Let {
-                                    name, ty, value, ..
-                                } => {
-                                    println!(
-                                        "    ├── Let {}: {} = {:#?}: {}",
-                                        name,
-                                        ty,
-                                        value,
-                                        value.ty()
-                                    );
-                                }
-                                agilang_ir::HirStmt::Return { value, .. } => {
-                                    if let Some(val) = value {
-                                        println!("    └── Return {:#?}: {}", val, val.ty());
-                                    } else {
-                                        println!("    └── Return void");
+                    if debug {
+                        println!("{:#?}", hir_prog);
+                    } else {
+                        println!("HirProgram");
+                        for (i, func) in hir_prog.functions.iter().enumerate() {
+                            let is_last_func = i == hir_prog.functions.len() - 1;
+                            let prefix = if is_last_func {
+                                "└── "
+                            } else {
+                                "├── "
+                            };
+                            println!(
+                                "{}HirFunction {}() -> {}",
+                                prefix, func.name, func.return_type
+                            );
+
+                            let child_prefix = if is_last_func { "    " } else { "│   " };
+                            for (j, stmt) in func.body.iter().enumerate() {
+                                let is_last_stmt = j == func.body.len() - 1;
+                                let stmt_prefix = if is_last_stmt {
+                                    "└── "
+                                } else {
+                                    "├── "
+                                };
+                                match stmt {
+                                    agilang_ir::HirStmt::Let {
+                                        name, ty, value, ..
+                                    } => {
+                                        println!(
+                                            "{}{}Let {}: {} = {}",
+                                            child_prefix,
+                                            stmt_prefix,
+                                            name,
+                                            ty,
+                                            format_hir_expr(value)
+                                        );
                                     }
-                                }
-                                agilang_ir::HirStmt::Expr(expr) => {
-                                    println!("    ├── Expr {:#?}: {}", expr, expr.ty());
+                                    agilang_ir::HirStmt::Return { value, .. } => {
+                                        if let Some(val) = value {
+                                            println!(
+                                                "{}{}Return {}",
+                                                child_prefix,
+                                                stmt_prefix,
+                                                format_hir_expr(val)
+                                            );
+                                        } else {
+                                            println!("{}{}Return void", child_prefix, stmt_prefix);
+                                        }
+                                    }
+                                    agilang_ir::HirStmt::Expr(expr) => {
+                                        println!(
+                                            "{}{}{}",
+                                            child_prefix,
+                                            stmt_prefix,
+                                            format_hir_expr(expr)
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -392,4 +429,45 @@ fn unknown_command(command: &str) {
         eprintln!("\nDid you mean:\n    {}", s);
     }
     eprintln!("\nRun `agilang help` for available commands.");
+}
+
+fn format_hir_expr(expr: &agilang_ir::HirExpr) -> String {
+    match expr {
+        agilang_ir::HirExpr::Identifier(name, _, _) => name.clone(),
+        agilang_ir::HirExpr::Integer(val, ty, _) => format!("{}:{}", val, ty),
+        agilang_ir::HirExpr::Float(val, ty, _) => format!("{}:{}", val, ty),
+        agilang_ir::HirExpr::String(val, _, _) => format!("\"{}\":string", val),
+        agilang_ir::HirExpr::Bool(val, _, _) => format!("{}:bool", val),
+        agilang_ir::HirExpr::Call {
+            callee, args, ty, ..
+        } => {
+            let callee_str = format_hir_expr(callee);
+            let args_str: Vec<String> = args.iter().map(format_hir_expr).collect();
+            format!("Call {}({}) -> {}", callee_str, args_str.join(", "), ty)
+        }
+        agilang_ir::HirExpr::Binary {
+            left, op, right, ..
+        } => {
+            let op_str = match op {
+                agilang_ir::HirBinaryOp::Add => "+",
+                agilang_ir::HirBinaryOp::Subtract => "-",
+                agilang_ir::HirBinaryOp::Multiply => "*",
+                agilang_ir::HirBinaryOp::Divide => "/",
+                agilang_ir::HirBinaryOp::Equal => "==",
+                agilang_ir::HirBinaryOp::NotEqual => "!=",
+                agilang_ir::HirBinaryOp::Less => "<",
+                agilang_ir::HirBinaryOp::LessEqual => "<=",
+                agilang_ir::HirBinaryOp::Greater => ">",
+                agilang_ir::HirBinaryOp::GreaterEqual => ">=",
+                agilang_ir::HirBinaryOp::And => "and",
+                agilang_ir::HirBinaryOp::Or => "or",
+            };
+            format!(
+                "({} {} {})",
+                format_hir_expr(left),
+                op_str,
+                format_hir_expr(right)
+            )
+        }
+    }
 }

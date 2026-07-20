@@ -36,6 +36,7 @@ name = "agilang-ir"
 version = "0.3.0"
 dependencies = [
  "agilang-source",
+ "agilang-symbols",
  "agilang-types",
  "serde",
 ]
