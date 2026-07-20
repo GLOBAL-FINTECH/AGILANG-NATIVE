@@ -45,10 +45,7 @@ impl Linker {
 
         let mut bat_content = String::new();
         if let Some(vcvars) = &self.vcvars_path {
-            bat_content.push_str(&format!(
-                "call \"{}\" amd64\r\n",
-                vcvars.to_string_lossy()
-            ));
+            bat_content.push_str(&format!("call \"{}\" amd64\r\n", vcvars.to_string_lossy()));
         }
         bat_content.push_str(&format!(
             "cl.exe /O2 /Fe:\"{}\" /Fo:\"{}\" \"{}\" \"{}\" ws2_32.lib userenv.lib ntdll.lib bcrypt.lib advapi32.lib\r\n",

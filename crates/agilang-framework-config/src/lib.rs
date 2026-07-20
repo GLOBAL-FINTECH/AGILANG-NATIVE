@@ -29,17 +29,22 @@ impl Config {
     }
 
     pub fn get(&self, key: &str, default: &str) -> String {
-        self.env.get(key).cloned().unwrap_or_else(|| default.to_string())
+        self.env
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| default.to_string())
     }
 
     pub fn get_bool(&self, key: &str, default: bool) -> bool {
-        self.env.get(key)
+        self.env
+            .get(key)
             .map(|val| val.to_lowercase() == "true")
             .unwrap_or(default)
     }
 
     pub fn get_i32(&self, key: &str, default: i32) -> i32 {
-        self.env.get(key)
+        self.env
+            .get(key)
             .and_then(|val| val.parse::<i32>().ok())
             .unwrap_or(default)
     }

@@ -353,7 +353,11 @@ fn main() -> Result<()> {
 
             let host_ip: std::net::IpAddr = host.parse().context("invalid host IP address")?;
 
-            let (listener, bound_port) = match agilang_framework_server::bind_with_fallback(host_ip, requested_port, allow_fallback) {
+            let (listener, bound_port) = match agilang_framework_server::bind_with_fallback(
+                host_ip,
+                requested_port,
+                allow_fallback,
+            ) {
                 Ok((l, p)) => {
                     if p != requested_port {
                         println!("warning: port {} is already occupied", requested_port);
@@ -392,7 +396,12 @@ fn main() -> Result<()> {
                         let router_ref = &router;
                         let view_ref = &view_engine;
                         let root_ref = &project_root;
-                        if let Err(e) = agilang_framework_server::handle_client(client_stream, router_ref, view_ref, root_ref) {
+                        if let Err(e) = agilang_framework_server::handle_client(
+                            client_stream,
+                            router_ref,
+                            view_ref,
+                            root_ref,
+                        ) {
                             eprintln!("request error: {}", e);
                         }
                     }
@@ -411,7 +420,10 @@ fn main() -> Result<()> {
             let mut i = 0;
             while i < remaining.len() {
                 if remaining[i] == "--roles" && i + 1 < remaining.len() {
-                    roles = remaining[i + 1].split(',').map(|s| s.trim().to_string()).collect();
+                    roles = remaining[i + 1]
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect();
                     i += 2;
                 } else if remaining[i] == "--force" {
                     force = true;

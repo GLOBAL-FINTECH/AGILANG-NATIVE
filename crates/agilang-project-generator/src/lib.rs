@@ -9,7 +9,9 @@ pub fn generate_project(name: &str, template: &str) -> Result<()> {
     }
 
     let files = [
-        ("agilang.toml", r#"[project]
+        (
+            "agilang.toml",
+            r#"[project]
 name = "{name}"
 version = "0.1.0"
 edition = "2026"
@@ -41,8 +43,11 @@ path = "public"
 [build]
 target = "native"
 output = "build/{name}.exe"
-"#),
-        (".env.example", r#"APP_NAME=AGILANG
+"#,
+        ),
+        (
+            ".env.example",
+            r#"APP_NAME=AGILANG
 APP_ENV=local
 APP_URL=http://127.0.0.1:8080
 APP_HOST=127.0.0.1
@@ -54,12 +59,18 @@ TRUST_PROXY=false
 SESSION_SECURE=false
 SESSION_HTTP_ONLY=true
 SESSION_SAME_SITE=Lax
-"#),
-        ("README.md", r#"# {name}
+"#,
+        ),
+        (
+            "README.md",
+            r#"# {name}
 
 Created with AGILANG CLI.
-"#),
-        ("bootstrap/app.agi", r#"use Framework.Application
+"#,
+        ),
+        (
+            "bootstrap/app.agi",
+            r#"use Framework.Application
 use App.Providers.AppServiceProvider
 use App.Providers.RouteServiceProvider
 
@@ -75,8 +86,11 @@ fn bootstrap() -> Application:
     app.public_path("public")
 
     return app
-"#),
-        ("app/Controllers/HomeController.agi", r#"module App.Controllers
+"#,
+        ),
+        (
+            "app/Controllers/HomeController.agi",
+            r#"module App.Controllers
 
 use Framework.Http.Request
 use Framework.Http.Response
@@ -93,8 +107,11 @@ class HomeController:
         return Response.html(
             "<h1>About AGILANG</h1><p>Native application framework.</p>"
         )
-"#),
-        ("app/Controllers/Api/HealthController.agi", r#"module App.Controllers.Api
+"#,
+        ),
+        (
+            "app/Controllers/Api/HealthController.agi",
+            r#"module App.Controllers.Api
 
 use Framework.Http.Request
 use Framework.Http.Response
@@ -106,8 +123,11 @@ class HealthController:
             "framework": "AGILANG",
             "version": "0.4.0"
         })
-"#),
-        ("app/Middleware/WebMiddleware.agi", r#"module App.Middleware
+"#,
+        ),
+        (
+            "app/Middleware/WebMiddleware.agi",
+            r#"module App.Middleware
 
 use Framework.Http.Request
 use Framework.Http.Response
@@ -118,8 +138,11 @@ class WebMiddleware:
         let response = next(request)
         response.header("X-Powered-By", "AGILANG")
         return response
-"#),
-        ("app/Middleware/ApiMiddleware.agi", r#"module App.Middleware
+"#,
+        ),
+        (
+            "app/Middleware/ApiMiddleware.agi",
+            r#"module App.Middleware
 
 use Framework.Http.Request
 use Framework.Http.Response
@@ -130,8 +153,11 @@ class ApiMiddleware:
         let response = next(request)
         response.header("Content-Type", "application/json")
         return response
-"#),
-        ("app/Models/User.agi", r#"module App.Models
+"#,
+        ),
+        (
+            "app/Models/User.agi",
+            r#"module App.Models
 
 class User:
     let id: i64
@@ -142,8 +168,11 @@ class User:
 
     fn is_admin() -> bool:
         return self.role == "admin"
-"#),
-        ("app/Providers/AppServiceProvider.agi", r#"module App.Providers
+"#,
+        ),
+        (
+            "app/Providers/AppServiceProvider.agi",
+            r#"module App.Providers
 
 use Framework.Container.Container
 use Framework.Providers.ServiceProvider
@@ -155,8 +184,11 @@ class AppServiceProvider extends ServiceProvider:
 
     fn boot() -> void:
         print("Application services booted")
-"#),
-        ("app/Providers/RouteServiceProvider.agi", r#"module App.Providers
+"#,
+        ),
+        (
+            "app/Providers/RouteServiceProvider.agi",
+            r#"module App.Providers
 
 use Framework.Application
 use Framework.Providers.ServiceProvider
@@ -167,20 +199,29 @@ class RouteServiceProvider extends ServiceProvider:
     fn boot(app: Application) -> void:
         Web.register_web()
         Api.register_api()
-"#),
-        ("app/Services/ApplicationService.agi", r#"module App.Services
+"#,
+        ),
+        (
+            "app/Services/ApplicationService.agi",
+            r#"module App.Services
 
 class ApplicationService:
     fn get_version() -> string:
         return "0.4.0"
-"#),
-        ("app/Console/Commands/HelloCommand.agi", r#"module App.Console.Commands
+"#,
+        ),
+        (
+            "app/Console/Commands/HelloCommand.agi",
+            r#"module App.Console.Commands
 
 class HelloCommand:
     fn handle() -> void:
         print("Hello from AGILANG Console")
-"#),
-        ("config/app.agi", r#"use Framework.Config.AppConfig
+"#,
+        ),
+        (
+            "config/app.agi",
+            r#"use Framework.Config.AppConfig
 
 return AppConfig {
     name: env("APP_NAME", "AGILANG Application"),
@@ -188,8 +229,11 @@ return AppConfig {
     url: env("APP_URL", "http://127.0.0.1:8080"),
     debug: env_bool("APP_DEBUG", true)
 }
-"#),
-        ("config/server.agi", r#"use Framework.Config.ServerConfig
+"#,
+        ),
+        (
+            "config/server.agi",
+            r#"use Framework.Config.ServerConfig
 
 return ServerConfig {
     host: env("APP_HOST", "127.0.0.1"),
@@ -197,8 +241,11 @@ return ServerConfig {
     https_port: env_i32("APP_HTTPS_PORT", 8443),
     force_https: env_bool("FORCE_HTTPS", false)
 }
-"#),
-        ("config/auth.agi", r#"use Framework.Auth.AuthConfig
+"#,
+        ),
+        (
+            "config/auth.agi",
+            r#"use Framework.Auth.AuthConfig
 
 return AuthConfig {
     enabled: false,
@@ -208,37 +255,55 @@ return AuthConfig {
         "admin"
     ]
 }
-"#),
-        ("config/logging.agi", r#"return {
+"#,
+        ),
+        (
+            "config/logging.agi",
+            r#"return {
     "level": "debug"
 }
-"#),
-        ("config/database.agi", r#"return {
+"#,
+        ),
+        (
+            "config/database.agi",
+            r#"return {
     "driver": "sqlite"
 }
-"#),
-        ("routes/web.agi", r#"use Framework.Routing.Route
+"#,
+        ),
+        (
+            "routes/web.agi",
+            r#"use Framework.Routing.Route
 use App.Controllers.HomeController
 
 fn register_web() -> void:
     Route.get("/", HomeController.index)
     Route.get("/about", HomeController.about)
-"#),
-        ("routes/api.agi", r#"use Framework.Routing.Route
+"#,
+        ),
+        (
+            "routes/api.agi",
+            r#"use Framework.Routing.Route
 use App.Controllers.Api.HealthController
 
 fn register_api() -> void:
     Route.group("/api", fn:
         Route.get("/health", HealthController.show)
     )
-"#),
-        ("routes/console.agi", r#"use Framework.Routing.Route
+"#,
+        ),
+        (
+            "routes/console.agi",
+            r#"use Framework.Routing.Route
 use App.Console.Commands.HelloCommand
 
 fn register_console() -> void:
     Route.command("hello", HelloCommand.handle)
-"#),
-        ("resources/views/layouts/app.ags", r#"<!DOCTYPE html>
+"#,
+        ),
+        (
+            "resources/views/layouts/app.ags",
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -261,8 +326,11 @@ fn register_console() -> void:
     <script src="/assets/js/app.js"></script>
 </body>
 </html>
-"#),
-        ("resources/views/welcome.ags", r#"@extends("layouts/app")
+"#,
+        ),
+        (
+            "resources/views/welcome.ags",
+            r#"@extends("layouts/app")
 
 @section("content")
 <section class="hero">
@@ -277,17 +345,29 @@ fn register_console() -> void:
     </div>
 </section>
 @endsection
-"#),
-        ("resources/views/errors/404.ags", r#"<h1>404 Not Found</h1>
+"#,
+        ),
+        (
+            "resources/views/errors/404.ags",
+            r#"<h1>404 Not Found</h1>
 <p>The page you are looking for does not exist.</p>
-"#),
-        ("resources/views/errors/500.ags", r#"<h1>500 Internal Server Error</h1>
+"#,
+        ),
+        (
+            "resources/views/errors/500.ags",
+            r#"<h1>500 Internal Server Error</h1>
 <p>Something went wrong on our end.</p>
-"#),
-        ("resources/views/components/button.ags", r#"<!-- Button Component -->
+"#,
+        ),
+        (
+            "resources/views/components/button.ags",
+            r#"<!-- Button Component -->
 <button class="btn">{{ text }}</button>
-"#),
-        ("resources/assets/css/app.css", r#":root {
+"#,
+        ),
+        (
+            "resources/assets/css/app.css",
+            r#":root {
     font-family: Inter, system-ui, sans-serif;
     color: #eef6ff;
     background: #07111f;
@@ -374,15 +454,27 @@ p {
     color: white;
     border: 1px solid rgba(255,255,255,0.24);
 }
-"#),
-        ("resources/assets/js/app.js", r#"document.documentElement.dataset.agilang = "ready";
+"#,
+        ),
+        (
+            "resources/assets/js/app.js",
+            r#"document.documentElement.dataset.agilang = "ready";
 console.info("AGILANG application assets loaded");
-"#),
-        ("public/index.html", r#"<h1>Hello from AGILANG Public Folder</h1>
-"#),
-        ("public/favicon.svg", r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#1769e0"/></svg>
-"##),
-        ("database/migrations/CreateUsersTable.agi", r#"use Framework.Database.Migration
+"#,
+        ),
+        (
+            "public/index.html",
+            r#"<h1>Hello from AGILANG Public Folder</h1>
+"#,
+        ),
+        (
+            "public/favicon.svg",
+            r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#1769e0"/></svg>
+"##,
+        ),
+        (
+            "database/migrations/CreateUsersTable.agi",
+            r#"use Framework.Database.Migration
 use Framework.Database.Schema
 
 class CreateUsersTable extends Migration:
@@ -398,14 +490,20 @@ class CreateUsersTable extends Migration:
 
     fn down() -> void:
         Schema.drop_if_exists("users")
-"#),
-        ("database/seeders/DatabaseSeeder.agi", r#"use Framework.Database.Seeder
+"#,
+        ),
+        (
+            "database/seeders/DatabaseSeeder.agi",
+            r#"use Framework.Database.Seeder
 
 class DatabaseSeeder extends Seeder:
     fn run() -> void:
         print("Database seeding complete")
-"#),
-        ("database/factories/UserFactory.agi", r#"use App.Models.User
+"#,
+        ),
+        (
+            "database/factories/UserFactory.agi",
+            r#"use App.Models.User
 use Framework.Database.Factory
 
 class UserFactory extends Factory:
@@ -416,15 +514,21 @@ class UserFactory extends Factory:
             password_hash: hash_password("password"),
             role: "user"
         }
-"#),
-        ("tests/Feature/HomePageTest.agi", r#"use Framework.Testing.WebTest
+"#,
+        ),
+        (
+            "tests/Feature/HomePageTest.agi",
+            r#"use Framework.Testing.WebTest
 
 test "home page returns successful response":
     let response = WebTest.get("/")
     response.assert_status(200)
     response.assert_contains("AGILANG Native Framework")
-"#),
-        ("tests/Feature/HealthApiTest.agi", r#"use Framework.Testing.WebTest
+"#,
+        ),
+        (
+            "tests/Feature/HealthApiTest.agi",
+            r#"use Framework.Testing.WebTest
 
 test "health API returns healthy status":
     let response = WebTest.get("/api/health")
@@ -432,14 +536,18 @@ test "health API returns healthy status":
     response.assert_json({
         "status": "healthy"
     })
-"#),
-        ("tests/Unit/ApplicationServiceTest.agi", r#"use Framework.Testing.UnitTest
+"#,
+        ),
+        (
+            "tests/Unit/ApplicationServiceTest.agi",
+            r#"use Framework.Testing.UnitTest
 use App.Services.ApplicationService
 
 test "version returns 0.4.0":
     let service = ApplicationService()
     assert(service.get_version() == "0.4.0")
-"#),
+"#,
+        ),
         ("storage/cache/.gitkeep", ""),
         ("storage/logs/.gitkeep", ""),
         ("storage/sessions/.gitkeep", ""),
@@ -463,12 +571,18 @@ test "version returns 0.4.0":
     for (relative_path, _) in &files {
         let full_path = path.join(relative_path);
         if !full_path.exists() {
-            bail!("Template verification failed: missing file `{}`", relative_path);
+            bail!(
+                "Template verification failed: missing file `{}`",
+                relative_path
+            );
         }
         if !relative_path.ends_with(".gitkeep") {
             let metadata = fs::metadata(&full_path)?;
             if metadata.len() == 0 {
-                bail!("Template verification failed: empty required file `{}`", relative_path);
+                bail!(
+                    "Template verification failed: empty required file `{}`",
+                    relative_path
+                );
             }
         }
     }
@@ -539,7 +653,9 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
             } else {
                 format!("{}Controller", class_name)
             };
-            let path = project_root.join("app/Controllers").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Controllers")
+                .join(format!("{}.agi", file_name));
             if path.exists() {
                 bail!("controller `{}` already exists", file_name);
             }
@@ -549,7 +665,10 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
 
             let ns_parts = file_name.split('/').collect::<Vec<_>>();
             let ns = if ns_parts.len() > 1 {
-                format!("App.Controllers.{}", ns_parts[..ns_parts.len() - 1].join("."))
+                format!(
+                    "App.Controllers.{}",
+                    ns_parts[..ns_parts.len() - 1].join(".")
+                )
             } else {
                 "App.Controllers".to_string()
             };
@@ -578,10 +697,7 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
                 "App.Models".to_string()
             };
 
-            let content = format!(
-                "module {}\n\nclass {}:\n    let id: i64\n",
-                ns, class_name
-            );
+            let content = format!("module {}\n\nclass {}:\n    let id: i64\n", ns, class_name);
             fs::write(&path, content)?;
             println!("Created model app/Models/{}.agi", normalized_name);
         }
@@ -596,7 +712,9 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
             } else {
                 format!("{}Service", class_name)
             };
-            let path = project_root.join("app/Services").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Services")
+                .join(format!("{}.agi", file_name));
             if path.exists() {
                 bail!("service `{}` already exists", file_name);
             }
@@ -629,7 +747,9 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
             } else {
                 format!("{}Middleware", class_name)
             };
-            let path = project_root.join("app/Middleware").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Middleware")
+                .join(format!("{}.agi", file_name));
             if path.exists() {
                 bail!("middleware `{}` already exists", file_name);
             }
@@ -639,7 +759,10 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
 
             let ns_parts = file_name.split('/').collect::<Vec<_>>();
             let ns = if ns_parts.len() > 1 {
-                format!("App.Middleware.{}", ns_parts[..ns_parts.len() - 1].join("."))
+                format!(
+                    "App.Middleware.{}",
+                    ns_parts[..ns_parts.len() - 1].join(".")
+                )
             } else {
                 "App.Middleware".to_string()
             };
@@ -662,7 +785,9 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
             } else {
                 format!("{}ServiceProvider", class_name)
             };
-            let path = project_root.join("app/Providers").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Providers")
+                .join(format!("{}.agi", file_name));
             if path.exists() {
                 bail!("provider `{}` already exists", file_name);
             }
@@ -694,11 +819,16 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(&path, format!("<!-- View template {} -->\n", normalized_name))?;
+            fs::write(
+                &path,
+                format!("<!-- View template {} -->\n", normalized_name),
+            )?;
             println!("Created view resources/views/{}.ags", normalized_name);
         }
         "route" => {
-            let path = project_root.join("routes").join(format!("{}.agi", normalized_name));
+            let path = project_root
+                .join("routes")
+                .join(format!("{}.agi", normalized_name));
             if path.exists() {
                 bail!("route file `{}` already exists", normalized_name);
             }
@@ -718,7 +848,9 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
                 .as_secs();
             let migration_class = to_pascal_case(class_name);
             let file_name = format!("{}_{}", timestamp, migration_class);
-            let path = project_root.join("database/migrations").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("database/migrations")
+                .join(format!("{}.agi", file_name));
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
@@ -771,7 +903,9 @@ pub fn generate_auth(roles: Vec<String>, force: bool, repair: bool) -> Result<()
     };
 
     let auth_files = [
-        ("app/Controllers/Auth/LoginController.agi", r#"module App.Controllers.Auth
+        (
+            "app/Controllers/Auth/LoginController.agi",
+            r#"module App.Controllers.Auth
 
 use Framework.Auth.Auth
 use Framework.Http.Request
@@ -796,44 +930,65 @@ class LoginController:
         return View.render("auth/login", {
             "error": "Invalid email or password."
         }).status(422)
-"#),
-        ("app/Controllers/Auth/RegisterController.agi", r#"module App.Controllers.Auth
+"#,
+        ),
+        (
+            "app/Controllers/Auth/RegisterController.agi",
+            r#"module App.Controllers.Auth
 
 class RegisterController:
     fn show() -> void:
         pass
-"#),
-        ("app/Controllers/Auth/LogoutController.agi", r#"module App.Controllers.Auth
+"#,
+        ),
+        (
+            "app/Controllers/Auth/LogoutController.agi",
+            r#"module App.Controllers.Auth
 
 class LogoutController:
     fn logout() -> void:
         pass
-"#),
-        ("app/Controllers/Auth/PasswordController.agi", r#"module App.Controllers.Auth
+"#,
+        ),
+        (
+            "app/Controllers/Auth/PasswordController.agi",
+            r#"module App.Controllers.Auth
 
 class PasswordController:
     fn reset() -> void:
         pass
-"#),
-        ("app/Middleware/Authenticate.agi", r#"module App.Middleware
+"#,
+        ),
+        (
+            "app/Middleware/Authenticate.agi",
+            r#"module App.Middleware
 
 class Authenticate:
     fn handle() -> void:
         pass
-"#),
-        ("app/Middleware/GuestOnly.agi", r#"module App.Middleware
+"#,
+        ),
+        (
+            "app/Middleware/GuestOnly.agi",
+            r#"module App.Middleware
 
 class GuestOnly:
     fn handle() -> void:
         pass
-"#),
-        ("app/Middleware/RequireRole.agi", r#"module App.Middleware
+"#,
+        ),
+        (
+            "app/Middleware/RequireRole.agi",
+            r#"module App.Middleware
 
 class RequireRole:
     fn handle() -> void:
         pass
-"#),
-        ("app/Models/User.agi", r#"module App.Models
+"#,
+        ),
+        (
+            "app/Models/User.agi",
+            r#"module App.Models
 
 class User:
     let id: i64
@@ -844,49 +999,82 @@ class User:
 
     fn is_admin() -> bool:
         return self.role == "admin"
-"#),
-        ("app/Models/Role.agi", r#"module App.Models
+"#,
+        ),
+        (
+            "app/Models/Role.agi",
+            r#"module App.Models
 
 class Role:
     let id: i64
     let name: string
-"#),
-        ("app/Services/AuthService.agi", r#"module App.Services
+"#,
+        ),
+        (
+            "app/Services/AuthService.agi",
+            r#"module App.Services
 
 class AuthService:
     fn check() -> bool:
         return true
-"#),
-        ("app/Services/PasswordHasher.agi", r#"module App.Services
+"#,
+        ),
+        (
+            "app/Services/PasswordHasher.agi",
+            r#"module App.Services
 
 class PasswordHasher:
     fn hash(password: string) -> string:
         return password
-"#),
-        ("app/Services/SessionService.agi", r#"module App.Services
+"#,
+        ),
+        (
+            "app/Services/SessionService.agi",
+            r#"module App.Services
 
 class SessionService:
     fn regenerate() -> void:
         pass
-"#),
-        ("resources/views/auth/login.ags", r#"<h1>Login</h1>
+"#,
+        ),
+        (
+            "resources/views/auth/login.ags",
+            r#"<h1>Login</h1>
 <form method="POST" action="/login">
     <input type="email" name="email" required>
     <input type="password" name="password" required>
     <button type="submit">Log in</button>
 </form>
-"#),
-        ("resources/views/auth/register.ags", r#"<h1>Register</h1>
-"#),
-        ("resources/views/auth/forgot-password.ags", r#"<h1>Forgot Password</h1>
-"#),
-        ("resources/views/auth/reset-password.ags", r#"<h1>Reset Password</h1>
-"#),
-        ("resources/views/dashboard/user.ags", r#"<h1>User Dashboard</h1>
-"#),
-        ("resources/views/dashboard/admin.ags", r#"<h1>Admin Dashboard</h1>
-"#),
-        ("database/migrations/CreateUsersTable.agi", r#"use Framework.Database.Migration
+"#,
+        ),
+        (
+            "resources/views/auth/register.ags",
+            r#"<h1>Register</h1>
+"#,
+        ),
+        (
+            "resources/views/auth/forgot-password.ags",
+            r#"<h1>Forgot Password</h1>
+"#,
+        ),
+        (
+            "resources/views/auth/reset-password.ags",
+            r#"<h1>Reset Password</h1>
+"#,
+        ),
+        (
+            "resources/views/dashboard/user.ags",
+            r#"<h1>User Dashboard</h1>
+"#,
+        ),
+        (
+            "resources/views/dashboard/admin.ags",
+            r#"<h1>Admin Dashboard</h1>
+"#,
+        ),
+        (
+            "database/migrations/CreateUsersTable.agi",
+            r#"use Framework.Database.Migration
 use Framework.Database.Schema
 
 class CreateUsersTable extends Migration:
@@ -902,8 +1090,11 @@ class CreateUsersTable extends Migration:
 
     fn down() -> void:
         Schema.drop_if_exists("users")
-"#),
-        ("database/migrations/CreateRolesTable.agi", r#"use Framework.Database.Migration
+"#,
+        ),
+        (
+            "database/migrations/CreateRolesTable.agi",
+            r#"use Framework.Database.Migration
 use Framework.Database.Schema
 
 class CreateRolesTable extends Migration:
@@ -915,8 +1106,11 @@ class CreateRolesTable extends Migration:
 
     fn down() -> void:
         Schema.drop_if_exists("roles")
-"#),
-        ("database/migrations/CreateUserRolesTable.agi", r#"use Framework.Database.Migration
+"#,
+        ),
+        (
+            "database/migrations/CreateUserRolesTable.agi",
+            r#"use Framework.Database.Migration
 use Framework.Database.Schema
 
 class CreateUserRolesTable extends Migration:
@@ -928,8 +1122,11 @@ class CreateUserRolesTable extends Migration:
 
     fn down() -> void:
         Schema.drop_if_exists("user_roles")
-"#),
-        ("routes/auth.agi", r#"use Framework.Routing.Route
+"#,
+        ),
+        (
+            "routes/auth.agi",
+            r#"use Framework.Routing.Route
 use App.Controllers.Auth.LoginController
 use App.Controllers.DashboardController
 use App.Middleware.Authenticate
@@ -949,8 +1146,11 @@ fn register_auth() -> void:
             Route.get("/", DashboardController.admin)
         )
     )
-"#),
-        ("app/Controllers/DashboardController.agi", r#"module App.Controllers
+"#,
+        ),
+        (
+            "app/Controllers/DashboardController.agi",
+            r#"module App.Controllers
 
 use Framework.Http.Request
 use Framework.Http.Response
@@ -966,7 +1166,8 @@ class DashboardController:
         return View.render("dashboard/admin", {
             "title": "Admin Dashboard"
         })
-"#),
+"#,
+        ),
     ];
 
     println!("Checking project...");
@@ -1060,7 +1261,9 @@ pub fn repair_template(dry_run: bool, force: bool) -> Result<()> {
     println!("Inspecting AGILANG web template...\n");
 
     let files = [
-        ("agilang.toml", r#"[project]
+        (
+            "agilang.toml",
+            r#"[project]
 name = "{name}"
 version = "0.1.0"
 edition = "2026"
@@ -1092,8 +1295,11 @@ path = "public"
 [build]
 target = "native"
 output = "build/{name}.exe"
-"#),
-        (".env.example", r#"APP_NAME=AGILANG
+"#,
+        ),
+        (
+            ".env.example",
+            r#"APP_NAME=AGILANG
 APP_ENV=local
 APP_URL=http://127.0.0.1:8080
 APP_HOST=127.0.0.1
@@ -1105,12 +1311,18 @@ TRUST_PROXY=false
 SESSION_SECURE=false
 SESSION_HTTP_ONLY=true
 SESSION_SAME_SITE=Lax
-"#),
-        ("README.md", r#"# {name}
+"#,
+        ),
+        (
+            "README.md",
+            r#"# {name}
 
 Created with AGILANG CLI.
-"#),
-        ("bootstrap/app.agi", r#"use Framework.Application
+"#,
+        ),
+        (
+            "bootstrap/app.agi",
+            r#"use Framework.Application
 use App.Providers.AppServiceProvider
 use App.Providers.RouteServiceProvider
 
@@ -1126,8 +1338,11 @@ fn bootstrap() -> Application:
     app.public_path("public")
 
     return app
-"#),
-        ("app/Controllers/HomeController.agi", r#"module App.Controllers
+"#,
+        ),
+        (
+            "app/Controllers/HomeController.agi",
+            r#"module App.Controllers
 
 use Framework.Http.Request
 use Framework.Http.Response
@@ -1144,8 +1359,11 @@ class HomeController:
         return Response.html(
             "<h1>About AGILANG</h1><p>Native application framework.</p>"
         )
-"#),
-        ("app/Controllers/Api/HealthController.agi", r#"module App.Controllers.Api
+"#,
+        ),
+        (
+            "app/Controllers/Api/HealthController.agi",
+            r#"module App.Controllers.Api
 
 use Framework.Http.Request
 use Framework.Http.Response
@@ -1157,8 +1375,11 @@ class HealthController:
             "framework": "AGILANG",
             "version": "0.4.0"
         })
-"#),
-        ("app/Middleware/WebMiddleware.agi", r#"module App.Middleware
+"#,
+        ),
+        (
+            "app/Middleware/WebMiddleware.agi",
+            r#"module App.Middleware
 
 use Framework.Http.Request
 use Framework.Http.Response
@@ -1169,8 +1390,11 @@ class WebMiddleware:
         let response = next(request)
         response.header("X-Powered-By", "AGILANG")
         return response
-"#),
-        ("app/Middleware/ApiMiddleware.agi", r#"module App.Middleware
+"#,
+        ),
+        (
+            "app/Middleware/ApiMiddleware.agi",
+            r#"module App.Middleware
 
 use Framework.Http.Request
 use Framework.Http.Response
@@ -1181,8 +1405,11 @@ class ApiMiddleware:
         let response = next(request)
         response.header("Content-Type", "application/json")
         return response
-"#),
-        ("app/Models/User.agi", r#"module App.Models
+"#,
+        ),
+        (
+            "app/Models/User.agi",
+            r#"module App.Models
 
 class User:
     let id: i64
@@ -1193,8 +1420,11 @@ class User:
 
     fn is_admin() -> bool:
         return self.role == "admin"
-"#),
-        ("app/Providers/AppServiceProvider.agi", r#"module App.Providers
+"#,
+        ),
+        (
+            "app/Providers/AppServiceProvider.agi",
+            r#"module App.Providers
 
 use Framework.Container.Container
 use Framework.Providers.ServiceProvider
@@ -1206,8 +1436,11 @@ class AppServiceProvider extends ServiceProvider:
 
     fn boot() -> void:
         print("Application services booted")
-"#),
-        ("app/Providers/RouteServiceProvider.agi", r#"module App.Providers
+"#,
+        ),
+        (
+            "app/Providers/RouteServiceProvider.agi",
+            r#"module App.Providers
 
 use Framework.Application
 use Framework.Providers.ServiceProvider
@@ -1218,20 +1451,29 @@ class RouteServiceProvider extends ServiceProvider:
     fn boot(app: Application) -> void:
         Web.register_web()
         Api.register_api()
-"#),
-        ("app/Services/ApplicationService.agi", r#"module App.Services
+"#,
+        ),
+        (
+            "app/Services/ApplicationService.agi",
+            r#"module App.Services
 
 class ApplicationService:
     fn get_version() -> string:
         return "0.4.0"
-"#),
-        ("app/Console/Commands/HelloCommand.agi", r#"module App.Console.Commands
+"#,
+        ),
+        (
+            "app/Console/Commands/HelloCommand.agi",
+            r#"module App.Console.Commands
 
 class HelloCommand:
     fn handle() -> void:
         print("Hello from AGILANG Console")
-"#),
-        ("config/app.agi", r#"use Framework.Config.AppConfig
+"#,
+        ),
+        (
+            "config/app.agi",
+            r#"use Framework.Config.AppConfig
 
 return AppConfig {
     name: env("APP_NAME", "AGILANG Application"),
@@ -1239,8 +1481,11 @@ return AppConfig {
     url: env("APP_URL", "http://127.0.0.1:8080"),
     debug: env_bool("APP_DEBUG", true)
 }
-"#),
-        ("config/server.agi", r#"use Framework.Config.ServerConfig
+"#,
+        ),
+        (
+            "config/server.agi",
+            r#"use Framework.Config.ServerConfig
 
 return ServerConfig {
     host: env("APP_HOST", "127.0.0.1"),
@@ -1248,8 +1493,11 @@ return ServerConfig {
     https_port: env_i32("APP_HTTPS_PORT", 8443),
     force_https: env_bool("FORCE_HTTPS", false)
 }
-"#),
-        ("config/auth.agi", r#"use Framework.Auth.AuthConfig
+"#,
+        ),
+        (
+            "config/auth.agi",
+            r#"use Framework.Auth.AuthConfig
 
 return AuthConfig {
     enabled: false,
@@ -1259,37 +1507,55 @@ return AuthConfig {
         "admin"
     ]
 }
-"#),
-        ("config/logging.agi", r#"return {
+"#,
+        ),
+        (
+            "config/logging.agi",
+            r#"return {
     "level": "debug"
 }
-"#),
-        ("config/database.agi", r#"return {
+"#,
+        ),
+        (
+            "config/database.agi",
+            r#"return {
     "driver": "sqlite"
 }
-"#),
-        ("routes/web.agi", r#"use Framework.Routing.Route
+"#,
+        ),
+        (
+            "routes/web.agi",
+            r#"use Framework.Routing.Route
 use App.Controllers.HomeController
 
 fn register_web() -> void:
     Route.get("/", HomeController.index)
     Route.get("/about", HomeController.about)
-"#),
-        ("routes/api.agi", r#"use Framework.Routing.Route
+"#,
+        ),
+        (
+            "routes/api.agi",
+            r#"use Framework.Routing.Route
 use App.Controllers.Api.HealthController
 
 fn register_api() -> void:
     Route.group("/api", fn:
         Route.get("/health", HealthController.show)
     )
-"#),
-        ("routes/console.agi", r#"use Framework.Routing.Route
+"#,
+        ),
+        (
+            "routes/console.agi",
+            r#"use Framework.Routing.Route
 use App.Console.Commands.HelloCommand
 
 fn register_console() -> void:
     Route.command("hello", HelloCommand.handle)
-"#),
-        ("resources/views/layouts/app.ags", r#"<!DOCTYPE html>
+"#,
+        ),
+        (
+            "resources/views/layouts/app.ags",
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1312,8 +1578,11 @@ fn register_console() -> void:
     <script src="/assets/js/app.js"></script>
 </body>
 </html>
-"#),
-        ("resources/views/welcome.ags", r#"@extends("layouts/app")
+"#,
+        ),
+        (
+            "resources/views/welcome.ags",
+            r#"@extends("layouts/app")
 
 @section("content")
 <section class="hero">
@@ -1328,17 +1597,29 @@ fn register_console() -> void:
     </div>
 </section>
 @endsection
-"#),
-        ("resources/views/errors/404.ags", r#"<h1>404 Not Found</h1>
+"#,
+        ),
+        (
+            "resources/views/errors/404.ags",
+            r#"<h1>404 Not Found</h1>
 <p>The page you are looking for does not exist.</p>
-"#),
-        ("resources/views/errors/500.ags", r#"<h1>500 Internal Server Error</h1>
+"#,
+        ),
+        (
+            "resources/views/errors/500.ags",
+            r#"<h1>500 Internal Server Error</h1>
 <p>Something went wrong on our end.</p>
-"#),
-        ("resources/views/components/button.ags", r#"<!-- Button Component -->
+"#,
+        ),
+        (
+            "resources/views/components/button.ags",
+            r#"<!-- Button Component -->
 <button class="btn">{{ text }}</button>
-"#),
-        ("resources/assets/css/app.css", r#":root {
+"#,
+        ),
+        (
+            "resources/assets/css/app.css",
+            r#":root {
     font-family: Inter, system-ui, sans-serif;
     color: #eef6ff;
     background: #07111f;
@@ -1425,15 +1706,27 @@ p {
     color: white;
     border: 1px solid rgba(255,255,255,0.24);
 }
-"#),
-        ("resources/assets/js/app.js", r#"document.documentElement.dataset.agilang = "ready";
+"#,
+        ),
+        (
+            "resources/assets/js/app.js",
+            r#"document.documentElement.dataset.agilang = "ready";
 console.info("AGILANG application assets loaded");
-"#),
-        ("public/index.html", r#"<h1>Hello from AGILANG Public Folder</h1>
-"#),
-        ("public/favicon.svg", r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#1769e0"/></svg>
-"##),
-        ("database/migrations/CreateUsersTable.agi", r#"use Framework.Database.Migration
+"#,
+        ),
+        (
+            "public/index.html",
+            r#"<h1>Hello from AGILANG Public Folder</h1>
+"#,
+        ),
+        (
+            "public/favicon.svg",
+            r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#1769e0"/></svg>
+"##,
+        ),
+        (
+            "database/migrations/CreateUsersTable.agi",
+            r#"use Framework.Database.Migration
 use Framework.Database.Schema
 
 class CreateUsersTable extends Migration:
@@ -1449,14 +1742,20 @@ class CreateUsersTable extends Migration:
 
     fn down() -> void:
         Schema.drop_if_exists("users")
-"#),
-        ("database/seeders/DatabaseSeeder.agi", r#"use Framework.Database.Seeder
+"#,
+        ),
+        (
+            "database/seeders/DatabaseSeeder.agi",
+            r#"use Framework.Database.Seeder
 
 class DatabaseSeeder extends Seeder:
     fn run() -> void:
         print("Database seeding complete")
-"#),
-        ("database/factories/UserFactory.agi", r#"use App.Models.User
+"#,
+        ),
+        (
+            "database/factories/UserFactory.agi",
+            r#"use App.Models.User
 use Framework.Database.Factory
 
 class UserFactory extends Factory:
@@ -1467,15 +1766,21 @@ class UserFactory extends Factory:
             password_hash: hash_password("password"),
             role: "user"
         }
-"#),
-        ("tests/Feature/HomePageTest.agi", r#"use Framework.Testing.WebTest
+"#,
+        ),
+        (
+            "tests/Feature/HomePageTest.agi",
+            r#"use Framework.Testing.WebTest
 
 test "home page returns successful response":
     let response = WebTest.get("/")
     response.assert_status(200)
     response.assert_contains("AGILANG Native Framework")
-"#),
-        ("tests/Feature/HealthApiTest.agi", r#"use Framework.Testing.WebTest
+"#,
+        ),
+        (
+            "tests/Feature/HealthApiTest.agi",
+            r#"use Framework.Testing.WebTest
 
 test "health API returns healthy status":
     let response = WebTest.get("/api/health")
@@ -1483,14 +1788,18 @@ test "health API returns healthy status":
     response.assert_json({
         "status": "healthy"
     })
-"#),
-        ("tests/Unit/ApplicationServiceTest.agi", r#"use Framework.Testing.UnitTest
+"#,
+        ),
+        (
+            "tests/Unit/ApplicationServiceTest.agi",
+            r#"use Framework.Testing.UnitTest
 use App.Services.ApplicationService
 
 test "version returns 0.4.0":
     let service = ApplicationService()
     assert(service.get_version() == "0.4.0")
-"#),
+"#,
+        ),
         ("storage/cache/.gitkeep", ""),
         ("storage/logs/.gitkeep", ""),
         ("storage/sessions/.gitkeep", ""),

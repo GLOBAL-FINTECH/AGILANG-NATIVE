@@ -25,10 +25,17 @@ impl<'a> MiddlewareChain<'a> {
         self.execute_at(0, request, &core_handler)
     }
 
-    fn execute_at(&self, index: usize, request: Request, core_handler: &dyn Fn(Request) -> Response) -> Response {
+    fn execute_at(
+        &self,
+        index: usize,
+        request: Request,
+        core_handler: &dyn Fn(Request) -> Response,
+    ) -> Response {
         if index < self.middlewares.len() {
             let middleware = self.middlewares[index];
-            middleware.handle(request, &|req| self.execute_at(index + 1, req, core_handler))
+            middleware.handle(request, &|req| {
+                self.execute_at(index + 1, req, core_handler)
+            })
         } else {
             core_handler(request)
         }

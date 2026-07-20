@@ -1,5 +1,0 @@
-{
-  "project": "hello",
-  "target": "native",
-  "executable": "build/out.exe"
-}

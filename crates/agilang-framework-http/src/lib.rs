@@ -27,7 +27,9 @@ impl Request {
         &self.path
     }
     pub fn query(&self, key: &str) -> Option<&str> {
-        self.query.get(key).and_then(|v| v.first().map(|s| s.as_str()))
+        self.query
+            .get(key)
+            .and_then(|v| v.first().map(|s| s.as_str()))
     }
     pub fn query_all(&self, key: &str) -> Vec<&str> {
         self.query
@@ -50,7 +52,10 @@ pub struct Response {
 impl Response {
     pub fn html(body: &str) -> Self {
         let mut headers = HashMap::new();
-        headers.insert("Content-Type".to_string(), "text/html; charset=utf-8".to_string());
+        headers.insert(
+            "Content-Type".to_string(),
+            "text/html; charset=utf-8".to_string(),
+        );
         Response {
             status: 200,
             headers,

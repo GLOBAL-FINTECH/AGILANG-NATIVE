@@ -83,12 +83,7 @@ impl Router {
                                     .strip_prefix("App.Controllers.")
                                     .unwrap_or(controller_raw);
 
-                                self.add(
-                                    HttpMethod::Get,
-                                    full_path,
-                                    controller,
-                                    action,
-                                );
+                                self.add(HttpMethod::Get, full_path, controller, action);
                             }
                         }
                     }

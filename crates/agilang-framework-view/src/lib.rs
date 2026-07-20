@@ -10,10 +10,18 @@ impl ViewEngine {
         ViewEngine { views_dir }
     }
 
-    pub fn render(&self, view_name: &str, data: &HashMap<String, String>) -> Result<String, String> {
+    pub fn render(
+        &self,
+        view_name: &str,
+        data: &HashMap<String, String>,
+    ) -> Result<String, String> {
         let view_path = self.views_dir.join(format!("{}.ags", view_name));
         if !view_path.exists() {
-            return Err(format!("View `{}` not found at {}", view_name, view_path.display()));
+            return Err(format!(
+                "View `{}` not found at {}",
+                view_name,
+                view_path.display()
+            ));
         }
 
         let mut content = std::fs::read_to_string(&view_path)
@@ -24,7 +32,11 @@ impl ViewEngine {
             let layout_name = self.extract_extends(&content)?;
             let layout_path = self.views_dir.join(format!("{}.ags", layout_name));
             if !layout_path.exists() {
-                return Err(format!("Layout `{}` not found at {}", layout_name, layout_path.display()));
+                return Err(format!(
+                    "Layout `{}` not found at {}",
+                    layout_name,
+                    layout_path.display()
+                ));
             }
 
             let layout_content = std::fs::read_to_string(&layout_path)
@@ -96,7 +108,9 @@ impl ViewEngine {
                     let parts: Vec<&str> = expr.split("??").collect();
                     let key = parts[0].trim();
                     let fallback = parts[1].trim().trim_matches('"').trim_matches('\'');
-                    data.get(key).cloned().unwrap_or_else(|| fallback.to_string())
+                    data.get(key)
+                        .cloned()
+                        .unwrap_or_else(|| fallback.to_string())
                 } else {
                     data.get(expr).cloned().unwrap_or_default()
                 };

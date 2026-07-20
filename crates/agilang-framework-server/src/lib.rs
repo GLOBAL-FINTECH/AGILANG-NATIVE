@@ -62,7 +62,9 @@ pub fn parse_query(query_str: &str) -> HashMap<String, Vec<String>> {
 pub fn parse_http_request(stream: &mut TcpStream) -> Result<Request, String> {
     let mut reader = BufReader::new(stream);
     let mut first_line = String::new();
-    reader.read_line(&mut first_line).map_err(|e| e.to_string())?;
+    reader
+        .read_line(&mut first_line)
+        .map_err(|e| e.to_string())?;
 
     let parts: Vec<&str> = first_line.split_whitespace().collect();
     if parts.len() < 3 {
@@ -337,10 +339,15 @@ pub fn handle_client(
             let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S");
 
             // Serves static files from public/ first
-            let public_path = project_root.join("public").join(path.trim_start_matches('/'));
+            let public_path = project_root
+                .join("public")
+                .join(path.trim_start_matches('/'));
             if public_path.is_file() && !path.ends_with('/') {
                 if let Ok(content) = std::fs::read(public_path) {
-                    let ext = Path::new(path).extension().and_then(|s| s.to_str()).unwrap_or("");
+                    let ext = Path::new(path)
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("");
                     let mime = match ext {
                         "css" => "text/css",
                         "js" => "application/javascript",
@@ -357,7 +364,13 @@ pub fn handle_client(
                     stream.write_all(response.as_bytes()).ok();
                     stream.write_all(&content).ok();
                     stream.flush().ok();
-                    println!("{} {:?} {} 200 {}ms", now, req.method, path, start_time.elapsed().as_millis());
+                    println!(
+                        "{} {:?} {} 200 {}ms",
+                        now,
+                        req.method,
+                        path,
+                        start_time.elapsed().as_millis()
+                    );
                     return Ok(());
                 }
             }
@@ -380,28 +393,21 @@ pub fn handle_client(
                                 format!("<h1>500 Internal Server Error</h1><pre>{}</pre>", e),
                                 "text/html; charset=utf-8",
                             ),
-                            Ok(ControllerResult::Html(html)) => (
-                                200,
-                                html,
-                                "text/html; charset=utf-8",
-                            ),
-                            Ok(ControllerResult::Json(json)) => (
-                                200,
-                                json,
-                                "application/json",
-                            ),
+                            Ok(ControllerResult::Html(html)) => {
+                                (200, html, "text/html; charset=utf-8")
+                            }
+                            Ok(ControllerResult::Json(json)) => (200, json, "application/json"),
                             Ok(ControllerResult::Render(view, data)) => {
                                 match view_engine.render(&view, &data) {
-                                    Ok(html) => (
-                                        200,
-                                        html,
-                                        "text/html; charset=utf-8",
-                                    ),
+                                    Ok(html) => (200, html, "text/html; charset=utf-8"),
                                     Err(e) => (
                                         500,
-                                        format!("<h1>500 Internal Server Error</h1><pre>{}</pre>", e),
+                                        format!(
+                                            "<h1>500 Internal Server Error</h1><pre>{}</pre>",
+                                            e
+                                        ),
                                         "text/html; charset=utf-8",
-                                    )
+                                    ),
                                 }
                             }
                         }
