@@ -132,6 +132,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-lsp"
+version = "0.3.0"
+dependencies = [
+ "agilang-compiler",
+ "agilang-diagnostics",
+ "agilang-lexer",
+ "agilang-parser",
+ "agilang-semantic",
+ "agilang-source",
+ "agilang-symbols",
+ "agilang-types",
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "agilang-native-cli"
 version = "0.3.0"
 dependencies = [
@@ -142,6 +159,7 @@ dependencies = [
  "agilang-framework-server",
  "agilang-framework-view",
  "agilang-ir",
+ "agilang-lsp",
  "agilang-project-generator",
  "agilang-symbols",
  "agilang-types",

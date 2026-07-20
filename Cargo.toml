@@ -29,6 +29,7 @@ members = [
   "crates/agilang-framework-middleware",
   "crates/agilang-framework-view",
   "crates/agilang-framework-server",
+  "crates/agilang-lsp",
 ]
 
 [workspace.package]

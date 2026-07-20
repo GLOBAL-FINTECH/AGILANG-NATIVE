@@ -21,5 +21,6 @@ agilang-framework-server = { path = "../agilang-framework-server" }
 agilang-framework-routing = { path = "../agilang-framework-routing" }
 agilang-framework-view = { path = "../agilang-framework-view" }
 agilang-framework-http = { path = "../agilang-framework-http" }
+agilang-lsp = { path = "../agilang-lsp" }
 chrono = "0.4"
 

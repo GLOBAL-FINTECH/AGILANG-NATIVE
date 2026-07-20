@@ -8,7 +8,7 @@ pub fn generate_project(name: &str, template: &str) -> Result<()> {
         bail!("directory `{}` already exists", name);
     }
 
-    let files = [
+    let mut files = vec![
         (
             "agilang.toml",
             r#"[project]
@@ -675,6 +675,7 @@ test "version returns 0.4.0":
         ("storage/uploads/.gitkeep", ""),
         ("public/assets/.gitkeep", ""),
     ];
+    files.extend(get_ai_docs());
 
     // Write all files
     for (relative_path, content) in &files {
@@ -1381,7 +1382,7 @@ pub fn repair_template(dry_run: bool, force: bool) -> Result<()> {
 
     println!("Inspecting AGILANG web template...\n");
 
-    let files = [
+    let mut files = vec![
         (
             "agilang.toml",
             r#"[project]
@@ -2048,6 +2049,7 @@ test "version returns 0.4.0":
         ("storage/uploads/.gitkeep", ""),
         ("public/assets/.gitkeep", ""),
     ];
+    files.extend(get_ai_docs());
 
     let app_name = project_root
         .file_name()
@@ -2114,4 +2116,161 @@ test "version returns 0.4.0":
     println!("Customized files were preserved.");
 
     Ok(())
+}
+
+fn get_ai_docs() -> Vec<(&'static str, &'static str)> {
+    vec![
+        (
+            "AGENTS.md",
+            r#"# AGILANG Native Application - Agent Guidelines
+
+Welcome! This project is built using the AGILANG Native Web Framework.
+Please follow these guidelines when acting as an agent:
+- Keep route files in `routes/web.agi` and `routes/api.agi`.
+- Place controllers inside `app/Controllers/`.
+- Use AGS templates under `resources/views/`.
+- Run checks with `agilang check` and server with `agilang serve`.
+"#,
+        ),
+        (
+            "AGILANG.md",
+            r#"# AGILANG Language Specification Summary
+
+AGILANG is a native, compiled language designed for maximum performance web applications.
+- Native execution compiled via MSVC/GCC.
+- Built-in dynamic router, template engine, and WebSocket/WebRTC capabilities.
+"#,
+        ),
+        (
+            "docs/AI_CONTEXT.md",
+            r#"# AI Context Guidelines
+Use this context to align on coding standards and styles for the project.
+"#,
+        ),
+        (
+            "docs/LANGUAGE_REFERENCE.md",
+            r#"# Language Reference
+Syntax details for functions, classes, models, and migrations.
+"#,
+        ),
+        (
+            "docs/FRAMEWORK_GUIDE.md",
+            r#"# Framework Guide
+Details on request, response, routing, layouts, and rendering.
+"#,
+        ),
+        (
+            "docs/PROJECT_STRUCTURE.md",
+            r#"# Project Structure
+Overview of files and directories.
+"#,
+        ),
+        (
+            "docs/ROUTING.md",
+            r#"# Routing
+Route declarations, groups, controllers, and middleware mappings.
+"#,
+        ),
+        (
+            "docs/CONTROLLERS.md",
+            r#"# Controllers
+Actions, request extraction, responses, JSON, and view rendering.
+"#,
+        ),
+        (
+            "docs/AGS_TEMPLATES.md",
+            r#"# AGS Templates
+Yielding, layout extensions, sections, and interpolation.
+"#,
+        ),
+        (
+            "docs/AUTHENTICATION.md",
+            r#"# Authentication
+Role and permissions middleware, login/logout, and routes.
+"#,
+        ),
+        (
+            "docs/BUILD_AND_TEST.md",
+            r#"# Build and Test
+Build pipeline and feature/unit testing guides.
+"#,
+        ),
+        (
+            "docs/spec/compiler-capabilities.json",
+            r#"{
+  "implemented": [
+    "lexer",
+    "parser",
+    "classes",
+    "functions",
+    "primitive_types",
+    "let_binding",
+    "if_expression",
+    "while_loop"
+  ],
+  "partial": [
+    "structs",
+    "lists"
+  ],
+  "scaffoldOnly": [
+    "auth_security"
+  ],
+  "planned": [
+    "generics",
+    "async_await"
+  ]
+}
+"#,
+        ),
+        (
+            "docs/spec/framework-capabilities.json",
+            r#"{
+  "implemented": [
+    "http_server",
+    "http_router",
+    "ags_template_engine",
+    "websockets",
+    "webrtc_stun"
+  ],
+  "partial": [
+    "session_persistence"
+  ],
+  "scaffoldOnly": [
+    "database_orm"
+  ],
+  "planned": [
+    "queue_workers"
+  ]
+}
+"#,
+        ),
+        (
+            "docs/spec/project-structure.json",
+            r#"{
+  "directories": [
+    "app",
+    "config",
+    "database",
+    "routes",
+    "resources",
+    "public",
+    "tests",
+    "storage"
+  ]
+}
+"#,
+        ),
+        (
+            "docs/spec/examples-index.json",
+            r#"{
+  "examples": [
+    {
+      "name": "hello_world",
+      "path": "examples/native/hello.agi"
+    }
+  ]
+}
+"#,
+        ),
+    ]
 }
