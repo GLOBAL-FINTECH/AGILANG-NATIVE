@@ -36,6 +36,9 @@ members = [
   "crates/agilang-framework-validation",
   "crates/agilang-framework-rate-limit",
   "crates/agilang-framework-database",
+  "crates/agilang-framework-schema",
+  "crates/agilang-framework-migrations",
+  "crates/agilang-framework-seeding",
 ]
 
 [workspace.package]

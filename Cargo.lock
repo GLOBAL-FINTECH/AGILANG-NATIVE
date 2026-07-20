@@ -103,6 +103,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-framework-migrations"
+version = "0.3.0"
+dependencies = [
+ "agilang-framework-schema",
+ "anyhow",
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "agilang-framework-rate-limit"
 version = "0.3.0"
 dependencies = [
@@ -118,11 +129,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-framework-schema"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-framework-security"
 version = "0.3.0"
 dependencies = [
  "agilang-framework-rate-limit",
  "agilang-framework-session",
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "agilang-framework-seeding"
+version = "0.3.0"
+dependencies = [
+ "agilang-framework-database",
  "anyhow",
  "serde",
  "serde_json",
@@ -211,6 +240,7 @@ dependencies = [
  "agilang-build",
  "agilang-compiler",
  "agilang-framework-http",
+ "agilang-framework-migrations",
  "agilang-framework-routing",
  "agilang-framework-server",
  "agilang-framework-view",
