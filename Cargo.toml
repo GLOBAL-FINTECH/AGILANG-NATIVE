@@ -17,6 +17,10 @@ members = [
   "crates/agilang-symbols",
   "crates/agilang-ir",
   "crates/agilang-semantic",
+  "crates/agilang-codegen-c",
+  "crates/agilang-linker",
+  "crates/agilang-project-generator",
+  "crates/agilang-build",
 ]
 
 [workspace.package]

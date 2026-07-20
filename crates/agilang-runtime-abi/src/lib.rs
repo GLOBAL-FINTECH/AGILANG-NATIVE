@@ -407,6 +407,15 @@ pub extern "C" fn agi_runtime_identity() -> *const c_char {
     b"AGILANG-NATIVE-RUNTIME\0".as_ptr().cast()
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn agi_print(msg: *const c_char) {
+    if !msg.is_null() {
+        if let Ok(s) = std::ffi::CStr::from_ptr(msg).to_str() {
+            println!("{}", s);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

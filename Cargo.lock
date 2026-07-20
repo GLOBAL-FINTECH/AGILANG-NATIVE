@@ -10,6 +10,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-build"
+version = "0.3.0"
+dependencies = [
+ "agilang-codegen-c",
+ "agilang-compiler",
+ "agilang-ir",
+ "agilang-linker",
+ "agilang-source",
+ "agilang-symbols",
+ "agilang-types",
+ "anyhow",
+]
+
+[[package]]
+name = "agilang-codegen-c"
+version = "0.3.0"
+dependencies = [
+ "agilang-compiler",
+ "agilang-ir",
+ "agilang-source",
+ "agilang-symbols",
+ "agilang-types",
+ "serde",
+]
+
+[[package]]
 name = "agilang-compiler"
 version = "0.3.0"
 dependencies = [
@@ -50,11 +76,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-linker"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
 name = "agilang-native-cli"
 version = "0.3.0"
 dependencies = [
+ "agilang-build",
  "agilang-compiler",
  "agilang-ir",
+ "agilang-project-generator",
  "agilang-symbols",
  "agilang-types",
  "anyhow",
@@ -68,6 +103,13 @@ dependencies = [
  "agilang-diagnostics",
  "agilang-lexer",
  "agilang-source",
+]
+
+[[package]]
+name = "agilang-project-generator"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
 ]
 
 [[package]]

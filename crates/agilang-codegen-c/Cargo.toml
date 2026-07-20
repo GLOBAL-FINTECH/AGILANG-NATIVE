@@ -1,19 +1,16 @@
 [package]
-name = "agilang-native-cli"
+name = "agilang-codegen-c"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
-[[bin]]
-name = "agilang"
-path = "src/main.rs"
-
 [dependencies]
-anyhow.workspace = true
-agilang-compiler = { path = "../agilang-compiler" }
+agilang-source = { path = "../agilang-source" }
 agilang-types = { path = "../agilang-types" }
 agilang-symbols = { path = "../agilang-symbols" }
 agilang-ir = { path = "../agilang-ir" }
-agilang-build = { path = "../agilang-build" }
-agilang-project-generator = { path = "../agilang-project-generator" }
+serde = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+agilang-compiler = { path = "../agilang-compiler" }
