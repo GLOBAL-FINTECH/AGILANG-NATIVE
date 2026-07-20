@@ -1,0 +1,10 @@
+[package]
+name = "agilang-database-prepared"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+agilang-database-driver = { path = "../agilang-database-driver" }
+agilang-database-sql = { path = "../agilang-database-sql" }

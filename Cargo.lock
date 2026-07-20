@@ -125,6 +125,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-database-parser"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-sql",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-planner"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-sql",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-policy"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-security-kernel",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-database-pool"
 version = "0.3.0"
 dependencies = [
@@ -144,6 +171,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-database-prepared"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-driver",
+ "agilang-database-sql",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-query-security"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-parser",
+ "agilang-database-planner",
+ "agilang-database-policy",
+ "agilang-database-prepared",
+ "agilang-database-sql",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-database-recovery"
 version = "0.3.0"
 dependencies = [
@@ -155,6 +205,14 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-security-kernel"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-sql"
 version = "0.3.0"
 dependencies = [
  "anyhow",
