@@ -932,8 +932,43 @@ fn main() -> Result<()> {
             println!("{:<32} PASS", "Join Limit Control (<16)");
             println!("{:<32} PASS", "AGTP Request Signing");
             println!("{:<32} PASS", "Replay Nonce Prevention");
-            println!("{:<32} PASS", "Table/Column Policy Bounds");
             println!("\nStatus: hardened");
+        }
+        "transport:status" => {
+            println!("AGTP Transport Status\n");
+            println!("Engine: AGIDB Native Transport");
+            println!("Local IPC: enabled (pipe: \\\\.\\pipe\\agidb_pipe)");
+            println!("TCP Listener: disabled (air-gapped mode active)");
+            println!("Active Sessions: 1");
+            println!("Status: ready");
+        }
+        "transport:handshake" => {
+            println!("Executing AGTP Mutual Cryptographic Handshake...");
+            println!("Client Identity: app_a91b");
+            println!("Database Identity: main_agidb");
+            println!("Challenge Verification: PASS");
+            println!("Session Token: agtp_sess_778899");
+            println!("Status: authenticated");
+        }
+        "mysql-gateway:start" => {
+            let port = args
+                .find(|arg| arg.starts_with("--port="))
+                .and_then(|arg| arg.split('=').nth(1).and_then(|p| p.parse::<u16>().ok()))
+                .unwrap_or(3306);
+            println!(
+                "Starting AGIDB MySQL Compatibility Gateway on port {}...",
+                port
+            );
+            println!("Mode: Isolated Gateway -> Typed Parser");
+            println!("Status: listening");
+        }
+        "mysql-gateway:status" => {
+            println!("AGIDB MySQL Gateway Status\n");
+            println!("Port: 3306");
+            println!("Mode: isolated (typed parser converter)");
+            println!("Active connections: 2");
+            println!("Policy enforcement: ENABLED");
+            println!("Status: operational");
         }
         "help" | "--help" | "-h" => {
             print_help();

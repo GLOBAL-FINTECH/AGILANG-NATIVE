@@ -1,0 +1,9 @@
+[package]
+name = "agilang-database-tcp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+agilang-database-transport = { path = "../agilang-database-transport" }

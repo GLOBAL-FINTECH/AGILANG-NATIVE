@@ -82,6 +82,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-database-auth"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-identity",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-database-crypto"
 version = "0.3.0"
 dependencies = [
@@ -100,9 +109,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-database-identity"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-database-index"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-ipc"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-transport",
  "anyhow",
  "serde",
 ]
@@ -120,6 +146,17 @@ name = "agilang-database-mysql"
 version = "0.3.0"
 dependencies = [
  "agilang-database-driver",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-mysql-gateway"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-parser",
+ "agilang-database-policy",
+ "agilang-database-prepared",
  "anyhow",
  "serde",
 ]
@@ -212,6 +249,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-database-session"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-security-kernel",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-database-sql"
 version = "0.3.0"
 dependencies = [
@@ -237,10 +283,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-database-tcp"
+version = "0.3.0"
+dependencies = [
+ "agilang-database-transport",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
 name = "agilang-database-transactions"
 version = "0.3.0"
 dependencies = [
  "agilang-database-driver",
+ "anyhow",
+ "serde",
+]
+
+[[package]]
+name = "agilang-database-transport"
+version = "0.3.0"
+dependencies = [
  "anyhow",
  "serde",
 ]

@@ -62,6 +62,13 @@ members = [
   "crates/agilang-database-prepared",
   "crates/agilang-database-policy",
   "crates/agilang-database-query-security",
+  "crates/agilang-database-identity",
+  "crates/agilang-database-auth",
+  "crates/agilang-database-session",
+  "crates/agilang-database-transport",
+  "crates/agilang-database-ipc",
+  "crates/agilang-database-tcp",
+  "crates/agilang-database-mysql-gateway",
 ]
 
 [workspace.package]
