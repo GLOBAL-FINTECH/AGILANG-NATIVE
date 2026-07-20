@@ -17,3 +17,9 @@ agilang-symbols = { path = "../agilang-symbols" }
 agilang-ir = { path = "../agilang-ir" }
 agilang-build = { path = "../agilang-build" }
 agilang-project-generator = { path = "../agilang-project-generator" }
+agilang-framework-server = { path = "../agilang-framework-server" }
+agilang-framework-routing = { path = "../agilang-framework-routing" }
+agilang-framework-view = { path = "../agilang-framework-view" }
+agilang-framework-http = { path = "../agilang-framework-http" }
+chrono = "0.4"
+

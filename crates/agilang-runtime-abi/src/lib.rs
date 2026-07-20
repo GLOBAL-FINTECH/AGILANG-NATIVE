@@ -407,12 +407,22 @@ pub extern "C" fn agi_runtime_identity() -> *const c_char {
     b"AGILANG-NATIVE-RUNTIME\0".as_ptr().cast()
 }
 
+/// Prints the given null-terminated string to standard output.
+///
+/// # Ownership Contract
+/// - `agi_print` does not retain, modify, or free the provided pointer.
+/// - The caller must provide a valid null-terminated string for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn agi_print(msg: *const c_char) {
-    if !msg.is_null() {
-        if let Ok(s) = std::ffi::CStr::from_ptr(msg).to_str() {
-            println!("{}", s);
-        }
+    if msg.is_null() {
+        return;
+    }
+
+    let value = unsafe { std::ffi::CStr::from_ptr(msg) };
+
+    match value.to_str() {
+        Ok(text) => println!("{text}"),
+        Err(_) => eprintln!("AGILANG runtime: invalid UTF-8 passed to agi_print"),
     }
 }
 

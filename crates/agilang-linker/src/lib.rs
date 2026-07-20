@@ -32,7 +32,15 @@ impl Linker {
         let lib_path_str = lib_path.to_string_lossy();
 
         let build_dir = out_exe.parent().unwrap_or_else(|| Path::new("build"));
-        std::fs::create_dir_all(build_dir).ok();
+        let obj_dir = build_dir.join("objects");
+        std::fs::create_dir_all(&obj_dir).ok();
+
+        let stem = out_exe
+            .file_stem()
+            .unwrap_or_else(|| std::ffi::OsStr::new("app"));
+        let obj_file_path = obj_dir.join(format!("{}.obj", stem.to_string_lossy()));
+        let obj_file_str = obj_file_path.to_string_lossy();
+
         let bat_path = build_dir.join("compile.bat");
 
         let mut bat_content = String::new();
@@ -43,8 +51,9 @@ impl Linker {
             ));
         }
         bat_content.push_str(&format!(
-            "cl.exe /O2 /Fe:\"{}\" \"{}\" \"{}\" ws2_32.lib userenv.lib ntdll.lib bcrypt.lib advapi32.lib\r\n",
+            "cl.exe /O2 /Fe:\"{}\" /Fo:\"{}\" \"{}\" \"{}\" ws2_32.lib userenv.lib ntdll.lib bcrypt.lib advapi32.lib\r\n",
             out_exe_str,
+            obj_file_str,
             c_file_str,
             lib_path_str
         ));
@@ -69,16 +78,6 @@ impl Linker {
                 stdout,
                 stderr
             );
-        }
-
-        // Clean up temporary compilation artifacts (.obj file generated in same folder as out_exe)
-        if let Some(parent) = out_exe.parent() {
-            if let Some(stem) = out_exe.file_stem() {
-                let obj_file = parent.join(format!("{}.obj", stem.to_string_lossy()));
-                if obj_file.exists() {
-                    std::fs::remove_file(obj_file).ok();
-                }
-            }
         }
 
         Ok(())

@@ -44,8 +44,11 @@ pub fn generate(program: &HirProgram) -> String {
 
     // Generate C main standard entry point
     out.push_str("// Standard C Main Entry Point\n");
-    out.push_str("int main(int argc, char* argv[]) {\n");
-    out.push_str("    return (int)main_agi();\n");
+    out.push_str("int32_t agilang_main(void) {\n");
+    out.push_str("    return (int32_t)main_agi();\n");
+    out.push_str("}\n\n");
+    out.push_str("int main(void) {\n");
+    out.push_str("    return (int)agilang_main();\n");
     out.push_str("}\n");
 
     out
@@ -159,6 +162,6 @@ mod tests {
         assert!(c_code.contains("int32_t main_agi("));
         assert!(c_code.contains("agi_print(\"Hello C Codegen\");"));
         assert!(c_code.contains("return 0;"));
-        assert!(c_code.contains("int main(int argc, char* argv[])"));
+        assert!(c_code.contains("int main(void)"));
     }
 }

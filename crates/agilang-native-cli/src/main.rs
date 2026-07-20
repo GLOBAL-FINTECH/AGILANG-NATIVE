@@ -228,7 +228,7 @@ fn main() -> Result<()> {
                 }
             }
 
-            agilang_build::build_project(&entry_path, &out_exe, false)?;
+            agilang_build::build_project(&entry_path, &out_exe, false, false, false)?;
 
             println!("\nExecuting {}...", out_exe.display());
             let status = std::process::Command::new(&out_exe)
@@ -242,9 +242,15 @@ fn main() -> Result<()> {
         "build" => {
             let mut file_arg = None;
             let mut emit_c = false;
+            let mut keep_generated = false;
+            let mut verbose = false;
             for arg in args.by_ref() {
                 if arg == "--emit-c" {
                     emit_c = true;
+                } else if arg == "--keep-generated" {
+                    keep_generated = true;
+                } else if arg == "--verbose" {
+                    verbose = true;
                 } else if file_arg.is_none() {
                     file_arg = Some(arg);
                 }
@@ -255,6 +261,7 @@ fn main() -> Result<()> {
             };
 
             let mut out_exe = PathBuf::from("build/out.exe");
+            let mut found_project = false;
             if let Ok(current_dir) = env::current_dir() {
                 let mut dir = current_dir;
                 loop {
@@ -264,6 +271,7 @@ fn main() -> Result<()> {
                             .map(|n| n.to_string_lossy().into_owned())
                             .unwrap_or_else(|| "app".into());
                         out_exe = dir.join("build").join(format!("{}.exe", name));
+                        found_project = true;
                         break;
                     }
                     if !dir.pop() {
@@ -272,11 +280,21 @@ fn main() -> Result<()> {
                 }
             }
 
-            agilang_build::build_project(&entry_path, &out_exe, emit_c)?;
+            if !found_project {
+                let stem = entry_path
+                    .file_stem()
+                    .unwrap_or_else(|| std::ffi::OsStr::new("out"))
+                    .to_string_lossy();
+                out_exe = PathBuf::from(format!("build/{}.exe", stem));
+            }
+
+            agilang_build::build_project(&entry_path, &out_exe, emit_c, keep_generated, verbose)?;
         }
         "serve" => {
             let mut host = "127.0.0.1".to_string();
-            let mut port = "8080".to_string();
+            let mut port_str = "8080".to_string();
+            let mut allow_fallback = false;
+
             let remaining: Vec<String> = args.collect();
             let mut i = 0;
             while i < remaining.len() {
@@ -284,44 +302,149 @@ fn main() -> Result<()> {
                     host = remaining[i + 1].clone();
                     i += 2;
                 } else if remaining[i] == "--port" && i + 1 < remaining.len() {
-                    port = remaining[i + 1].clone();
+                    port_str = remaining[i + 1].clone();
                     i += 2;
+                } else if remaining[i] == "--port-fallback" {
+                    allow_fallback = true;
+                    i += 1;
                 } else {
                     i += 1;
                 }
             }
 
+            let requested_port: u16 = port_str.parse().context("invalid port number")?;
+
+            // Find project root
+            let mut project_root = std::env::current_dir()?;
             let mut app_name = "app".to_string();
-            if let Ok(current_dir) = env::current_dir() {
-                let mut dir = current_dir;
-                loop {
-                    if dir.join("agilang.toml").exists() {
-                        app_name = dir
-                            .file_name()
-                            .map(|n| n.to_string_lossy().into_owned())
-                            .unwrap_or_else(|| "app".into());
-                        break;
-                    }
-                    if !dir.pop() {
-                        break;
-                    }
+            let mut found = false;
+            loop {
+                if project_root.join("agilang.toml").exists() {
+                    app_name = project_root
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| "app".into());
+                    found = true;
+                    break;
+                }
+                if !project_root.pop() {
+                    break;
                 }
             }
 
-            println!("AGILANG development server");
+            if !found {
+                bail!("not in an AGILANG project (agilang.toml not found)");
+            }
+
+            println!("Loading application configuration...");
+            println!("Compiling routes...");
+
+            let mut router = agilang_framework_routing::Router::new();
+            let web_routes_file = project_root.join("routes/web.agi");
+            let api_routes_file = project_root.join("routes/api.agi");
+            router.load_routes_from_file(&web_routes_file).ok();
+            router.load_routes_from_file(&api_routes_file).ok();
+
+            println!("Compiling views...");
+            let views_dir = project_root.join("resources/views");
+            let view_count = count_views(&views_dir);
+
+            println!("Binding {}:{}...", host, requested_port);
+
+            let host_ip: std::net::IpAddr = host.parse().context("invalid host IP address")?;
+
+            let (listener, bound_port) = match agilang_framework_server::bind_with_fallback(host_ip, requested_port, allow_fallback) {
+                Ok((l, p)) => {
+                    if p != requested_port {
+                        println!("warning: port {} is already occupied", requested_port);
+                        println!("Using available port {}", p);
+                    }
+                    (l, p)
+                }
+                Err(error) => {
+                    if error.kind() == std::io::ErrorKind::AddrInUse {
+                        eprintln!("\nerror[E4001]: unable to bind development server\n");
+                        eprintln!("Address: {}:{}", host, requested_port);
+                        eprintln!("Reason: the port is already in use\n");
+                        eprintln!("Try:\n    agilang serve --port {}", requested_port + 1);
+                        eprintln!("\nTo inspect the process on Windows:\n    Get-NetTCPConnection -LocalPort {} -State Listen\n", requested_port);
+                        return Ok(());
+                    } else {
+                        return Err(error.into());
+                    }
+                }
+            };
+
+            println!("\nAGILANG development server\n");
             println!("Application: {}", app_name);
             println!("Environment: local");
-            println!("Address: http://{}:{}", host, port);
-            println!("Routes loaded: 12");
-            println!("Views compiled: 8");
+            println!("Address: http://{}:{}", host, bound_port);
+            println!("Routes loaded: {}", router.routes.len());
+            println!("Views compiled: {}", view_count);
+            println!("Status: ready\n");
             println!("Press Ctrl+C to stop.");
 
-            let listener = std::net::TcpListener::bind(format!("{}:{}", host, port))?;
-            for mut stream in listener.incoming().flatten() {
-                use std::io::Write;
-                let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<h1>Hello from AGILANG Native Framework!</h1>\n";
-                stream.write_all(response.as_bytes()).ok();
+            let view_engine = agilang_framework_view::ViewEngine::new(views_dir);
+
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(client_stream) => {
+                        let router_ref = &router;
+                        let view_ref = &view_engine;
+                        let root_ref = &project_root;
+                        if let Err(e) = agilang_framework_server::handle_client(client_stream, router_ref, view_ref, root_ref) {
+                            eprintln!("request error: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("connection error: {}", e);
+                    }
+                }
             }
+        }
+        "auth" => {
+            let mut roles = vec!["user".to_string(), "admin".to_string()];
+            let mut force = false;
+            let mut repair = false;
+
+            let remaining: Vec<String> = args.collect();
+            let mut i = 0;
+            while i < remaining.len() {
+                if remaining[i] == "--roles" && i + 1 < remaining.len() {
+                    roles = remaining[i + 1].split(',').map(|s| s.trim().to_string()).collect();
+                    i += 2;
+                } else if remaining[i] == "--force" {
+                    force = true;
+                    i += 1;
+                } else if remaining[i] == "--repair" {
+                    repair = true;
+                    i += 1;
+                } else {
+                    i += 1;
+                }
+            }
+
+            agilang_project_generator::generate_auth(roles, force, repair)?;
+        }
+        "template:repair" => {
+            let mut dry_run = false;
+            let mut force = false;
+
+            let remaining: Vec<String> = args.collect();
+            let mut i = 0;
+            while i < remaining.len() {
+                if remaining[i] == "--dry-run" {
+                    dry_run = true;
+                    i += 1;
+                } else if remaining[i] == "--force" {
+                    force = true;
+                    i += 1;
+                } else {
+                    i += 1;
+                }
+            }
+
+            agilang_project_generator::repair_template(dry_run, force)?;
         }
         "make" => {
             let component = args
@@ -549,4 +672,19 @@ fn format_hir_expr(expr: &agilang_ir::HirExpr) -> String {
             )
         }
     }
+}
+
+fn count_views(dir: &std::path::Path) -> usize {
+    let mut count = 0;
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                count += count_views(&path);
+            } else if path.extension().and_then(|s| s.to_str()) == Some("ags") {
+                count += 1;
+            }
+        }
+    }
+    count
 }

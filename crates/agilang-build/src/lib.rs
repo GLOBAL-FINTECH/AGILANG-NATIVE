@@ -2,14 +2,24 @@ use anyhow::{bail, Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub fn build_project(entry_file: &Path, out_exe: &Path, emit_c: bool) -> Result<()> {
-    println!("Compiling {}", entry_file.display());
+pub fn build_project(
+    entry_file: &Path,
+    out_exe: &Path,
+    emit_c: bool,
+    keep_generated: bool,
+    verbose: bool,
+) -> Result<()> {
+    if verbose {
+        println!("Compiling entry file: {}", entry_file.display());
+    }
 
     // 1. Load source and compile to AST
     let source = agilang_source::SourceFile::load(entry_file)
         .with_context(|| format!("failed to load entry file: {}", entry_file.display()))?;
 
-    println!("Generating typed HIR");
+    if verbose {
+        println!("Generating typed HIR");
+    }
     let hir = agilang_compiler::hir(&source).map_err(|errs| {
         for e in &errs {
             eprintln!("{}", e.render(&source));
@@ -18,10 +28,12 @@ pub fn build_project(entry_file: &Path, out_exe: &Path, emit_c: bool) -> Result<
     })?;
 
     // 2. Generate C code
-    println!("Generating native C");
+    if verbose {
+        println!("Generating native C");
+    }
     let c_code = agilang_codegen_c::generate(&hir);
 
-    let build_dir = out_exe.parent().unwrap_or(Path::new("build"));
+    let build_dir = out_exe.parent().unwrap_or_else(|| Path::new("build"));
     let gen_dir = build_dir.join("generated");
     fs::create_dir_all(&gen_dir)?;
 
@@ -31,22 +43,31 @@ pub fn build_project(entry_file: &Path, out_exe: &Path, emit_c: bool) -> Result<
     let c_file_path = gen_dir.join(format!("{}.c", stem.to_string_lossy()));
     fs::write(&c_file_path, &c_code)?;
 
+    if emit_c {
+        println!("Emitted C source: {}", c_file_path.display());
+        return Ok(());
+    }
+
     // 3. Find runtime library
     let runtime_lib = find_runtime_lib()?;
 
     // 4. Compile and link C file
-    println!("Compiling native target");
-    println!("Linking AGILANG runtime");
+    if verbose {
+        println!("Compiling native target and linking AGILANG runtime");
+    }
     let linker = agilang_linker::Linker::new();
     linker.compile_and_link(&c_file_path, out_exe, &runtime_lib)?;
 
-    // Clean up C files if emit_c is false
-    if !emit_c {
-        fs::remove_dir_all(gen_dir).ok();
+    // Clean up if keep_generated is false
+    if !keep_generated {
+        fs::remove_dir_all(&gen_dir).ok();
+        fs::remove_dir_all(build_dir.join("objects")).ok();
     }
 
-    // Write manifest
-    let manifest_path = build_dir.join("build-manifest.json");
+    // Write manifest under manifests/build-manifest.json
+    let manifests_dir = build_dir.join("manifests");
+    fs::create_dir_all(&manifests_dir)?;
+    let manifest_path = manifests_dir.join("build-manifest.json");
     let manifest_json = format!(
         "{{\n  \"project\": \"{}\",\n  \"target\": \"native\",\n  \"executable\": \"{}\"\n}}\n",
         stem.to_string_lossy(),

@@ -21,6 +21,14 @@ members = [
   "crates/agilang-linker",
   "crates/agilang-project-generator",
   "crates/agilang-build",
+  "crates/agilang-framework-core",
+  "crates/agilang-framework-config",
+  "crates/agilang-framework-container",
+  "crates/agilang-framework-http",
+  "crates/agilang-framework-routing",
+  "crates/agilang-framework-middleware",
+  "crates/agilang-framework-view",
+  "crates/agilang-framework-server",
 ]
 
 [workspace.package]

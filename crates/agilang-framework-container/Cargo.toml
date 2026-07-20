@@ -1,0 +1,6 @@
+[package]
+name = "agilang-framework-container"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

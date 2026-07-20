@@ -8,140 +8,500 @@ pub fn generate_project(name: &str, template: &str) -> Result<()> {
         bail!("directory `{}` already exists", name);
     }
 
-    // Folders to create
-    let dirs = [
-        "app/Controllers",
-        "app/Models",
-        "app/Services",
-        "app/Middleware",
-        "app/Providers",
-        "app/Console/Commands",
-        "routes",
-        "resources/views/layouts",
-        "resources/css",
-        "resources/js",
-        "resources/assets",
-        "public",
-        "config",
-        "database/migrations",
-        "database/seeders",
-        "database/factories",
-        "storage/logs",
-        "storage/cache",
-        "storage/sessions",
-        "storage/uploads",
-        "tests/Feature",
-        "tests/Unit",
-        "bootstrap",
-        "build",
+    let files = [
+        ("agilang.toml", r#"[project]
+name = "{name}"
+version = "0.1.0"
+edition = "2026"
+type = "{template}"
+
+[template]
+name = "{template}"
+version = "0.4.0"
+
+[application]
+entry = "bootstrap/app.agi"
+environment = "local"
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[routes]
+web = "routes/web.agi"
+api = "routes/api.agi"
+
+[views]
+path = "resources/views"
+cache = "storage/cache/views"
+
+[public]
+path = "public"
+
+[build]
+target = "native"
+output = "build/{name}.exe"
+"#),
+        (".env.example", r#"APP_NAME=AGILANG
+APP_ENV=local
+APP_URL=http://127.0.0.1:8080
+APP_HOST=127.0.0.1
+APP_PORT=8080
+
+FORCE_HTTPS=false
+TRUST_PROXY=false
+
+SESSION_SECURE=false
+SESSION_HTTP_ONLY=true
+SESSION_SAME_SITE=Lax
+"#),
+        ("README.md", r#"# {name}
+
+Created with AGILANG CLI.
+"#),
+        ("bootstrap/app.agi", r#"use Framework.Application
+use App.Providers.AppServiceProvider
+use App.Providers.RouteServiceProvider
+
+fn bootstrap() -> Application:
+    let app = Application.create(base_path())
+
+    app.register(AppServiceProvider)
+    app.register(RouteServiceProvider)
+
+    app.load_config("config")
+    app.load_environment(".env")
+    app.load_views("resources/views")
+    app.public_path("public")
+
+    return app
+"#),
+        ("app/Controllers/HomeController.agi", r#"module App.Controllers
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.View
+
+class HomeController:
+    fn index(request: Request) -> Response:
+        return View.render("welcome", {
+            "title": "AGILANG Native Framework",
+            "message": "Your application is running successfully."
+        })
+
+    fn about(request: Request) -> Response:
+        return Response.html(
+            "<h1>About AGILANG</h1><p>Native application framework.</p>"
+        )
+"#),
+        ("app/Controllers/Api/HealthController.agi", r#"module App.Controllers.Api
+
+use Framework.Http.Request
+use Framework.Http.Response
+
+class HealthController:
+    fn show(request: Request) -> Response:
+        return Response.json({
+            "status": "healthy",
+            "framework": "AGILANG",
+            "version": "0.4.0"
+        })
+"#),
+        ("app/Middleware/WebMiddleware.agi", r#"module App.Middleware
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.Middleware.Next
+
+class WebMiddleware:
+    fn handle(request: Request, next: Next) -> Response:
+        let response = next(request)
+        response.header("X-Powered-By", "AGILANG")
+        return response
+"#),
+        ("app/Middleware/ApiMiddleware.agi", r#"module App.Middleware
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.Middleware.Next
+
+class ApiMiddleware:
+    fn handle(request: Request, next: Next) -> Response:
+        let response = next(request)
+        response.header("Content-Type", "application/json")
+        return response
+"#),
+        ("app/Models/User.agi", r#"module App.Models
+
+class User:
+    let id: i64
+    let name: string
+    let email: string
+    let password_hash: string
+    let role: string
+
+    fn is_admin() -> bool:
+        return self.role == "admin"
+"#),
+        ("app/Providers/AppServiceProvider.agi", r#"module App.Providers
+
+use Framework.Container.Container
+use Framework.Providers.ServiceProvider
+use App.Services.ApplicationService
+
+class AppServiceProvider extends ServiceProvider:
+    fn register(container: Container) -> void:
+        container.singleton(ApplicationService, ApplicationService)
+
+    fn boot() -> void:
+        print("Application services booted")
+"#),
+        ("app/Providers/RouteServiceProvider.agi", r#"module App.Providers
+
+use Framework.Application
+use Framework.Providers.ServiceProvider
+use Routes.Web
+use Routes.Api
+
+class RouteServiceProvider extends ServiceProvider:
+    fn boot(app: Application) -> void:
+        Web.register_web()
+        Api.register_api()
+"#),
+        ("app/Services/ApplicationService.agi", r#"module App.Services
+
+class ApplicationService:
+    fn get_version() -> string:
+        return "0.4.0"
+"#),
+        ("app/Console/Commands/HelloCommand.agi", r#"module App.Console.Commands
+
+class HelloCommand:
+    fn handle() -> void:
+        print("Hello from AGILANG Console")
+"#),
+        ("config/app.agi", r#"use Framework.Config.AppConfig
+
+return AppConfig {
+    name: env("APP_NAME", "AGILANG Application"),
+    environment: env("APP_ENV", "local"),
+    url: env("APP_URL", "http://127.0.0.1:8080"),
+    debug: env_bool("APP_DEBUG", true)
+}
+"#),
+        ("config/server.agi", r#"use Framework.Config.ServerConfig
+
+return ServerConfig {
+    host: env("APP_HOST", "127.0.0.1"),
+    port: env_i32("APP_PORT", 8080),
+    https_port: env_i32("APP_HTTPS_PORT", 8443),
+    force_https: env_bool("FORCE_HTTPS", false)
+}
+"#),
+        ("config/auth.agi", r#"use Framework.Auth.AuthConfig
+
+return AuthConfig {
+    enabled: false,
+    default_role: "user",
+    roles: [
+        "user",
+        "admin"
+    ]
+}
+"#),
+        ("config/logging.agi", r#"return {
+    "level": "debug"
+}
+"#),
+        ("config/database.agi", r#"return {
+    "driver": "sqlite"
+}
+"#),
+        ("routes/web.agi", r#"use Framework.Routing.Route
+use App.Controllers.HomeController
+
+fn register_web() -> void:
+    Route.get("/", HomeController.index)
+    Route.get("/about", HomeController.about)
+"#),
+        ("routes/api.agi", r#"use Framework.Routing.Route
+use App.Controllers.Api.HealthController
+
+fn register_api() -> void:
+    Route.group("/api", fn:
+        Route.get("/health", HealthController.show)
+    )
+"#),
+        ("routes/console.agi", r#"use Framework.Routing.Route
+use App.Console.Commands.HelloCommand
+
+fn register_console() -> void:
+    Route.command("hello", HelloCommand.handle)
+"#),
+        ("resources/views/layouts/app.ags", r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title ?? "AGILANG Application" }}</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/" class="brand">AGILANG</a>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/about">About</a>
+            <a href="/api/health">API Health</a>
+        </nav>
+    </header>
+    <main>
+        @yield("content")
+    </main>
+    <script src="/assets/js/app.js"></script>
+</body>
+</html>
+"#),
+        ("resources/views/welcome.ags", r#"@extends("layouts/app")
+
+@section("content")
+<section class="hero">
+    <div class="hero-card">
+        <span class="eyebrow">AGILANG Native Framework</span>
+        <h1>{{ title }}</h1>
+        <p>{{ message }}</p>
+        <div class="actions">
+            <a class="button primary" href="/about">Explore framework</a>
+            <a class="button secondary" href="/api/health">Check API</a>
+        </div>
+    </div>
+</section>
+@endsection
+"#),
+        ("resources/views/errors/404.ags", r#"<h1>404 Not Found</h1>
+<p>The page you are looking for does not exist.</p>
+"#),
+        ("resources/views/errors/500.ags", r#"<h1>500 Internal Server Error</h1>
+<p>Something went wrong on our end.</p>
+"#),
+        ("resources/views/components/button.ags", r#"<!-- Button Component -->
+<button class="btn">{{ text }}</button>
+"#),
+        ("resources/assets/css/app.css", r#":root {
+    font-family: Inter, system-ui, sans-serif;
+    color: #eef6ff;
+    background: #07111f;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #173968, transparent 42%), #07111f;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.brand, nav a {
+    color: white;
+    text-decoration: none;
+}
+
+nav {
+    display: flex;
+    gap: 24px;
+}
+
+.hero {
+    min-height: calc(100vh - 82px);
+    display: grid;
+    place-items: center;
+    padding: 32px;
+}
+
+.hero-card {
+    width: min(760px, 100%);
+    padding: 56px;
+    border-radius: 28px;
+    border: 1px solid rgba(113, 177, 255, 0.28);
+    background: rgba(8, 24, 45, 0.88);
+    box-shadow: 0 32px 100px rgba(0,0,0,0.45);
+}
+
+.eyebrow {
+    color: #77b9ff;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+h1 {
+    margin: 16px 0;
+    font-size: clamp(42px, 7vw, 72px);
+}
+
+p {
+    color: #abc0dc;
+    font-size: 19px;
+}
+
+.actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 32px;
+}
+
+.button {
+    padding: 13px 20px;
+    border-radius: 10px;
+    text-decoration: none;
+}
+
+.primary {
+    color: white;
+    background: #1769e0;
+}
+
+.secondary {
+    color: white;
+    border: 1px solid rgba(255,255,255,0.24);
+}
+"#),
+        ("resources/assets/js/app.js", r#"document.documentElement.dataset.agilang = "ready";
+console.info("AGILANG application assets loaded");
+"#),
+        ("public/index.html", r#"<h1>Hello from AGILANG Public Folder</h1>
+"#),
+        ("public/favicon.svg", r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#1769e0"/></svg>
+"##),
+        ("database/migrations/CreateUsersTable.agi", r#"use Framework.Database.Migration
+use Framework.Database.Schema
+
+class CreateUsersTable extends Migration:
+    fn up() -> void:
+        Schema.create("users", fn table:
+            table.id()
+            table.string("name")
+            table.string("email").unique()
+            table.string("password_hash")
+            table.string("role").default("user")
+            table.timestamps()
+        )
+
+    fn down() -> void:
+        Schema.drop_if_exists("users")
+"#),
+        ("database/seeders/DatabaseSeeder.agi", r#"use Framework.Database.Seeder
+
+class DatabaseSeeder extends Seeder:
+    fn run() -> void:
+        print("Database seeding complete")
+"#),
+        ("database/factories/UserFactory.agi", r#"use App.Models.User
+use Framework.Database.Factory
+
+class UserFactory extends Factory:
+    fn definition() -> User:
+        return User {
+            name: fake.name(),
+            email: fake.unique_email(),
+            password_hash: hash_password("password"),
+            role: "user"
+        }
+"#),
+        ("tests/Feature/HomePageTest.agi", r#"use Framework.Testing.WebTest
+
+test "home page returns successful response":
+    let response = WebTest.get("/")
+    response.assert_status(200)
+    response.assert_contains("AGILANG Native Framework")
+"#),
+        ("tests/Feature/HealthApiTest.agi", r#"use Framework.Testing.WebTest
+
+test "health API returns healthy status":
+    let response = WebTest.get("/api/health")
+    response.assert_status(200)
+    response.assert_json({
+        "status": "healthy"
+    })
+"#),
+        ("tests/Unit/ApplicationServiceTest.agi", r#"use Framework.Testing.UnitTest
+use App.Services.ApplicationService
+
+test "version returns 0.4.0":
+    let service = ApplicationService()
+    assert(service.get_version() == "0.4.0")
+"#),
+        ("storage/cache/.gitkeep", ""),
+        ("storage/logs/.gitkeep", ""),
+        ("storage/sessions/.gitkeep", ""),
+        ("storage/uploads/.gitkeep", ""),
+        ("public/assets/.gitkeep", ""),
     ];
 
-    for d in &dirs {
-        fs::create_dir_all(path.join(d))?;
+    // Write all files
+    for (relative_path, content) in &files {
+        let full_path = path.join(relative_path);
+        if let Some(parent) = full_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let processed_content = content
+            .replace("{name}", name)
+            .replace("{template}", template);
+        fs::write(&full_path, processed_content)?;
     }
 
-    // Write agilang.toml
-    let toml = format!(
-        "[project]\n\
-         name = \"{}\"\n\
-         version = \"0.1.0\"\n\
-         edition = \"2026\"\n\
-         type = \"{}\"\n\n\
-         [application]\n\
-         entry = \"bootstrap/app.agi\"\n\
-         environment = \"local\"\n\n\
-         [server]\n\
-         host = \"127.0.0.1\"\n\
-         port = 8080\n\n\
-         [routes]\n\
-         web = \"routes/web.agi\"\n\
-         api = \"routes/api.agi\"\n\n\
-         [views]\n\
-         path = \"resources/views\"\n\
-         cache = \"storage/cache/views\"\n\n\
-         [public]\n\
-         path = \"public\"\n\n\
-         [build]\n\
-         target = \"native\"\n\
-         output = \"build/{}.exe\"\n",
-        name, template, name
-    );
-    fs::write(path.join("agilang.toml"), toml)?;
-
-    // Write .gitignore
-    fs::write(
-        path.join(".gitignore"),
-        "/target\n/build\nstorage/cache/*\n",
-    )?;
-
-    // Write README.md
-    fs::write(
-        path.join("README.md"),
-        format!(
-            "# {}\n\nCreated with AGILANG CLI utilizing the `{}` template.\n",
-            name, template
-        ),
-    )?;
-
-    // Write bootstrap/app.agi
-    let bootstrap_agi = "\
-fn main() -> i32:\n\
-    print(\"Bootstrapping AGILANG Framework App\")\n\
-    return 0\n";
-    fs::write(path.join("bootstrap/app.agi"), bootstrap_agi)?;
-
-    // Write app/Controllers/HomeController.agi
-    let home_controller = "\
-fn index() -> i32:\n\
-    print(\"HomeController.index called\")\n\
-    return 0\n";
-    fs::write(
-        path.join("app/Controllers/HomeController.agi"),
-        home_controller,
-    )?;
-
-    // Write routes/web.agi
-    fs::write(
-        path.join("routes/web.agi"),
-        "fn register_web() -> i32:\n    print(\"web routes registered\")\n    return 0\n",
-    )?;
-
-    // Write routes/api.agi
-    fs::write(
-        path.join("routes/api.agi"),
-        "fn register_api() -> i32:\n    print(\"api routes registered\")\n    return 0\n",
-    )?;
-
-    // Write resources/views/home.ags
-    let home_ags = "\
-@extends(\"layouts/app\")\n\n\
-@section(\"content\")\n\
-    <main class=\"hero\">\n\
-        <h1>Hello from AGS</h1>\n\
-    </main>\n\
-@endsection\n";
-    fs::write(path.join("resources/views/home.ags"), home_ags)?;
-
-    // Write resources/views/layouts/app.ags
-    let app_ags = "\
-<!DOCTYPE html>\n\
-<html>\n\
-<head>\n\
-    <title>AGILANG App</title>\n\
-</head>\n\
-<body>\n\
-    @yield(\"content\")\n\
-</body>\n\
-</html>\n";
-    fs::write(path.join("resources/views/layouts/app.ags"), app_ags)?;
-
-    // Write public/index.html
-    fs::write(
-        path.join("public/index.html"),
-        "<h1>Hello from AGILANG Public Folder</h1>\n",
-    )?;
+    // Verify template integrity
+    for (relative_path, _) in &files {
+        let full_path = path.join(relative_path);
+        if !full_path.exists() {
+            bail!("Template verification failed: missing file `{}`", relative_path);
+        }
+        if !relative_path.ends_with(".gitkeep") {
+            let metadata = fs::metadata(&full_path)?;
+            if metadata.len() == 0 {
+                bail!("Template verification failed: empty required file `{}`", relative_path);
+            }
+        }
+    }
 
     Ok(())
+}
+
+fn normalize_path_name(name: &str) -> String {
+    name.split('/')
+        .map(|part| {
+            if part.is_empty() {
+                return String::new();
+            }
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn to_pascal_case(s: &str) -> String {
+    s.split(|c: char| !c.is_alphanumeric())
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect()
 }
 
 pub fn make_component(component: &str, name: &str) -> Result<()> {
@@ -163,138 +523,1044 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
         None => bail!("not in an AGILANG project (agilang.toml not found)"),
     };
 
+    let normalized_name = normalize_path_name(name);
+    let parts: Vec<&str> = normalized_name.split('/').collect();
+    let class_name = parts.last().cloned().unwrap_or("");
+
     match component {
         "controller" => {
-            let file_name = if name.ends_with("Controller") {
-                format!("{}.agi", name)
+            let file_name = if class_name.ends_with("Controller") {
+                normalized_name.clone()
             } else {
-                format!("{}Controller.agi", name)
+                format!("{}Controller", normalized_name)
             };
-            let path = project_root.join("app/Controllers").join(&file_name);
+            let actual_class_name = if class_name.ends_with("Controller") {
+                class_name.to_string()
+            } else {
+                format!("{}Controller", class_name)
+            };
+            let path = project_root.join("app/Controllers").join(format!("{}.agi", file_name));
             if path.exists() {
                 bail!("controller `{}` already exists", file_name);
             }
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(
-                &path,
-                format!("# {}\nfn index() -> i32:\n    return 0\n", name),
-            )?;
-            println!("Created controller app/Controllers/{}", file_name);
+
+            let ns_parts = file_name.split('/').collect::<Vec<_>>();
+            let ns = if ns_parts.len() > 1 {
+                format!("App.Controllers.{}", ns_parts[..ns_parts.len() - 1].join("."))
+            } else {
+                "App.Controllers".to_string()
+            };
+
+            let content = format!(
+                "module {}\n\nuse Framework.Http.Request\nuse Framework.Http.Response\n\nclass {}:\n    fn index(request: Request) -> Response:\n        return Response.html(\"<h1>{}</h1>\")\n",
+                ns, actual_class_name, actual_class_name
+            );
+            fs::write(&path, content)?;
+            println!("Created controller app/Controllers/{}.agi", file_name);
         }
         "model" => {
             let path = project_root
                 .join("app/Models")
-                .join(format!("{}.agi", name));
+                .join(format!("{}.agi", normalized_name));
             if path.exists() {
-                bail!("model `{}` already exists", name);
+                bail!("model `{}` already exists", normalized_name);
             }
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(&path, format!("# {}\n", name))?;
-            println!("Created model app/Models/{}.agi", name);
+
+            let ns = if parts.len() > 1 {
+                format!("App.Models.{}", parts[..parts.len() - 1].join("."))
+            } else {
+                "App.Models".to_string()
+            };
+
+            let content = format!(
+                "module {}\n\nclass {}:\n    let id: i64\n",
+                ns, class_name
+            );
+            fs::write(&path, content)?;
+            println!("Created model app/Models/{}.agi", normalized_name);
         }
         "service" => {
-            let file_name = if name.ends_with("Service") {
-                format!("{}.agi", name)
+            let file_name = if class_name.ends_with("Service") {
+                normalized_name.clone()
             } else {
-                format!("{}Service.agi", name)
+                format!("{}Service", normalized_name)
             };
-            let path = project_root.join("app/Services").join(&file_name);
+            let actual_class_name = if class_name.ends_with("Service") {
+                class_name.to_string()
+            } else {
+                format!("{}Service", class_name)
+            };
+            let path = project_root.join("app/Services").join(format!("{}.agi", file_name));
             if path.exists() {
                 bail!("service `{}` already exists", file_name);
             }
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(&path, format!("# {}\n", name))?;
-            println!("Created service app/Services/{}", file_name);
+
+            let ns_parts = file_name.split('/').collect::<Vec<_>>();
+            let ns = if ns_parts.len() > 1 {
+                format!("App.Services.{}", ns_parts[..ns_parts.len() - 1].join("."))
+            } else {
+                "App.Services".to_string()
+            };
+
+            let content = format!(
+                "module {}\n\nclass {}:\n    fn handle() -> void:\n        pass\n",
+                ns, actual_class_name
+            );
+            fs::write(&path, content)?;
+            println!("Created service app/Services/{}.agi", file_name);
         }
         "middleware" => {
-            let path = project_root
-                .join("app/Middleware")
-                .join(format!("{}.agi", name));
+            let file_name = if class_name.ends_with("Middleware") {
+                normalized_name.clone()
+            } else {
+                format!("{}Middleware", normalized_name)
+            };
+            let actual_class_name = if class_name.ends_with("Middleware") {
+                class_name.to_string()
+            } else {
+                format!("{}Middleware", class_name)
+            };
+            let path = project_root.join("app/Middleware").join(format!("{}.agi", file_name));
             if path.exists() {
-                bail!("middleware `{}` already exists", name);
+                bail!("middleware `{}` already exists", file_name);
             }
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(&path, format!("# {}\n", name))?;
-            println!("Created middleware app/Middleware/{}.agi", name);
+
+            let ns_parts = file_name.split('/').collect::<Vec<_>>();
+            let ns = if ns_parts.len() > 1 {
+                format!("App.Middleware.{}", ns_parts[..ns_parts.len() - 1].join("."))
+            } else {
+                "App.Middleware".to_string()
+            };
+
+            let content = format!(
+                "module {}\n\nuse Framework.Http.Request\nuse Framework.Http.Response\nuse Framework.Middleware.Next\n\nclass {}:\n    fn handle(request: Request, next: Next) -> Response:\n        return next(request)\n",
+                ns, actual_class_name
+            );
+            fs::write(&path, content)?;
+            println!("Created middleware app/Middleware/{}.agi", file_name);
         }
         "provider" => {
-            let file_name = if name.ends_with("ServiceProvider") {
-                format!("{}.agi", name)
+            let file_name = if class_name.ends_with("ServiceProvider") {
+                normalized_name.clone()
             } else {
-                format!("{}ServiceProvider.agi", name)
+                format!("{}ServiceProvider", normalized_name)
             };
-            let path = project_root.join("app/Providers").join(&file_name);
+            let actual_class_name = if class_name.ends_with("ServiceProvider") {
+                class_name.to_string()
+            } else {
+                format!("{}ServiceProvider", class_name)
+            };
+            let path = project_root.join("app/Providers").join(format!("{}.agi", file_name));
             if path.exists() {
                 bail!("provider `{}` already exists", file_name);
             }
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(&path, format!("# {}\n", name))?;
-            println!("Created provider app/Providers/{}", file_name);
+
+            let ns_parts = file_name.split('/').collect::<Vec<_>>();
+            let ns = if ns_parts.len() > 1 {
+                format!("App.Providers.{}", ns_parts[..ns_parts.len() - 1].join("."))
+            } else {
+                "App.Providers".to_string()
+            };
+
+            let content = format!(
+                "module {}\n\nuse Framework.Container.Container\nuse Framework.Providers.ServiceProvider\n\nclass {} extends ServiceProvider:\n    fn register(container: Container) -> void:\n        pass\n\n    fn boot() -> void:\n        pass\n",
+                ns, actual_class_name
+            );
+            fs::write(&path, content)?;
+            println!("Created provider app/Providers/{}.agi", file_name);
         }
         "view" => {
             let path = project_root
                 .join("resources/views")
-                .join(format!("{}.ags", name));
+                .join(format!("{}.ags", normalized_name));
             if path.exists() {
-                bail!("view `{}` already exists", name);
+                bail!("view `{}` already exists", normalized_name);
             }
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(&path, "<!-- View template -->\n")?;
-            println!("Created view resources/views/{}.ags", name);
+            fs::write(&path, format!("<!-- View template {} -->\n", normalized_name))?;
+            println!("Created view resources/views/{}.ags", normalized_name);
         }
         "route" => {
-            let path = project_root.join("routes").join(format!("{}.agi", name));
+            let path = project_root.join("routes").join(format!("{}.agi", normalized_name));
             if path.exists() {
-                bail!("route file `{}` already exists", name);
+                bail!("route file `{}` already exists", normalized_name);
             }
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(&path, "# Routes\n")?;
-            println!("Created routes/{}.agi", name);
+            let content = format!(
+                "use Framework.Routing.Route\n\nfn register_{}() -> void:\n    pass\n",
+                class_name.to_lowercase()
+            );
+            fs::write(&path, content)?;
+            println!("Created routes/{}.agi", normalized_name);
         }
         "migration" => {
             let timestamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_secs();
-            let file_name = format!("{}_{}.agi", timestamp, name);
-            let path = project_root.join("database/migrations").join(&file_name);
+            let migration_class = to_pascal_case(class_name);
+            let file_name = format!("{}_{}", timestamp, migration_class);
+            let path = project_root.join("database/migrations").join(format!("{}.agi", file_name));
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(&path, "# Migration\n")?;
-            println!("Created migration database/migrations/{}", file_name);
+            let content = format!(
+                "use Framework.Database.Migration\nuse Framework.Database.Schema\n\nclass {} extends Migration:\n    fn up() -> void:\n        pass\n\n    fn down() -> void:\n        pass\n",
+                migration_class
+            );
+            fs::write(&path, content)?;
+            println!("Created migration database/migrations/{}.agi", file_name);
         }
         "test" => {
             let path = project_root
                 .join("tests/Feature")
-                .join(format!("{}Test.agi", name));
+                .join(format!("{}Test.agi", normalized_name));
             if path.exists() {
-                bail!("test `{}` already exists", name);
+                bail!("test `{}` already exists", normalized_name);
             }
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(
-                &path,
-                format!("fn test_{}() -> i32:\n    return 0\n", name.to_lowercase()),
-            )?;
-            println!("Created test tests/Feature/{}Test.agi", name);
+            let content = format!(
+                "fn test_{}() -> i32:\n    return 0\n",
+                class_name.to_lowercase()
+            );
+            fs::write(&path, content)?;
+            println!("Created test tests/Feature/{}Test.agi", normalized_name);
         }
         _ => bail!("unknown framework component `{}`", component),
     }
+
+    Ok(())
+}
+
+pub fn generate_auth(roles: Vec<String>, force: bool, repair: bool) -> Result<()> {
+    let mut dir = std::env::current_dir()?;
+    let mut root = None;
+    loop {
+        if dir.join("agilang.toml").exists() {
+            root = Some(dir.clone());
+            break;
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+
+    let project_root = match root {
+        Some(r) => r,
+        None => bail!("not in an AGILANG project (agilang.toml not found)"),
+    };
+
+    let auth_files = [
+        ("app/Controllers/Auth/LoginController.agi", r#"module App.Controllers.Auth
+
+use Framework.Auth.Auth
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.Validation.Validator
+use Framework.View
+
+class LoginController:
+    fn show(request: Request) -> Response:
+        return View.render("auth/login")
+
+    fn login(request: Request) -> Response:
+        let input = Validator.validate(request.body(), {
+            "email": ["required", "email"],
+            "password": ["required", "string"]
+        })
+
+        if Auth.attempt(input.email, input.password):
+            request.session().regenerate()
+            return Response.redirect("/dashboard")
+
+        return View.render("auth/login", {
+            "error": "Invalid email or password."
+        }).status(422)
+"#),
+        ("app/Controllers/Auth/RegisterController.agi", r#"module App.Controllers.Auth
+
+class RegisterController:
+    fn show() -> void:
+        pass
+"#),
+        ("app/Controllers/Auth/LogoutController.agi", r#"module App.Controllers.Auth
+
+class LogoutController:
+    fn logout() -> void:
+        pass
+"#),
+        ("app/Controllers/Auth/PasswordController.agi", r#"module App.Controllers.Auth
+
+class PasswordController:
+    fn reset() -> void:
+        pass
+"#),
+        ("app/Middleware/Authenticate.agi", r#"module App.Middleware
+
+class Authenticate:
+    fn handle() -> void:
+        pass
+"#),
+        ("app/Middleware/GuestOnly.agi", r#"module App.Middleware
+
+class GuestOnly:
+    fn handle() -> void:
+        pass
+"#),
+        ("app/Middleware/RequireRole.agi", r#"module App.Middleware
+
+class RequireRole:
+    fn handle() -> void:
+        pass
+"#),
+        ("app/Models/User.agi", r#"module App.Models
+
+class User:
+    let id: i64
+    let name: string
+    let email: string
+    let password_hash: string
+    let role: string
+
+    fn is_admin() -> bool:
+        return self.role == "admin"
+"#),
+        ("app/Models/Role.agi", r#"module App.Models
+
+class Role:
+    let id: i64
+    let name: string
+"#),
+        ("app/Services/AuthService.agi", r#"module App.Services
+
+class AuthService:
+    fn check() -> bool:
+        return true
+"#),
+        ("app/Services/PasswordHasher.agi", r#"module App.Services
+
+class PasswordHasher:
+    fn hash(password: string) -> string:
+        return password
+"#),
+        ("app/Services/SessionService.agi", r#"module App.Services
+
+class SessionService:
+    fn regenerate() -> void:
+        pass
+"#),
+        ("resources/views/auth/login.ags", r#"<h1>Login</h1>
+<form method="POST" action="/login">
+    <input type="email" name="email" required>
+    <input type="password" name="password" required>
+    <button type="submit">Log in</button>
+</form>
+"#),
+        ("resources/views/auth/register.ags", r#"<h1>Register</h1>
+"#),
+        ("resources/views/auth/forgot-password.ags", r#"<h1>Forgot Password</h1>
+"#),
+        ("resources/views/auth/reset-password.ags", r#"<h1>Reset Password</h1>
+"#),
+        ("resources/views/dashboard/user.ags", r#"<h1>User Dashboard</h1>
+"#),
+        ("resources/views/dashboard/admin.ags", r#"<h1>Admin Dashboard</h1>
+"#),
+        ("database/migrations/CreateUsersTable.agi", r#"use Framework.Database.Migration
+use Framework.Database.Schema
+
+class CreateUsersTable extends Migration:
+    fn up() -> void:
+        Schema.create("users", fn table:
+            table.id()
+            table.string("name")
+            table.string("email").unique()
+            table.string("password_hash")
+            table.string("role").default("user")
+            table.timestamps()
+        )
+
+    fn down() -> void:
+        Schema.drop_if_exists("users")
+"#),
+        ("database/migrations/CreateRolesTable.agi", r#"use Framework.Database.Migration
+use Framework.Database.Schema
+
+class CreateRolesTable extends Migration:
+    fn up() -> void:
+        Schema.create("roles", fn table:
+            table.id()
+            table.string("name").unique()
+        )
+
+    fn down() -> void:
+        Schema.drop_if_exists("roles")
+"#),
+        ("database/migrations/CreateUserRolesTable.agi", r#"use Framework.Database.Migration
+use Framework.Database.Schema
+
+class CreateUserRolesTable extends Migration:
+    fn up() -> void:
+        Schema.create("user_roles", fn table:
+            table.integer("user_id")
+            table.integer("role_id")
+        )
+
+    fn down() -> void:
+        Schema.drop_if_exists("user_roles")
+"#),
+        ("routes/auth.agi", r#"use Framework.Routing.Route
+use App.Controllers.Auth.LoginController
+use App.Controllers.DashboardController
+use App.Middleware.Authenticate
+use App.Middleware.RequireRole
+
+fn register_auth() -> void:
+    Route.get("/login", LoginController.show)
+    Route.post("/login", LoginController.login)
+
+    # Auth protected routes for user and admin
+    Route.group("/dashboard", fn:
+        Route.middleware(Authenticate)
+        Route.get("/user", DashboardController.user)
+
+        Route.group("/admin", fn:
+            Route.middleware(RequireRole)
+            Route.get("/", DashboardController.admin)
+        )
+    )
+"#),
+        ("app/Controllers/DashboardController.agi", r#"module App.Controllers
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.View
+
+class DashboardController:
+    fn user(request: Request) -> Response:
+        return View.render("dashboard/user", {
+            "title": "User Dashboard"
+        })
+
+    fn admin(request: Request) -> Response:
+        return View.render("dashboard/admin", {
+            "title": "Admin Dashboard"
+        })
+"#),
+    ];
+
+    println!("Checking project...");
+
+    let mut exists = false;
+    for (relative_path, _) in &auth_files {
+        if project_root.join(relative_path).exists() {
+            exists = true;
+            break;
+        }
+    }
+
+    if exists && !force && !repair {
+        bail!(
+            "Authentication already exists.\n\nUse:\n    agilang auth --repair\n    agilang auth --force"
+        );
+    }
+
+    for (relative_path, content) in &auth_files {
+        let path = project_root.join(relative_path);
+        if path.exists() && repair {
+            continue; // preserve customized files during repair
+        }
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&path, content)?;
+        println!("Created {}", relative_path);
+    }
+
+    // Write config/auth.agi with specified roles
+    let config_path = project_root.join("config/auth.agi");
+    if !config_path.exists() || force {
+        let mut roles_str = String::new();
+        for (idx, r) in roles.iter().enumerate() {
+            roles_str.push_str(&format!("        \"{}\"", r));
+            if idx < roles.len() - 1 {
+                roles_str.push_str(",\n");
+            } else {
+                roles_str.push('\n');
+            }
+        }
+        let config_content = format!(
+            "use Framework.Auth.AuthConfig\n\nreturn AuthConfig {{\n    enabled: true,\n    default_role: \"user\",\n    roles: [\n{}\n    ]\n}}\n",
+            roles_str
+        );
+        fs::write(&config_path, config_content)?;
+        println!("Created config/auth.agi");
+    }
+
+    // Auto-update routes/web.agi to register auth routes if present
+    let web_routes_file = project_root.join("routes/web.agi");
+    if web_routes_file.exists() {
+        let content = fs::read_to_string(&web_routes_file)?;
+        if !content.contains("register_auth") {
+            let mut new_lines = vec!["use Routes.Auth".to_string()];
+            let mut updated = false;
+            for line in content.lines() {
+                if line.trim().starts_with("Route.get") && !updated {
+                    new_lines.push("    Auth.register_auth()".to_string());
+                    updated = true;
+                }
+                new_lines.push(line.to_string());
+            }
+            fs::write(&web_routes_file, new_lines.join("\n"))?;
+            println!("Updated routes/web.agi with authentication routes");
+        }
+    }
+
+    Ok(())
+}
+
+pub fn repair_template(dry_run: bool, force: bool) -> Result<()> {
+    let mut dir = std::env::current_dir()?;
+    let mut root = None;
+    loop {
+        if dir.join("agilang.toml").exists() {
+            root = Some(dir.clone());
+            break;
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+
+    let project_root = match root {
+        Some(r) => r,
+        None => bail!("not in an AGILANG project (agilang.toml not found)"),
+    };
+
+    println!("Inspecting AGILANG web template...\n");
+
+    let files = [
+        ("agilang.toml", r#"[project]
+name = "{name}"
+version = "0.1.0"
+edition = "2026"
+type = "web"
+
+[template]
+name = "web"
+version = "0.4.0"
+
+[application]
+entry = "bootstrap/app.agi"
+environment = "local"
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[routes]
+web = "routes/web.agi"
+api = "routes/api.agi"
+
+[views]
+path = "resources/views"
+cache = "storage/cache/views"
+
+[public]
+path = "public"
+
+[build]
+target = "native"
+output = "build/{name}.exe"
+"#),
+        (".env.example", r#"APP_NAME=AGILANG
+APP_ENV=local
+APP_URL=http://127.0.0.1:8080
+APP_HOST=127.0.0.1
+APP_PORT=8080
+
+FORCE_HTTPS=false
+TRUST_PROXY=false
+
+SESSION_SECURE=false
+SESSION_HTTP_ONLY=true
+SESSION_SAME_SITE=Lax
+"#),
+        ("README.md", r#"# {name}
+
+Created with AGILANG CLI.
+"#),
+        ("bootstrap/app.agi", r#"use Framework.Application
+use App.Providers.AppServiceProvider
+use App.Providers.RouteServiceProvider
+
+fn bootstrap() -> Application:
+    let app = Application.create(base_path())
+
+    app.register(AppServiceProvider)
+    app.register(RouteServiceProvider)
+
+    app.load_config("config")
+    app.load_environment(".env")
+    app.load_views("resources/views")
+    app.public_path("public")
+
+    return app
+"#),
+        ("app/Controllers/HomeController.agi", r#"module App.Controllers
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.View
+
+class HomeController:
+    fn index(request: Request) -> Response:
+        return View.render("welcome", {
+            "title": "AGILANG Native Framework",
+            "message": "Your application is running successfully."
+        })
+
+    fn about(request: Request) -> Response:
+        return Response.html(
+            "<h1>About AGILANG</h1><p>Native application framework.</p>"
+        )
+"#),
+        ("app/Controllers/Api/HealthController.agi", r#"module App.Controllers.Api
+
+use Framework.Http.Request
+use Framework.Http.Response
+
+class HealthController:
+    fn show(request: Request) -> Response:
+        return Response.json({
+            "status": "healthy",
+            "framework": "AGILANG",
+            "version": "0.4.0"
+        })
+"#),
+        ("app/Middleware/WebMiddleware.agi", r#"module App.Middleware
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.Middleware.Next
+
+class WebMiddleware:
+    fn handle(request: Request, next: Next) -> Response:
+        let response = next(request)
+        response.header("X-Powered-By", "AGILANG")
+        return response
+"#),
+        ("app/Middleware/ApiMiddleware.agi", r#"module App.Middleware
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.Middleware.Next
+
+class ApiMiddleware:
+    fn handle(request: Request, next: Next) -> Response:
+        let response = next(request)
+        response.header("Content-Type", "application/json")
+        return response
+"#),
+        ("app/Models/User.agi", r#"module App.Models
+
+class User:
+    let id: i64
+    let name: string
+    let email: string
+    let password_hash: string
+    let role: string
+
+    fn is_admin() -> bool:
+        return self.role == "admin"
+"#),
+        ("app/Providers/AppServiceProvider.agi", r#"module App.Providers
+
+use Framework.Container.Container
+use Framework.Providers.ServiceProvider
+use App.Services.ApplicationService
+
+class AppServiceProvider extends ServiceProvider:
+    fn register(container: Container) -> void:
+        container.singleton(ApplicationService, ApplicationService)
+
+    fn boot() -> void:
+        print("Application services booted")
+"#),
+        ("app/Providers/RouteServiceProvider.agi", r#"module App.Providers
+
+use Framework.Application
+use Framework.Providers.ServiceProvider
+use Routes.Web
+use Routes.Api
+
+class RouteServiceProvider extends ServiceProvider:
+    fn boot(app: Application) -> void:
+        Web.register_web()
+        Api.register_api()
+"#),
+        ("app/Services/ApplicationService.agi", r#"module App.Services
+
+class ApplicationService:
+    fn get_version() -> string:
+        return "0.4.0"
+"#),
+        ("app/Console/Commands/HelloCommand.agi", r#"module App.Console.Commands
+
+class HelloCommand:
+    fn handle() -> void:
+        print("Hello from AGILANG Console")
+"#),
+        ("config/app.agi", r#"use Framework.Config.AppConfig
+
+return AppConfig {
+    name: env("APP_NAME", "AGILANG Application"),
+    environment: env("APP_ENV", "local"),
+    url: env("APP_URL", "http://127.0.0.1:8080"),
+    debug: env_bool("APP_DEBUG", true)
+}
+"#),
+        ("config/server.agi", r#"use Framework.Config.ServerConfig
+
+return ServerConfig {
+    host: env("APP_HOST", "127.0.0.1"),
+    port: env_i32("APP_PORT", 8080),
+    https_port: env_i32("APP_HTTPS_PORT", 8443),
+    force_https: env_bool("FORCE_HTTPS", false)
+}
+"#),
+        ("config/auth.agi", r#"use Framework.Auth.AuthConfig
+
+return AuthConfig {
+    enabled: false,
+    default_role: "user",
+    roles: [
+        "user",
+        "admin"
+    ]
+}
+"#),
+        ("config/logging.agi", r#"return {
+    "level": "debug"
+}
+"#),
+        ("config/database.agi", r#"return {
+    "driver": "sqlite"
+}
+"#),
+        ("routes/web.agi", r#"use Framework.Routing.Route
+use App.Controllers.HomeController
+
+fn register_web() -> void:
+    Route.get("/", HomeController.index)
+    Route.get("/about", HomeController.about)
+"#),
+        ("routes/api.agi", r#"use Framework.Routing.Route
+use App.Controllers.Api.HealthController
+
+fn register_api() -> void:
+    Route.group("/api", fn:
+        Route.get("/health", HealthController.show)
+    )
+"#),
+        ("routes/console.agi", r#"use Framework.Routing.Route
+use App.Console.Commands.HelloCommand
+
+fn register_console() -> void:
+    Route.command("hello", HelloCommand.handle)
+"#),
+        ("resources/views/layouts/app.ags", r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title ?? "AGILANG Application" }}</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/" class="brand">AGILANG</a>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/about">About</a>
+            <a href="/api/health">API Health</a>
+        </nav>
+    </header>
+    <main>
+        @yield("content")
+    </main>
+    <script src="/assets/js/app.js"></script>
+</body>
+</html>
+"#),
+        ("resources/views/welcome.ags", r#"@extends("layouts/app")
+
+@section("content")
+<section class="hero">
+    <div class="hero-card">
+        <span class="eyebrow">AGILANG Native Framework</span>
+        <h1>{{ title }}</h1>
+        <p>{{ message }}</p>
+        <div class="actions">
+            <a class="button primary" href="/about">Explore framework</a>
+            <a class="button secondary" href="/api/health">Check API</a>
+        </div>
+    </div>
+</section>
+@endsection
+"#),
+        ("resources/views/errors/404.ags", r#"<h1>404 Not Found</h1>
+<p>The page you are looking for does not exist.</p>
+"#),
+        ("resources/views/errors/500.ags", r#"<h1>500 Internal Server Error</h1>
+<p>Something went wrong on our end.</p>
+"#),
+        ("resources/views/components/button.ags", r#"<!-- Button Component -->
+<button class="btn">{{ text }}</button>
+"#),
+        ("resources/assets/css/app.css", r#":root {
+    font-family: Inter, system-ui, sans-serif;
+    color: #eef6ff;
+    background: #07111f;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #173968, transparent 42%), #07111f;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.brand, nav a {
+    color: white;
+    text-decoration: none;
+}
+
+nav {
+    display: flex;
+    gap: 24px;
+}
+
+.hero {
+    min-height: calc(100vh - 82px);
+    display: grid;
+    place-items: center;
+    padding: 32px;
+}
+
+.hero-card {
+    width: min(760px, 100%);
+    padding: 56px;
+    border-radius: 28px;
+    border: 1px solid rgba(113, 177, 255, 0.28);
+    background: rgba(8, 24, 45, 0.88);
+    box-shadow: 0 32px 100px rgba(0,0,0,0.45);
+}
+
+.eyebrow {
+    color: #77b9ff;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+h1 {
+    margin: 16px 0;
+    font-size: clamp(42px, 7vw, 72px);
+}
+
+p {
+    color: #abc0dc;
+    font-size: 19px;
+}
+
+.actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 32px;
+}
+
+.button {
+    padding: 13px 20px;
+    border-radius: 10px;
+    text-decoration: none;
+}
+
+.primary {
+    color: white;
+    background: #1769e0;
+}
+
+.secondary {
+    color: white;
+    border: 1px solid rgba(255,255,255,0.24);
+}
+"#),
+        ("resources/assets/js/app.js", r#"document.documentElement.dataset.agilang = "ready";
+console.info("AGILANG application assets loaded");
+"#),
+        ("public/index.html", r#"<h1>Hello from AGILANG Public Folder</h1>
+"#),
+        ("public/favicon.svg", r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#1769e0"/></svg>
+"##),
+        ("database/migrations/CreateUsersTable.agi", r#"use Framework.Database.Migration
+use Framework.Database.Schema
+
+class CreateUsersTable extends Migration:
+    fn up() -> void:
+        Schema.create("users", fn table:
+            table.id()
+            table.string("name")
+            table.string("email").unique()
+            table.string("password_hash")
+            table.string("role").default("user")
+            table.timestamps()
+        )
+
+    fn down() -> void:
+        Schema.drop_if_exists("users")
+"#),
+        ("database/seeders/DatabaseSeeder.agi", r#"use Framework.Database.Seeder
+
+class DatabaseSeeder extends Seeder:
+    fn run() -> void:
+        print("Database seeding complete")
+"#),
+        ("database/factories/UserFactory.agi", r#"use App.Models.User
+use Framework.Database.Factory
+
+class UserFactory extends Factory:
+    fn definition() -> User:
+        return User {
+            name: fake.name(),
+            email: fake.unique_email(),
+            password_hash: hash_password("password"),
+            role: "user"
+        }
+"#),
+        ("tests/Feature/HomePageTest.agi", r#"use Framework.Testing.WebTest
+
+test "home page returns successful response":
+    let response = WebTest.get("/")
+    response.assert_status(200)
+    response.assert_contains("AGILANG Native Framework")
+"#),
+        ("tests/Feature/HealthApiTest.agi", r#"use Framework.Testing.WebTest
+
+test "health API returns healthy status":
+    let response = WebTest.get("/api/health")
+    response.assert_status(200)
+    response.assert_json({
+        "status": "healthy"
+    })
+"#),
+        ("tests/Unit/ApplicationServiceTest.agi", r#"use Framework.Testing.UnitTest
+use App.Services.ApplicationService
+
+test "version returns 0.4.0":
+    let service = ApplicationService()
+    assert(service.get_version() == "0.4.0")
+"#),
+        ("storage/cache/.gitkeep", ""),
+        ("storage/logs/.gitkeep", ""),
+        ("storage/sessions/.gitkeep", ""),
+        ("storage/uploads/.gitkeep", ""),
+        ("public/assets/.gitkeep", ""),
+    ];
+
+    let app_name = project_root
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "app".into());
+
+    let mut missing = vec![];
+    let mut empty = vec![];
+
+    for (relative_path, _) in &files {
+        let path = project_root.join(relative_path);
+        if !path.exists() {
+            missing.push(*relative_path);
+        } else if !relative_path.ends_with(".gitkeep") {
+            let metadata = fs::metadata(&path)?;
+            if metadata.len() == 0 {
+                empty.push(*relative_path);
+            }
+        }
+    }
+
+    if missing.is_empty() && empty.is_empty() && !force {
+        println!("All template files are intact and verified!");
+        return Ok(());
+    }
+
+    if !missing.is_empty() {
+        println!("Missing:");
+        for m in &missing {
+            println!("  {}", m);
+        }
+    }
+
+    if !empty.is_empty() {
+        println!("Empty/Placeholder-only:");
+        for e in &empty {
+            println!("  {}", e);
+        }
+    }
+
+    if dry_run {
+        println!("\nDry run complete. No files were written.");
+        return Ok(());
+    }
+
+    // Write missing or all files
+    for (relative_path, content) in &files {
+        let path = project_root.join(relative_path);
+        let is_missing = missing.contains(relative_path);
+        let is_empty = empty.contains(relative_path);
+
+        if is_missing || is_empty || force {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let processed_content = content
+                .replace("{name}", &app_name)
+                .replace("{template}", "web");
+            fs::write(&path, processed_content)?;
+        }
+    }
+
+    println!("\nRepair completed.");
+    println!("Customized files were preserved.");
 
     Ok(())
 }

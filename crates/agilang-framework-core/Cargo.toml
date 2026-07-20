@@ -1,0 +1,7 @@
+[package]
+name = "agilang-framework-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agilang-framework-container = { path = "../agilang-framework-container" }

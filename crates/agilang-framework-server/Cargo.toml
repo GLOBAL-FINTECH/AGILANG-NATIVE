@@ -1,0 +1,12 @@
+[package]
+name = "agilang-framework-server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agilang-framework-http = { path = "../agilang-framework-http" }
+agilang-framework-routing = { path = "../agilang-framework-routing" }
+agilang-framework-view = { path = "../agilang-framework-view" }
+agilang-framework-core = { path = "../agilang-framework-core" }
+agilang-framework-config = { path = "../agilang-framework-config" }
+chrono = "0.4"
