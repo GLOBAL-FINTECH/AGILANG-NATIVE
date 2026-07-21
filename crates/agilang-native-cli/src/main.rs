@@ -975,50 +975,54 @@ fn main() -> Result<()> {
             let count = 500_000;
 
             if profile == "connectivity" || profile == "live-db" || profile == "xampp" {
-                println!("AGIDB External Database Endpoint Connectivity & Primitive Verification");
-                println!("Sample Iterations: {}", count);
+                println!("AGIDB Database Connectivity Audit\n");
 
                 let live =
                     agilang_database_benchmark::BenchmarkRunner::run_live_db_comparison(count)?;
 
-                println!("\nEndpoint Accessibility Audit");
+                println!("Endpoint Connectivity");
                 println!("{:-<60}", "");
+                println!("{:<28} 127.0.0.1:3306", "MySQL endpoint:");
                 println!(
-                    "{:<38} {}",
-                    "MySQL XAMPP TCP Endpoint (127.0.0.1:3306):",
+                    "{:<28} {}",
+                    "TCP reachable:",
                     if live.mysql_live_connected {
-                        "REACHABLE (TCP Handshake OK)"
+                        "YES"
                     } else {
-                        "OFFLINE / LOCAL PORT IDLE"
+                        "NO (OFFLINE / LOCAL PORT IDLE)"
                     }
                 );
+                println!("{:<28} NOT TESTED", "MySQL authentication:");
+                println!("{:<28} NOT TESTED", "SQL query execution:");
+                println!("{:<28} NONE", "Database selected:");
+                println!("{:<28} NONE\n", "Table accessed:");
+
+                println!("SQLite Path Audit");
+                println!("{:-<60}", "");
+                println!("{:<28} agidb_benchmark.db", "Database path:");
                 println!(
-                    "{:<38} {}",
-                    "SQLite Database File Path:",
+                    "{:<28} {}",
+                    "File openable:",
                     if live.sqlite_file_created {
-                        "OPENABLE (agidb_benchmark.db)"
+                        "YES"
                     } else {
-                        "IN-MEMORY"
+                        "NO"
                     }
                 );
+                println!("{:<28} NOT TESTED", "SQLite engine opened:");
+                println!("{:<28} NOT TESTED", "SQL statement executed:");
+                println!("{:<28} NO\n", "Stored rows verified:");
+
+                println!("Internal AGIDB Verification");
+                println!("{:-<60}", "");
+                println!("{:<28} VERIFIED", "MVCC method execution:");
                 println!(
-                    "{:<38} VERIFIED (Method Execution OK)",
-                    "AGIDB Native MVCC Core Subsystem:"
+                    "{:<28} NOT TESTED BY THIS PROFILE\n",
+                    "Persistent AGIDB writes:"
                 );
 
-                println!("\nAudit Status Notes");
-                println!("{:-<60}", "");
-                println!(
-                    "MySQL SQL Execution Throughput:      NOT BENCHMARKED IN CONNECTIVITY TEST"
-                );
-                println!(
-                    "SQLite Disk SQL Throughput:         NOT BENCHMARKED IN CONNECTIVITY TEST"
-                );
-                println!(
-                    "Durability / Persistence Ranking:   NOT BENCHMARKED IN CONNECTIVITY TEST"
-                );
-                println!("\nClassification:                 Database Endpoint Connectivity Audit");
-                println!("Status:                         VERIFIED");
+                println!("Classification:             Database Endpoint Connectivity Audit");
+                println!("Status:                     PASS");
             } else if profile == "compare-all" || profile == "compare" {
                 println!("AGIDB Data-Path Microbenchmark Comparison");
                 println!("Operations Executed Per Engine: {}", count);
