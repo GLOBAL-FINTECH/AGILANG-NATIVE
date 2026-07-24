@@ -16,19 +16,91 @@ impl Analyser {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let mut global_scope = SymbolTable::new();
-        // Register builtins
+        // Register http global symbol.
         global_scope
             .insert(Symbol {
-                name: "print".to_string(),
-                kind: SymbolKind::Builtin,
-                ty: Type::Function(FunctionType {
-                    params: vec![Type::String],
-                    ret: Box::new(Type::Void),
-                }),
+                name: "http".to_string(),
+                kind: SymbolKind::Local,
+                ty: Type::Unknown,
                 span: Span::default(),
                 mutable: false,
             })
             .ok();
+
+        // Register builtins.
+        for (name, params, ret) in [
+            ("print", vec![Type::Unknown], Type::Void),
+            ("abs", vec![Type::F64], Type::F64),
+            ("sign", vec![Type::F64], Type::F64),
+            ("sqrt", vec![Type::F64], Type::F64),
+            ("cbrt", vec![Type::F64], Type::F64),
+            ("exp", vec![Type::F64], Type::F64),
+            ("exp2", vec![Type::F64], Type::F64),
+            ("ln", vec![Type::F64], Type::F64),
+            ("log2", vec![Type::F64], Type::F64),
+            ("log10", vec![Type::F64], Type::F64),
+            ("sin", vec![Type::F64], Type::F64),
+            ("cos", vec![Type::F64], Type::F64),
+            ("tan", vec![Type::F64], Type::F64),
+            ("asin", vec![Type::F64], Type::F64),
+            ("acos", vec![Type::F64], Type::F64),
+            ("atan", vec![Type::F64], Type::F64),
+            ("floor", vec![Type::F64], Type::F64),
+            ("ceil", vec![Type::F64], Type::F64),
+            ("round", vec![Type::F64], Type::F64),
+            ("trunc", vec![Type::F64], Type::F64),
+            ("fract", vec![Type::F64], Type::F64),
+            ("is_nan", vec![Type::F64], Type::Bool),
+            ("is_finite", vec![Type::F64], Type::Bool),
+            ("is_infinite", vec![Type::F64], Type::Bool),
+            ("min", vec![Type::F64, Type::F64], Type::F64),
+            ("max", vec![Type::F64, Type::F64], Type::F64),
+            ("clamp", vec![Type::F64, Type::F64, Type::F64], Type::F64),
+            ("pow", vec![Type::F64, Type::F64], Type::F64),
+            ("hypot", vec![Type::F64, Type::F64], Type::F64),
+            ("log", vec![Type::F64, Type::F64], Type::F64),
+            ("atan2", vec![Type::F64, Type::F64], Type::F64),
+            ("sum", vec![Type::F64], Type::F64),
+            ("product", vec![Type::F64], Type::F64),
+            ("mean", vec![Type::F64], Type::F64),
+            ("variance", vec![Type::F64], Type::F64),
+            ("stddev", vec![Type::F64], Type::F64),
+            ("median", vec![Type::F64], Type::F64),
+            ("mode", vec![Type::F64], Type::F64),
+            ("percentile", vec![Type::F64, Type::F64], Type::F64),
+            ("quantile", vec![Type::F64, Type::F64], Type::F64),
+            (
+                "append",
+                vec![Type::List(Box::new(Type::F64)), Type::F64],
+                Type::Void,
+            ),
+            ("len", vec![Type::List(Box::new(Type::Unknown))], Type::I64),
+            ("get", vec![Type::Unknown, Type::String], Type::String),
+            (
+                "post",
+                vec![Type::Unknown, Type::String, Type::String],
+                Type::String,
+            ),
+            ("get_json", vec![Type::Unknown, Type::String], Type::String),
+            (
+                "post_json",
+                vec![Type::Unknown, Type::String, Type::String],
+                Type::String,
+            ),
+        ] {
+            global_scope
+                .insert(Symbol {
+                    name: name.to_string(),
+                    kind: SymbolKind::Builtin,
+                    ty: Type::Function(FunctionType {
+                        params,
+                        ret: Box::new(ret),
+                    }),
+                    span: Span::default(),
+                    mutable: false,
+                })
+                .ok();
+        }
 
         Self {
             scopes: vec![global_scope],
@@ -311,6 +383,70 @@ impl Analyser {
                     span: *span,
                 })
             }
+            Stmt::Assign {
+                target,
+                value,
+                span,
+            } => {
+                let target_expr = self.analyse_expr(target, None)?;
+                let expected_ty = target_expr.ty().clone();
+                let value_expr = self.analyse_expr(value, Some(&expected_ty))?;
+
+                if !expected_ty.is_compatible(value_expr.ty()) {
+                    self.errors.push(Diagnostic::error(
+                        "E2001",
+                        format!(
+                            "type mismatch: expected `{}`, found `{}`",
+                            expected_ty,
+                            value_expr.ty()
+                        ),
+                        value.span(),
+                    ));
+                }
+
+                match &target_expr {
+                    HirExpr::Identifier(name, _, target_span) => {
+                        if let Some(sym) = self.lookup(name) {
+                            if !sym.mutable {
+                                self.errors.push(Diagnostic::error(
+                                    "E2010",
+                                    format!("cannot assign to immutable symbol `{}`", name),
+                                    *target_span,
+                                ));
+                            }
+                        }
+                    }
+                    HirExpr::Index { object, .. } => {
+                        if let HirExpr::Identifier(name, _, target_span) = object.as_ref() {
+                            if let Some(sym) = self.lookup(name) {
+                                if !sym.mutable {
+                                    self.errors.push(Diagnostic::error(
+                                        "E2010",
+                                        format!(
+                                            "cannot assign through immutable list symbol `{}`",
+                                            name
+                                        ),
+                                        *target_span,
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        self.errors.push(Diagnostic::error(
+                            "E2011",
+                            "invalid assignment target",
+                            target.span(),
+                        ));
+                    }
+                }
+
+                Some(HirStmt::Assign {
+                    target: target_expr,
+                    value: value_expr,
+                    span: *span,
+                })
+            }
             Stmt::Return { value, span } => {
                 let hir_val = match value {
                     Some(expr) => {
@@ -394,9 +530,155 @@ impl Analyser {
             }
             Expr::String(val, span) => Some(HirExpr::String(val.clone(), Type::String, *span)),
             Expr::Bool(val, span) => Some(HirExpr::Bool(*val, Type::Bool, *span)),
+            Expr::ListLiteral(items, span) => {
+                let mut hir_items = vec![];
+                let mut inferred: Option<Type> = None;
+                for item in items {
+                    let hir_item = self.analyse_expr(item, inferred.as_ref())?;
+                    if let Some(existing) = &inferred {
+                        if !existing.is_compatible(hir_item.ty()) {
+                            self.errors.push(Diagnostic::error(
+                                "E2001",
+                                format!(
+                                    "list literal element type mismatch: expected `{}`, found `{}`",
+                                    existing,
+                                    hir_item.ty()
+                                ),
+                                hir_item.span(),
+                            ));
+                        }
+                    } else {
+                        inferred = Some(hir_item.ty().clone());
+                    }
+                    hir_items.push(hir_item);
+                }
+                let elem_ty = inferred.unwrap_or(Type::Unknown);
+                Some(HirExpr::ListLiteral(
+                    hir_items,
+                    Type::List(Box::new(elem_ty)),
+                    *span,
+                ))
+            }
+            Expr::MemberAccess {
+                object,
+                member,
+                span,
+            } => {
+                let hir_object = self.analyse_expr(object, None)?;
+                let result_ty = match hir_object.ty() {
+                    Type::Error => Type::Error,
+                    _ => Type::Unknown,
+                };
+                Some(HirExpr::MemberAccess {
+                    object: Box::new(hir_object),
+                    member: member.clone(),
+                    ty: result_ty,
+                    span: *span,
+                })
+            }
+            Expr::Index {
+                object,
+                index,
+                span,
+            } => {
+                let hir_object = self.analyse_expr(object, None)?;
+                let hir_index = self.analyse_expr(index, Some(&Type::I64))?;
+
+                if !hir_index.ty().is_integer() && hir_index.ty() != &Type::Error {
+                    self.errors.push(Diagnostic::error(
+                        "E2001",
+                        format!("list index must be integer, found `{}`", hir_index.ty()),
+                        hir_index.span(),
+                    ));
+                }
+
+                let result_ty = match hir_object.ty() {
+                    Type::List(inner) => (*inner.clone()).clone(),
+                    Type::Error => Type::Error,
+                    other => {
+                        self.errors.push(Diagnostic::error(
+                            "E2001",
+                            format!("cannot index non-list value of type `{}`", other),
+                            hir_object.span(),
+                        ));
+                        Type::Error
+                    }
+                };
+
+                Some(HirExpr::Index {
+                    object: Box::new(hir_object),
+                    index: Box::new(hir_index),
+                    ty: result_ty,
+                    span: *span,
+                })
+            }
             Expr::Call { callee, args, span } => {
+                // Method-call desugaring support: `obj.method(x)` -> `method(obj, x)`.
+                if let Expr::MemberAccess { object, member, .. } = callee.as_ref() {
+                    let hir_object = self.analyse_expr(object, None)?;
+                    let mut hir_args = vec![hir_object];
+                    for arg in args {
+                        if let Some(hir_arg) = self.analyse_expr(arg, None) {
+                            hir_args.push(hir_arg);
+                        }
+                    }
+
+                    let (ret_ty, callee_ty) = match member.as_str() {
+                        "to_string" => (
+                            Type::String,
+                            Type::Function(FunctionType {
+                                params: vec![Type::Unknown],
+                                ret: Box::new(Type::String),
+                            }),
+                        ),
+                        "append" => (
+                            Type::Void,
+                            Type::Function(FunctionType {
+                                params: vec![Type::Unknown, Type::Unknown],
+                                ret: Box::new(Type::Void),
+                            }),
+                        ),
+                        "get" | "get_json" => (
+                            Type::String,
+                            Type::Function(FunctionType {
+                                params: vec![Type::Unknown, Type::String],
+                                ret: Box::new(Type::String),
+                            }),
+                        ),
+                        "post" | "post_json" => (
+                            Type::String,
+                            Type::Function(FunctionType {
+                                params: vec![Type::Unknown, Type::String, Type::String],
+                                ret: Box::new(Type::String),
+                            }),
+                        ),
+                        _ => (
+                            Type::Unknown,
+                            Type::Function(FunctionType {
+                                params: vec![Type::Unknown; hir_args.len()],
+                                ret: Box::new(Type::Unknown),
+                            }),
+                        ),
+                    };
+
+                    return Some(HirExpr::Call {
+                        callee: Box::new(HirExpr::Identifier(member.clone(), callee_ty, *span)),
+                        args: hir_args,
+                        ty: ret_ty,
+                        span: *span,
+                    });
+                }
+
                 let hir_callee = self.analyse_expr(callee, None)?;
                 let mut hir_args = vec![];
+
+                if let HirExpr::Identifier(name, _, _) = &hir_callee {
+                    if let Some(intrinsic_call) =
+                        self.analyse_builtin_call(name, &hir_callee, args, *span)
+                    {
+                        return Some(intrinsic_call);
+                    }
+                }
 
                 let callee_ty = hir_callee.ty().clone();
                 match callee_ty {
@@ -582,6 +864,87 @@ impl Analyser {
                         };
                         (HirBinaryOp::Divide, ty)
                     }
+                    BinaryOp::Equal | BinaryOp::NotEqual => {
+                        let ty = if hir_left.ty().is_compatible(hir_right.ty())
+                            || hir_left.ty() == &Type::Unknown
+                            || hir_right.ty() == &Type::Unknown
+                        {
+                            Type::Bool
+                        } else {
+                            self.errors.push(Diagnostic::error(
+                                "E2001",
+                                format!(
+                                    "type mismatch: cannot compare `{}` and `{}`",
+                                    hir_left.ty(),
+                                    hir_right.ty()
+                                ),
+                                *span,
+                            ));
+                            Type::Error
+                        };
+                        (
+                            if matches!(op, BinaryOp::Equal) {
+                                HirBinaryOp::Equal
+                            } else {
+                                HirBinaryOp::NotEqual
+                            },
+                            ty,
+                        )
+                    }
+                    BinaryOp::Less
+                    | BinaryOp::LessEqual
+                    | BinaryOp::Greater
+                    | BinaryOp::GreaterEqual => {
+                        let ty = if hir_left.ty().is_numeric()
+                            && hir_right.ty().is_numeric()
+                            && hir_left.ty().is_compatible(hir_right.ty())
+                        {
+                            Type::Bool
+                        } else {
+                            self.errors.push(Diagnostic::error(
+                                "E2001",
+                                format!(
+                                    "type mismatch: cannot order `{}` and `{}`",
+                                    hir_left.ty(),
+                                    hir_right.ty()
+                                ),
+                                *span,
+                            ));
+                            Type::Error
+                        };
+                        let op = match op {
+                            BinaryOp::Less => HirBinaryOp::Less,
+                            BinaryOp::LessEqual => HirBinaryOp::LessEqual,
+                            BinaryOp::Greater => HirBinaryOp::Greater,
+                            BinaryOp::GreaterEqual => HirBinaryOp::GreaterEqual,
+                            _ => unreachable!(),
+                        };
+                        (op, ty)
+                    }
+                    BinaryOp::And | BinaryOp::Or => {
+                        let ty = if hir_left.ty() == &Type::Bool && hir_right.ty() == &Type::Bool {
+                            Type::Bool
+                        } else {
+                            self.errors.push(Diagnostic::error(
+                                "E2001",
+                                format!(
+                                    "type mismatch: logical operator requires bool operands, found `{}` and `{}`",
+                                    hir_left.ty(),
+                                    hir_right.ty()
+                                ),
+                                *span,
+                            ));
+                            Type::Error
+                        };
+                        (
+                            if matches!(op, BinaryOp::And) {
+                                HirBinaryOp::And
+                            } else {
+                                HirBinaryOp::Or
+                            },
+                            ty,
+                        )
+                    }
                 };
 
                 Some(HirExpr::Binary {
@@ -592,6 +955,265 @@ impl Analyser {
                     span: *span,
                 })
             }
+        }
+    }
+
+    fn analyse_builtin_call(
+        &mut self,
+        name: &str,
+        hir_callee: &HirExpr,
+        args: &[Expr],
+        span: Span,
+    ) -> Option<HirExpr> {
+        let sym = self.lookup(name)?;
+        if sym.kind != SymbolKind::Builtin {
+            return None;
+        }
+
+        let mut hir_args = vec![];
+        let mut expect_numeric = false;
+        let mut min_args = 0usize;
+        let mut exact_args: Option<usize> = None;
+        let mut allow_numeric_list_overload = false;
+        let mut q_last_numeric = false;
+
+        match name {
+            "print" => {
+                min_args = 1;
+            }
+            "sum" | "product" | "mean" | "variance" | "stddev" | "median" | "mode" => {
+                min_args = 1;
+                expect_numeric = true;
+                allow_numeric_list_overload = true;
+            }
+            "append" => {
+                exact_args = Some(2);
+            }
+            "len" => {
+                exact_args = Some(1);
+            }
+            "get" | "get_json" => {
+                exact_args = Some(2);
+            }
+            "post" | "post_json" => {
+                exact_args = Some(3);
+            }
+            "percentile" | "quantile" => {
+                min_args = 2;
+                expect_numeric = true;
+                q_last_numeric = true;
+                allow_numeric_list_overload = true;
+            }
+            "min" | "max" | "pow" | "hypot" | "log" | "atan2" => {
+                exact_args = Some(2);
+                expect_numeric = true;
+            }
+            "clamp" => {
+                exact_args = Some(3);
+                expect_numeric = true;
+            }
+            "abs" | "sign" | "sqrt" | "cbrt" | "exp" | "exp2" | "ln" | "log2" | "log10" | "sin"
+            | "cos" | "tan" | "asin" | "acos" | "atan" | "floor" | "ceil" | "round" | "trunc"
+            | "fract" | "is_nan" | "is_finite" | "is_infinite" => {
+                exact_args = Some(1);
+                expect_numeric = true;
+            }
+            _ => return None,
+        }
+
+        if let Some(count) = exact_args {
+            if args.len() != count {
+                self.errors.push(Diagnostic::error(
+                    "E2002",
+                    format!(
+                        "argument count mismatch: function expects {} arguments, but {} were provided",
+                        count,
+                        args.len()
+                    ),
+                    span,
+                ));
+            }
+        } else if args.len() < min_args {
+            self.errors.push(Diagnostic::error(
+                "E2002",
+                format!(
+                    "argument count mismatch: function expects at least {} argument{}, but {} were provided",
+                    min_args,
+                    if min_args == 1 { "" } else { "s" },
+                    args.len()
+                ),
+                span,
+            ));
+        }
+
+        for (idx, arg) in args.iter().enumerate() {
+            let expected = if expect_numeric {
+                if allow_numeric_list_overload {
+                    if q_last_numeric {
+                        if idx == 0 {
+                            if args.len() == 2 {
+                                None
+                            } else {
+                                Some(&Type::F64)
+                            }
+                        } else {
+                            Some(&Type::F64)
+                        }
+                    } else if args.len() == 1 {
+                        None
+                    } else {
+                        Some(&Type::F64)
+                    }
+                } else {
+                    Some(&Type::F64)
+                }
+            } else {
+                None
+            };
+            if let Some(hir_arg) = self.analyse_expr(arg, expected) {
+                if expect_numeric
+                    && !hir_arg.ty().is_numeric()
+                    && hir_arg.ty() != &Type::Error
+                    && !(allow_numeric_list_overload
+                        && idx == 0
+                        && Self::is_numeric_list_type(hir_arg.ty()))
+                {
+                    self.errors.push(Diagnostic::error(
+                        "E2003",
+                        format!(
+                            "argument type mismatch: function `{}` expects numeric arguments, found `{}`",
+                            name,
+                            hir_arg.ty()
+                        ),
+                        hir_arg.span(),
+                    ));
+                }
+                hir_args.push(hir_arg);
+            }
+        }
+
+        if allow_numeric_list_overload {
+            if q_last_numeric {
+                if args.len() == 2 && !hir_args.is_empty() {
+                    let first_ok = hir_args[0].ty().is_numeric()
+                        || Self::is_numeric_list_type(hir_args[0].ty());
+                    if !first_ok {
+                        self.errors.push(Diagnostic::error(
+                            "E2003",
+                            format!(
+                                "argument type mismatch: function `{}` expects first argument as a numeric list or number",
+                                name
+                            ),
+                            hir_args[0].span(),
+                        ));
+                    }
+                }
+            } else if args.len() == 1 && !hir_args.is_empty() {
+                let only_ok =
+                    hir_args[0].ty().is_numeric() || Self::is_numeric_list_type(hir_args[0].ty());
+                if !only_ok {
+                    self.errors.push(Diagnostic::error(
+                        "E2003",
+                        format!(
+                            "argument type mismatch: function `{}` expects a numeric value or numeric list",
+                            name
+                        ),
+                        hir_args[0].span(),
+                    ));
+                }
+            }
+        }
+
+        if name == "append" && hir_args.len() == 2 {
+            if !Self::is_numeric_list_type(hir_args[0].ty()) {
+                self.errors.push(Diagnostic::error(
+                    "E2003",
+                    "argument type mismatch: function `append` expects first argument as numeric list",
+                    hir_args[0].span(),
+                ));
+            }
+            if !hir_args[1].ty().is_numeric() && hir_args[1].ty() != &Type::Error {
+                self.errors.push(Diagnostic::error(
+                    "E2003",
+                    format!(
+                        "argument type mismatch: function `append` expects numeric value, found `{}`",
+                        hir_args[1].ty()
+                    ),
+                    hir_args[1].span(),
+                ));
+            }
+        }
+
+        if name == "len" && hir_args.len() == 1 && !matches!(hir_args[0].ty(), Type::List(_)) {
+            self.errors.push(Diagnostic::error(
+                "E2003",
+                format!(
+                    "argument type mismatch: function `len` expects a list value, found `{}`",
+                    hir_args[0].ty()
+                ),
+                hir_args[0].span(),
+            ));
+        }
+
+        if (name == "get" || name == "get_json")
+            && hir_args.len() == 2
+            && hir_args[1].ty() != &Type::String
+            && hir_args[1].ty() != &Type::Error
+        {
+            self.errors.push(Diagnostic::error(
+                "E2003",
+                format!(
+                    "argument type mismatch: function `{}` expects second argument as string, found `{}`",
+                    name, hir_args[1].ty()
+                ),
+                hir_args[1].span(),
+            ));
+        }
+        if (name == "post" || name == "post_json") && hir_args.len() == 3 {
+            if hir_args[1].ty() != &Type::String && hir_args[1].ty() != &Type::Error {
+                self.errors.push(Diagnostic::error(
+                    "E2003",
+                    format!(
+                        "argument type mismatch: function `{}` expects second argument as string, found `{}`",
+                        name, hir_args[1].ty()
+                    ),
+                    hir_args[1].span(),
+                ));
+            }
+            if hir_args[2].ty() != &Type::String && hir_args[2].ty() != &Type::Error {
+                self.errors.push(Diagnostic::error(
+                    "E2003",
+                    format!(
+                        "argument type mismatch: function `{}` expects third argument as string, found `{}`",
+                        name, hir_args[2].ty()
+                    ),
+                    hir_args[2].span(),
+                ));
+            }
+        }
+
+        let ret_ty = match name {
+            "print" | "append" => Type::Void,
+            "len" => Type::I64,
+            "is_nan" | "is_finite" | "is_infinite" => Type::Bool,
+            "get" | "post" | "get_json" | "post_json" => Type::String,
+            // `mode` currently lowers to NaN when no mode exists.
+            "mode" => Type::F64,
+            _ => Type::F64,
+        };
+
+        Some(HirExpr::Call {
+            callee: Box::new(hir_callee.clone()),
+            args: hir_args,
+            ty: ret_ty,
+            span,
+        })
+    }
+
+    fn is_numeric_list_type(ty: &Type) -> bool {
+        match ty {
+            Type::List(inner) => inner.is_numeric() || inner.as_ref() == &Type::Unknown,
+            _ => false,
         }
     }
 }
@@ -635,6 +1257,39 @@ mod tests {
     }
 
     #[test]
+    fn test_numeric_builtins_valid() {
+        let src = "fn main() -> i32:\n    let x = sqrt(9.0)\n    let y = pow(2.0, 8.0)\n    let z = mean(1.0, 2.0, 3.0, 4.0)\n    print(x, y, z)\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_numeric_builtin_type_mismatch() {
+        let src = "fn main() -> i32:\n    let x = sqrt(\"nope\")\n    return 0\n";
+        let errs = check_source(src).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2003"));
+    }
+
+    #[test]
+    fn test_stats_builtin_list_overload() {
+        let src = "fn main() -> i32:\n    let m = mean([1.0, 2.0, 3.0, 4.0])\n    let q = quantile([1.0, 2.0, 3.0, 4.0], 0.5)\n    let p = percentile([1.0, 2.0, 3.0, 4.0], 50.0)\n    print(m, q, p)\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_stats_builtin_named_list_overload() {
+        let src = "fn main() -> i32:\n    let xs = [1.0, 2.0, 3.0, 4.0]\n    let m = mean(xs)\n    let q = quantile(xs, 0.5)\n    let p = percentile(xs, 50.0)\n    print(m, q, p)\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_stats_builtin_list_type_mismatch() {
+        let src =
+            "fn main() -> i32:\n    let xs = [\"a\", \"b\"]\n    let m = mean(xs)\n    return 0\n";
+        let errs = check_source(src).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2003"));
+    }
+
+    #[test]
     fn test_type_mismatch() {
         let src = "fn main() -> i32:\n    let x: string = 10\n    return 0\n";
         let errs = check_source(src).unwrap_err();
@@ -651,8 +1306,38 @@ mod tests {
     #[test]
     fn test_argument_type_mismatch() {
         let src = "fn main() -> i32:\n    print(10)\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_variadic_print() {
+        let src = "fn main() -> i32:\n    print(\"value\", 10, true)\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_list_index_and_comparison() {
+        let src = "fn main() -> i32:\n    let values = [1.0, 2.0, 3.0]\n    let ok: bool = values[0] < values[1]\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_mutable_list_index_assignment() {
+        let src = "fn main() -> i32:\n    let values = [1.0, 2.0, 3.0]\n    values[0] = 9.0\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_list_append_and_len() {
+        let src = "fn main() -> i32:\n    let values = [1.0, 2.0, 3.0]\n    append(values, 4.0)\n    let n: i64 = len(values)\n    print(n)\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_immutable_assignment_rejected() {
+        let src = "fn main() -> i32:\n    const values = [1.0, 2.0, 3.0]\n    values[0] = 9.0\n    return 0\n";
         let errs = check_source(src).unwrap_err();
-        assert!(errs.iter().any(|e| e.code == "E2003"));
+        assert!(errs.iter().any(|e| e.code == "E2010"));
     }
 
     #[test]

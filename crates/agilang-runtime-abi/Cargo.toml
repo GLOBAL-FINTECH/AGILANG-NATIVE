@@ -11,5 +11,13 @@ crate-type = ["rlib", "cdylib", "staticlib"]
 [dependencies]
 agilang-runtime-core = { path = "../agilang-runtime-core" }
 agilang-runtime-platform = { path = "../agilang-runtime-platform" }
+agilang-runtime-compute = { path = "../agilang-runtime-compute" }
+agilang-runtime-accelerator = { path = "../agilang-runtime-accelerator" }
+agilang-runtime-crypto = { path = "../agilang-runtime-crypto" }
+agilang-runtime-resource = { path = "../agilang-runtime-resource" }
+agilang-runtime-webrtc = { path = "../agilang-runtime-webrtc" }
+agilang-runtime-http = { path = "../agilang-runtime-http" }
+agilang-runtime-async = { path = "../agilang-runtime-async" }
 once_cell.workspace = true
 serde_json.workspace = true
+parking_lot.workspace = true

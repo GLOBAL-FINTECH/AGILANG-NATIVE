@@ -1,3 +1,5 @@
+use agilang_database_agidb::AgiDbConnection;
+use agilang_database_driver::{DatabaseConnection, DatabaseValue};
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use serde_json::Value;
@@ -85,6 +87,10 @@ impl QueryBuilder {
     }
 
     pub fn get(&self) -> Vec<HashMap<String, Value>> {
+        if let Ok(rows) = self.get_from_agidb() {
+            return rows;
+        }
+
         let guard = DATABASE_STORE.lock().unwrap();
         let empty = Vec::new();
         let rows = guard.get(&self.table_name).unwrap_or(&empty);
@@ -121,6 +127,26 @@ impl QueryBuilder {
         table: &str,
         mut record: HashMap<String, Value>,
     ) -> Result<HashMap<String, Value>> {
+        ensure_agidb_table(table, record.keys().map(String::as_str).collect())?;
+        let mut columns = record.keys().cloned().collect::<Vec<_>>();
+        columns.sort();
+        let values = columns
+            .iter()
+            .map(|column| json_to_database_value(record.get(column).unwrap()))
+            .collect::<Vec<_>>();
+        let placeholders = vec!["?"; columns.len()].join(", ");
+        let sql = format!(
+            "INSERT INTO {} ({}) VALUES ({})",
+            table,
+            columns.join(", "),
+            placeholders
+        );
+        let mut conn = default_agidb_connection();
+        let result = conn.execute(&sql, &values)?;
+        if let Some(id) = result.last_insert_id {
+            record.entry("id".to_string()).or_insert(Value::from(id));
+        }
+
         let mut guard = DATABASE_STORE.lock().unwrap();
         let table_rows = guard.entry(table.to_string()).or_default();
 
@@ -134,6 +160,9 @@ impl QueryBuilder {
     }
 
     pub fn clear_table(table: &str) {
+        let mut conn = default_agidb_connection();
+        let _ = conn.execute(&format!("DELETE FROM {}", table), &[]);
+
         let mut guard = DATABASE_STORE.lock().unwrap();
         guard.remove(table);
     }
@@ -154,6 +183,101 @@ impl QueryBuilder {
             total,
             last_page,
         }
+    }
+
+    fn get_from_agidb(&self) -> Result<Vec<HashMap<String, Value>>> {
+        let mut conn = default_agidb_connection();
+        let (sql, params) = self.to_sql();
+        let params = params
+            .iter()
+            .map(json_to_database_value)
+            .collect::<Vec<_>>();
+        let rows = conn.query(&sql, &params)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|(key, value)| (key, database_value_to_json(value)))
+                    .collect()
+            })
+            .collect())
+    }
+}
+
+fn default_agidb_connection() -> AgiDbConnection {
+    #[cfg(test)]
+    {
+        let path = std::env::temp_dir()
+            .join(format!(
+                "agilang-framework-database-{}.agidb",
+                std::process::id()
+            ))
+            .to_string_lossy()
+            .into_owned();
+        AgiDbConnection::new(path)
+    }
+
+    #[cfg(not(test))]
+    {
+        let path = std::env::var("AGIDB_DATABASE")
+            .or_else(|_| std::env::var("DATABASE_PATH"))
+            .unwrap_or_else(|_| "storage/database/main.agidb".to_string());
+        AgiDbConnection::new(path)
+    }
+}
+
+fn ensure_agidb_table(table: &str, columns: Vec<&str>) -> Result<()> {
+    let mut all_columns = vec!["id".to_string()];
+    for column in columns {
+        if !all_columns.iter().any(|existing| existing == column) {
+            all_columns.push(column.to_string());
+        }
+    }
+    let definitions = all_columns
+        .into_iter()
+        .map(|column| {
+            if column == "id" {
+                "id INTEGER".to_string()
+            } else {
+                format!("{} TEXT", column)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut conn = default_agidb_connection();
+    conn.execute(&format!("CREATE TABLE {} ({})", table, definitions), &[])?;
+    Ok(())
+}
+
+fn json_to_database_value(value: &Value) -> DatabaseValue {
+    match value {
+        Value::Null => DatabaseValue::Null,
+        Value::Bool(v) => DatabaseValue::Boolean(*v),
+        Value::Number(v) => {
+            if let Some(i) = v.as_i64() {
+                DatabaseValue::Integer(i)
+            } else if let Some(f) = v.as_f64() {
+                DatabaseValue::Float(f)
+            } else {
+                DatabaseValue::Text(v.to_string())
+            }
+        }
+        Value::String(v) => DatabaseValue::Text(v.clone()),
+        Value::Array(_) | Value::Object(_) => DatabaseValue::Json(value.to_string()),
+    }
+}
+
+fn database_value_to_json(value: DatabaseValue) -> Value {
+    match value {
+        DatabaseValue::Null => Value::Null,
+        DatabaseValue::Boolean(v) => Value::Bool(v),
+        DatabaseValue::Integer(v) => Value::from(v),
+        DatabaseValue::Float(v) => Value::from(v),
+        DatabaseValue::Decimal(v) | DatabaseValue::Text(v) | DatabaseValue::DateTime(v) => {
+            Value::String(v)
+        }
+        DatabaseValue::Binary(v) => Value::Array(v.into_iter().map(Value::from).collect()),
+        DatabaseValue::Json(v) => serde_json::from_str(&v).unwrap_or(Value::String(v)),
     }
 }
 
