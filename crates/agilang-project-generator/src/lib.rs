@@ -1460,7 +1460,7 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             let path = project_root.join("app/Controllers").join(format!("{}.agi", file_name));
             let ns = nested_namespace("App.Controllers", &file_name);
             let content = format!(
-                "module {ns}\n\nuse App.Models.{resource_pascal}\nuse App.Requests.Store{resource_pascal}Request\nuse App.Requests.Update{resource_pascal}Request\nuse Framework.Http.Request\nuse Framework.Http.Response\n\nclass {actual_class_name}:\n    fn index(request: Request) -> Response:\n        return Response.json({{\"resource\": \"{resource_table}\", \"action\": \"index\"}})\n\n    fn show(request: Request, id: i64) -> Response:\n        return Response.json({{\"resource\": \"{resource_table}\", \"action\": \"show\", \"id\": id}})\n\n    fn store(request: Store{resource_pascal}Request) -> Response:\n        return Response.status(201).json({{\"resource\": \"{resource_table}\", \"action\": \"store\"}})\n\n    fn update(request: Update{resource_pascal}Request, id: i64) -> Response:\n        return Response.json({{\"resource\": \"{resource_table}\", \"action\": \"update\", \"id\": id}})\n\n    fn destroy(request: Request, id: i64) -> Response:\n        return Response.json({{\"resource\": \"{resource_table}\", \"action\": \"destroy\", \"id\": id}})\n"
+                "module {ns}\n\nuse App.Models.{resource_pascal}\nuse App.Requests.Store{resource_pascal}Request\nuse App.Requests.Update{resource_pascal}Request\nuse Framework.Http.Request\nuse Framework.Http.Response\nuse Framework.Validation.Validator\n\nclass {actual_class_name}:\n    fn index(request: Request) -> Response:\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"index\"\n        }})\n\n    fn show(request: Request, id: i64) -> Response:\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"show\",\n            \"id\": id\n        }})\n\n    fn store(request: Store{resource_pascal}Request) -> Response:\n        let payload = request.body()\n        Validator.validate(payload, {{\n            \"name\": [\"required\", \"string\", \"max:255\"]\n        }})\n        return Response.status(201).json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"store\",\n            \"validated_fields\": [\"name\"]\n        }})\n\n    fn update(request: Update{resource_pascal}Request, id: i64) -> Response:\n        let payload = request.body()\n        Validator.validate(payload, {{\n            \"name\": [\"required\", \"string\", \"max:255\"]\n        }})\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"update\",\n            \"id\": id,\n            \"validated_fields\": [\"name\"]\n        }})\n\n    fn destroy(request: Request, id: i64) -> Response:\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"destroy\",\n            \"id\": id,\n            \"authorization\": \"required\"\n        }})\n\n    fn restore(request: Request, id: i64) -> Response:\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"restore\",\n            \"id\": id,\n            \"authorization\": \"required\"\n        }})\n"
             );
             write_generated_file(&path, &content, force, "controller")?;
             println!("Created controller app/Controllers/{}.agi", file_name);
@@ -1469,7 +1469,7 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             let path = project_root.join("app/Models").join(format!("{}.agi", normalized_name));
             let ns = nested_namespace("App.Models", &normalized_name);
             let content = format!(
-                "module {ns}\n\nuse Framework.Database.Model\n\nclass {resource_pascal} extends Model:\n    table = \"{resource_table}\"\n    primary_key = \"id\"\n    fillable = [\"name\"]\n    hidden = []\n    casts = {{}}\n"
+                "module {ns}\n\nuse Framework.Database.Model\n\nclass {resource_pascal} extends Model:\n    table = \"{resource_table}\"\n    primary_key = \"id\"\n    fillable = [\"name\"]\n    hidden = []\n    casts = {{\n        \"id\": \"integer\"\n    }}\n    timestamps = true\n    soft_deletes = true\n"
             );
             write_generated_file(&path, &content, force, "model")?;
             println!("Created model app/Models/{}.agi", normalized_name);
@@ -1507,7 +1507,7 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             let path = project_root.join("app/Requests").join(format!("{}.agi", file_name));
             let ns = nested_namespace("App.Requests", &file_name);
             let content = format!(
-                "module {ns}\n\nuse Framework.Validation.FormRequest\n\nclass {actual_class_name} extends FormRequest:\n    fn authorize() -> bool:\n        return true\n\n    fn rules() -> map:\n        return {{\n            \"name\": [\"required\", \"string\", \"max:255\"]\n        }}\n"
+                "module {ns}\n\nuse Framework.Validation.FormRequest\n\nclass {actual_class_name} extends FormRequest:\n    fn authorize() -> bool:\n        return true\n\n    fn rules() -> map:\n        return {{\n            \"name\": [\"required\", \"string\", \"max:255\"]\n        }}\n\n    fn validated_fields() -> list:\n        return [\"name\"]\n"
             );
             write_generated_file(&path, &content, force, "request")?;
             println!("Created request app/Requests/{}.agi", file_name);
@@ -1610,7 +1610,7 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             let actual_class_name = if class_name.ends_with("Factory") { class_name.to_string() } else { format!("{}Factory", class_name) };
             let path = project_root.join("database/factories").join(format!("{}.agi", file_name));
             let content = format!(
-                "class {actual_class_name}:\n    fn definition() -> map:\n        return {{\n            \"name\": \"Example {resource_pascal}\"\n        }}\n"
+                "class {actual_class_name}:\n    fn definition() -> map:\n        return {{\n            \"name\": \"Example {resource_pascal}\",\n            \"created_at\": \"seeded\",\n            \"updated_at\": \"seeded\"\n        }}\n"
             );
             write_generated_file(&path, &content, force, "factory")?;
             println!("Created factory database/factories/{}.agi", file_name);
@@ -1618,8 +1618,8 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
         "test" => {
             let path = project_root.join("tests/Feature").join(format!("{}Test.agi", normalized_name));
             let content = format!(
-                "fn test_{}() -> i32:\n    return 0\n",
-                class_name.to_lowercase()
+                "use Framework.Testing.WebTest\n\ntest \"{} resource scaffold is reachable\":\n    let response = WebTest.get(\"/\")\n    response.assert_status(200)\n    response.assert_contains(\"AGILANG\")\n",
+                normalized_name
             );
             write_generated_file(&path, &content, force, "test")?;
             println!("Created test tests/Feature/{}Test.agi", normalized_name);
@@ -3108,16 +3108,21 @@ pub fn validate_ai_context() -> Result<()> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn install_http_client_writes_wrapper_and_contract() {
+    fn unique_temp_dir(prefix: &str) -> std::path::PathBuf {
         let unique = format!(
-            "agilang-http-client-test-{}",
+            "{}-{}",
+            prefix,
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos()
         );
-        let root = std::env::temp_dir().join(unique);
+        std::env::temp_dir().join(unique)
+    }
+
+    #[test]
+    fn install_http_client_writes_wrapper_and_contract() {
+        let root = unique_temp_dir("agilang-http-client-test");
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join("agilang.toml"), "[project]\nname = \"test\"\n").unwrap();
 
@@ -3131,6 +3136,36 @@ mod tests {
         assert!(result.is_ok());
         assert!(root.join("app/Http/HttpClient.agi").exists());
         assert!(root.join("docs/HTTP_CLIENT_RUNTIME_CONTRACT.md").exists());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn resource_generation_emits_orm_aware_files() {
+        let root = unique_temp_dir("agilang-resource-test");
+        generate_project(root.to_string_lossy().as_ref(), "web").unwrap();
+
+        let previous = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&root).unwrap();
+        let result = make_component("resource", "Post", true);
+        std::env::set_current_dir(previous).unwrap();
+
+        assert!(result.is_ok());
+
+        let model = fs::read_to_string(root.join("app/Models/Post.agi")).unwrap();
+        assert!(model.contains("soft_deletes = true"));
+        assert!(model.contains("\"id\": \"integer\""));
+
+        let controller = fs::read_to_string(root.join("app/Controllers/PostController.agi")).unwrap();
+        assert!(controller.contains("\"repository\": \"orm\""));
+        assert!(controller.contains("validated_fields"));
+        assert!(controller.contains("fn restore"));
+
+        let request = fs::read_to_string(root.join("app/Requests/StorePostRequest.agi")).unwrap();
+        assert!(request.contains("fn validated_fields() -> list:"));
+
+        let test_file = fs::read_to_string(root.join("tests/Feature/PostResourceTest.agi")).unwrap();
+        assert!(test_file.contains("Framework.Testing.WebTest"));
 
         let _ = fs::remove_dir_all(root);
     }
