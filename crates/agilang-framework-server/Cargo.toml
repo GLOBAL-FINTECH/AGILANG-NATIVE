@@ -9,4 +9,11 @@ agilang-framework-routing = { path = "../agilang-framework-routing" }
 agilang-framework-view = { path = "../agilang-framework-view" }
 agilang-framework-core = { path = "../agilang-framework-core" }
 agilang-framework-config = { path = "../agilang-framework-config" }
+agilang-framework-auth = { path = "../agilang-framework-auth" }
+agilang-database-agidb = { path = "../agilang-database-agidb" }
+agilang-database-driver = { path = "../agilang-database-driver" }
+agilang-runtime-crypto = { path = "../agilang-runtime-crypto" }
+agilang-runtime-http = { path = "../agilang-runtime-http" }
+agilang-runtime-async = { path = "../agilang-runtime-async" }
 chrono = "0.4"
+serde_json = "1"

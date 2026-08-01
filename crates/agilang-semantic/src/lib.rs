@@ -1,4 +1,4 @@
-use agilang_ast::{BinaryOp, Expr, Function, Program, Stmt};
+use agilang_ast::{BinaryOp, Expr, Function, Program, Stmt, TypeRef};
 use agilang_diagnostics::Diagnostic;
 use agilang_ir::{HirBinaryOp, HirExpr, HirFunction, HirParameter, HirProgram, HirStmt};
 use agilang_source::Span;
@@ -20,6 +20,15 @@ impl Analyser {
         global_scope
             .insert(Symbol {
                 name: "http".to_string(),
+                kind: SymbolKind::Local,
+                ty: Type::Unknown,
+                span: Span::default(),
+                mutable: false,
+            })
+            .ok();
+        global_scope
+            .insert(Symbol {
+                name: "Native".to_string(),
                 kind: SymbolKind::Local,
                 ty: Type::Unknown,
                 span: Span::default(),
@@ -81,12 +90,18 @@ impl Analyser {
                 vec![Type::Unknown, Type::String, Type::String],
                 Type::String,
             ),
+            ("request", vec![Type::Unknown, Type::Unknown], Type::String),
             ("get_json", vec![Type::Unknown, Type::String], Type::String),
             (
                 "post_json",
                 vec![Type::Unknown, Type::String, Type::String],
                 Type::String,
             ),
+            ("json_encode", vec![Type::Unknown], Type::String),
+            ("json_decode", vec![Type::String], Type::Unknown),
+            ("env", vec![Type::String, Type::String], Type::String),
+            ("env_int", vec![Type::String, Type::I64], Type::I64),
+            ("throw", vec![Type::Unknown], Type::Void),
         ] {
             global_scope
                 .insert(Symbol {
@@ -119,13 +134,27 @@ impl Analyser {
             let mut param_types = vec![];
             for param in &func.params {
                 let ty = match &param.ty {
-                    Some(tr) => Type::from_str(&tr.name),
+                    Some(tr) => {
+                        let t = Type::from_str(&tr.name);
+                        if t == Type::Unknown && is_framework_type_name(&tr.name) {
+                            Type::Unknown
+                        } else {
+                            t
+                        }
+                    }
                     None => Type::Unknown,
                 };
                 param_types.push(ty);
             }
             let ret_type = match &func.return_type {
-                Some(tr) => Type::from_str(&tr.name),
+                Some(tr) => {
+                    let t = Type::from_str(&tr.name);
+                    if t == Type::Unknown && is_framework_type_name(&tr.name) {
+                        Type::Unknown
+                    } else {
+                        t
+                    }
+                }
                 None => Type::Void,
             };
 
@@ -140,7 +169,11 @@ impl Analyser {
                 mutable: false,
             };
 
-            if let Err(existing) = self.scopes[0].insert(symbol) {
+            if let Err(existing) = self.scopes[0].insert(symbol.clone()) {
+                if existing.kind == SymbolKind::Builtin {
+                    self.scopes[0].symbols.insert(func.name.clone(), symbol);
+                    continue;
+                }
                 self.errors.push(
                     Diagnostic::error(
                         "E1002",
@@ -209,6 +242,20 @@ impl Analyser {
         None
     }
 
+    fn resolve_type_ref(&mut self, tr: &TypeRef) -> Type {
+        let ty = Type::from_str(&tr.name);
+        if ty != Type::Unknown || is_framework_type_name(&tr.name) {
+            ty
+        } else {
+            self.errors.push(Diagnostic::error(
+                "E1004",
+                format!("unknown type `{}`", tr.name),
+                tr.span,
+            ));
+            Type::Error
+        }
+    }
+
     fn analyse_function(&mut self, func: &Function) -> Option<HirFunction> {
         self.enter_scope();
         self.current_local_symbols = vec![];
@@ -217,19 +264,7 @@ impl Analyser {
         let mut param_types = vec![];
         for param in &func.params {
             let ty = match &param.ty {
-                Some(tr) => {
-                    let t = Type::from_str(&tr.name);
-                    if t == Type::Unknown {
-                        self.errors.push(Diagnostic::error(
-                            "E1004",
-                            format!("unknown type `{}`", tr.name),
-                            tr.span,
-                        ));
-                        Type::Error
-                    } else {
-                        t
-                    }
-                }
+                Some(tr) => self.resolve_type_ref(tr),
                 None => Type::Unknown,
             };
 
@@ -250,19 +285,7 @@ impl Analyser {
         }
 
         let ret_type = match &func.return_type {
-            Some(tr) => {
-                let t = Type::from_str(&tr.name);
-                if t == Type::Unknown {
-                    self.errors.push(Diagnostic::error(
-                        "E1004",
-                        format!("unknown type `{}`", tr.name),
-                        tr.span,
-                    ));
-                    Type::Error
-                } else {
-                    t
-                }
-            }
+            Some(tr) => self.resolve_type_ref(tr),
             None => Type::Void,
         };
 
@@ -320,19 +343,7 @@ impl Analyser {
                 span,
             } => {
                 let declared_ty = match type_ref {
-                    Some(tr) => {
-                        let t = Type::from_str(&tr.name);
-                        if t == Type::Unknown {
-                            self.errors.push(Diagnostic::error(
-                                "E1004",
-                                format!("unknown type `{}`", tr.name),
-                                tr.span,
-                            ));
-                            Type::Error
-                        } else {
-                            t
-                        }
-                    }
+                    Some(tr) => self.resolve_type_ref(tr),
                     None => Type::Unknown,
                 };
 
@@ -392,7 +403,7 @@ impl Analyser {
                 let expected_ty = target_expr.ty().clone();
                 let value_expr = self.analyse_expr(value, Some(&expected_ty))?;
 
-                if !expected_ty.is_compatible(value_expr.ty()) {
+                if expected_ty != Type::Unknown && !expected_ty.is_compatible(value_expr.ty()) {
                     self.errors.push(Diagnostic::error(
                         "E2001",
                         format!(
@@ -432,6 +443,7 @@ impl Analyser {
                             }
                         }
                     }
+                    HirExpr::MemberAccess { .. } => {}
                     _ => {
                         self.errors.push(Diagnostic::error(
                             "E2011",
@@ -494,6 +506,82 @@ impl Analyser {
                     span: *span,
                 })
             }
+            Stmt::If {
+                condition,
+                then_body,
+                else_body,
+                span,
+            } => {
+                let hir_condition = self.analyse_expr(condition, None)?;
+                self.enter_scope();
+                let mut hir_then = vec![];
+                for stmt in then_body {
+                    if let Some(hir_stmt) = self.analyse_stmt(stmt) {
+                        hir_then.push(hir_stmt);
+                    }
+                }
+                self.exit_scope();
+
+                self.enter_scope();
+                let mut hir_else = vec![];
+                for stmt in else_body {
+                    if let Some(hir_stmt) = self.analyse_stmt(stmt) {
+                        hir_else.push(hir_stmt);
+                    }
+                }
+                self.exit_scope();
+
+                Some(HirStmt::If {
+                    condition: hir_condition,
+                    then_body: hir_then,
+                    else_body: hir_else,
+                    span: *span,
+                })
+            }
+            Stmt::ForIn {
+                key_name,
+                value_name,
+                iterable,
+                body,
+                span,
+            } => {
+                let hir_iterable = self.analyse_expr(iterable, None)?;
+                self.enter_scope();
+                let key_sym = Symbol {
+                    name: key_name.clone(),
+                    kind: SymbolKind::Local,
+                    ty: Type::Unknown,
+                    span: *span,
+                    mutable: true,
+                };
+                self.declare(key_sym.clone());
+                self.current_local_symbols.push(key_sym);
+                if let Some(value_name) = value_name {
+                    let value_sym = Symbol {
+                        name: value_name.clone(),
+                        kind: SymbolKind::Local,
+                        ty: Type::Unknown,
+                        span: *span,
+                        mutable: true,
+                    };
+                    self.declare(value_sym.clone());
+                    self.current_local_symbols.push(value_sym);
+                }
+                let mut hir_body = vec![];
+                for stmt in body {
+                    if let Some(hir_stmt) = self.analyse_stmt(stmt) {
+                        hir_body.push(hir_stmt);
+                    }
+                }
+                self.exit_scope();
+                Some(HirStmt::ForIn {
+                    key_name: key_name.clone(),
+                    value_name: value_name.clone(),
+                    iterable: hir_iterable,
+                    body: hir_body,
+                    span: *span,
+                })
+            }
             Stmt::Expr(expr) => {
                 let val_expr = self.analyse_expr(expr, None)?;
                 Some(HirStmt::Expr(val_expr))
@@ -506,12 +594,16 @@ impl Analyser {
             Expr::Identifier(name, span) => match self.lookup(name) {
                 Some(sym) => Some(HirExpr::Identifier(name.clone(), sym.ty.clone(), *span)),
                 None => {
-                    self.errors.push(Diagnostic::error(
-                        "E1001",
-                        format!("undefined symbol `{}`", name),
-                        *span,
-                    ));
-                    Some(HirExpr::Identifier(name.clone(), Type::Error, *span))
+                    if name.chars().next().map(char::is_uppercase).unwrap_or(false) {
+                        Some(HirExpr::Identifier(name.clone(), Type::Unknown, *span))
+                    } else {
+                        self.errors.push(Diagnostic::error(
+                            "E1001",
+                            format!("undefined symbol `{}`", name),
+                            *span,
+                        ));
+                        Some(HirExpr::Identifier(name.clone(), Type::Error, *span))
+                    }
                 }
             },
             Expr::Integer(val, span) => {
@@ -559,6 +651,14 @@ impl Analyser {
                     *span,
                 ))
             }
+            Expr::ObjectLiteral(items, span) => {
+                let mut hir_items = vec![];
+                for (key, value) in items {
+                    let hir_value = self.analyse_expr(value, None)?;
+                    hir_items.push((key.clone(), hir_value));
+                }
+                Some(HirExpr::ObjectLiteral(hir_items, Type::Unknown, *span))
+            }
             Expr::MemberAccess {
                 object,
                 member,
@@ -584,7 +684,10 @@ impl Analyser {
                 let hir_object = self.analyse_expr(object, None)?;
                 let hir_index = self.analyse_expr(index, Some(&Type::I64))?;
 
-                if !hir_index.ty().is_integer() && hir_index.ty() != &Type::Error {
+                if !hir_index.ty().is_integer()
+                    && hir_index.ty() != &Type::Error
+                    && hir_index.ty() != &Type::Unknown
+                {
                     self.errors.push(Diagnostic::error(
                         "E2001",
                         format!("list index must be integer, found `{}`", hir_index.ty()),
@@ -594,6 +697,7 @@ impl Analyser {
 
                 let result_ty = match hir_object.ty() {
                     Type::List(inner) => (*inner.clone()).clone(),
+                    Type::Unknown => Type::Unknown,
                     Type::Error => Type::Error,
                     other => {
                         self.errors.push(Diagnostic::error(
@@ -623,42 +727,69 @@ impl Analyser {
                         }
                     }
 
-                    let (ret_ty, callee_ty) = match member.as_str() {
-                        "to_string" => (
-                            Type::String,
-                            Type::Function(FunctionType {
-                                params: vec![Type::Unknown],
-                                ret: Box::new(Type::String),
-                            }),
-                        ),
-                        "append" => (
-                            Type::Void,
-                            Type::Function(FunctionType {
-                                params: vec![Type::Unknown, Type::Unknown],
-                                ret: Box::new(Type::Void),
-                            }),
-                        ),
-                        "get" | "get_json" => (
-                            Type::String,
-                            Type::Function(FunctionType {
-                                params: vec![Type::Unknown, Type::String],
-                                ret: Box::new(Type::String),
-                            }),
-                        ),
-                        "post" | "post_json" => (
-                            Type::String,
-                            Type::Function(FunctionType {
-                                params: vec![Type::Unknown, Type::String, Type::String],
-                                ret: Box::new(Type::String),
-                            }),
-                        ),
-                        _ => (
-                            Type::Unknown,
-                            Type::Function(FunctionType {
-                                params: vec![Type::Unknown; hir_args.len()],
-                                ret: Box::new(Type::Unknown),
-                            }),
-                        ),
+                    let (ret_ty, callee_ty) = match self.lookup(member) {
+                        Some(Symbol {
+                            ty: Type::Function(ft),
+                            ..
+                        }) => (ft.ret.as_ref().clone(), Type::Function(ft.clone())),
+                        _ => match member.as_str() {
+                            "to_string" => (
+                                Type::String,
+                                Type::Function(FunctionType {
+                                    params: vec![Type::Unknown],
+                                    ret: Box::new(Type::String),
+                                }),
+                            ),
+                            "starts_with" => (
+                                Type::Bool,
+                                Type::Function(FunctionType {
+                                    params: vec![Type::Unknown, Type::String],
+                                    ret: Box::new(Type::Bool),
+                                }),
+                            ),
+                            "trim_start" | "trim_end" => (
+                                Type::String,
+                                Type::Function(FunctionType {
+                                    params: vec![Type::Unknown, Type::String],
+                                    ret: Box::new(Type::String),
+                                }),
+                            ),
+                            "append" => (
+                                Type::Void,
+                                Type::Function(FunctionType {
+                                    params: vec![Type::Unknown, Type::Unknown],
+                                    ret: Box::new(Type::Void),
+                                }),
+                            ),
+                            "get" | "get_json" => (
+                                Type::String,
+                                Type::Function(FunctionType {
+                                    params: vec![Type::Unknown, Type::String],
+                                    ret: Box::new(Type::String),
+                                }),
+                            ),
+                            "post" | "post_json" => (
+                                Type::String,
+                                Type::Function(FunctionType {
+                                    params: vec![Type::Unknown, Type::String, Type::String],
+                                    ret: Box::new(Type::String),
+                                }),
+                            ),
+                            "request" => (
+                                Type::String,
+                                Type::Function(FunctionType {
+                                    params: vec![Type::Unknown, Type::Unknown],
+                                    ret: Box::new(Type::String),
+                                }),
+                            ),
+                            _ => (
+                                Type::Unknown,
+                                Type::Function(FunctionType {
+                                    params: vec![Type::Unknown; hir_args.len()],
+                                    ret: Box::new(Type::Unknown),
+                                }),
+                            ),
+                        },
                     };
 
                     return Some(HirExpr::Call {
@@ -736,6 +867,19 @@ impl Analyser {
                             span: *span,
                         })
                     }
+                    Type::Unknown if is_constructor_like_expr(callee.as_ref()) => {
+                        for arg in args {
+                            if let Some(hir_arg) = self.analyse_expr(arg, None) {
+                                hir_args.push(hir_arg);
+                            }
+                        }
+                        Some(HirExpr::Call {
+                            callee: Box::new(hir_callee),
+                            args: hir_args,
+                            ty: Type::Unknown,
+                            span: *span,
+                        })
+                    }
                     _ => {
                         self.errors.push(Diagnostic::error(
                             "E2009",
@@ -775,6 +919,10 @@ impl Analyser {
                         let ty =
                             if hir_left.ty() == &Type::String && hir_right.ty() == &Type::String {
                                 Type::String
+                            } else if hir_left.ty() == &Type::Unknown
+                                || hir_right.ty() == &Type::Unknown
+                            {
+                                Type::Unknown
                             } else if hir_left.ty().is_numeric() && hir_right.ty().is_numeric() {
                                 if hir_left.ty() == hir_right.ty() {
                                     hir_left.ty().clone()
@@ -805,7 +953,11 @@ impl Analyser {
                         (HirBinaryOp::Add, ty)
                     }
                     BinaryOp::Subtract => {
-                        let ty = if hir_left.ty().is_numeric()
+                        let ty = if hir_left.ty() == &Type::Unknown
+                            || hir_right.ty() == &Type::Unknown
+                        {
+                            Type::Unknown
+                        } else if hir_left.ty().is_numeric()
                             && hir_right.ty().is_numeric()
                             && hir_left.ty() == hir_right.ty()
                         {
@@ -825,7 +977,11 @@ impl Analyser {
                         (HirBinaryOp::Subtract, ty)
                     }
                     BinaryOp::Multiply => {
-                        let ty = if hir_left.ty().is_numeric()
+                        let ty = if hir_left.ty() == &Type::Unknown
+                            || hir_right.ty() == &Type::Unknown
+                        {
+                            Type::Unknown
+                        } else if hir_left.ty().is_numeric()
                             && hir_right.ty().is_numeric()
                             && hir_left.ty() == hir_right.ty()
                         {
@@ -845,7 +1001,11 @@ impl Analyser {
                         (HirBinaryOp::Multiply, ty)
                     }
                     BinaryOp::Divide => {
-                        let ty = if hir_left.ty().is_numeric()
+                        let ty = if hir_left.ty() == &Type::Unknown
+                            || hir_right.ty() == &Type::Unknown
+                        {
+                            Type::Unknown
+                        } else if hir_left.ty().is_numeric()
                             && hir_right.ty().is_numeric()
                             && hir_left.ty() == hir_right.ty()
                         {
@@ -895,7 +1055,11 @@ impl Analyser {
                     | BinaryOp::LessEqual
                     | BinaryOp::Greater
                     | BinaryOp::GreaterEqual => {
-                        let ty = if hir_left.ty().is_numeric()
+                        let ty = if hir_left.ty() == &Type::Unknown
+                            || hir_right.ty() == &Type::Unknown
+                        {
+                            Type::Bool
+                        } else if hir_left.ty().is_numeric()
                             && hir_right.ty().is_numeric()
                             && hir_left.ty().is_compatible(hir_right.ty())
                         {
@@ -922,7 +1086,10 @@ impl Analyser {
                         (op, ty)
                     }
                     BinaryOp::And | BinaryOp::Or => {
-                        let ty = if hir_left.ty() == &Type::Bool && hir_right.ty() == &Type::Bool {
+                        let ty = if hir_left.ty() == &Type::Unknown
+                            || hir_right.ty() == &Type::Unknown
+                            || (hir_left.ty() == &Type::Bool && hir_right.ty() == &Type::Bool)
+                        {
                             Type::Bool
                         } else {
                             self.errors.push(Diagnostic::error(
@@ -1353,4 +1520,17 @@ mod tests {
         let errs = check_source(src).unwrap_err();
         assert!(errs.iter().any(|e| e.code == "E2008"));
     }
+}
+
+fn is_framework_type_name(name: &str) -> bool {
+    name == "map"
+        || name == "bytes"
+        || name.chars().next().map(char::is_uppercase).unwrap_or(false)
+}
+
+fn is_constructor_like_expr(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Identifier(name, _) if name.chars().next().map(char::is_uppercase).unwrap_or(false)
+    )
 }

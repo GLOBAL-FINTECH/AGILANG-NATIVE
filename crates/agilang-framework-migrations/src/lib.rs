@@ -190,9 +190,13 @@ impl MigrationExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_checksum_computation_and_drift_detection() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         MigrationRepository::clear();
         let content = "schema.create('users')";
         let checksum = compute_checksum(content);
@@ -209,6 +213,7 @@ mod tests {
 
     #[test]
     fn test_pretend_mode_output() {
+        let _guard = TEST_MUTEX.lock().unwrap();
         MigrationRepository::clear();
         let file = MigrationFile {
             name: "20260720_002_posts".to_string(),

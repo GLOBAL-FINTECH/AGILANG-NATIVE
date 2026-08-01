@@ -1,0 +1,27 @@
+{
+  "schema": "AGI-HANDBOOK-COMPAT-1",
+  "language": "AGILANG",
+  "canonical_repository": "GLOBAL-FINTECH/agilang",
+  "canonical_package_version": "2.1.0",
+  "native_runtime_version": "0.4.0-handbook-patch",
+  "entrypoint": {
+    "syntax": "fn main() -> i32:",
+    "success_return": "return 0",
+    "status": "native-implemented"
+  },
+  "surfaces": {
+    "agi": "programming and backend language surface",
+    "ags": "reactive presentation/template surface",
+    "aiflow": "AI training and inference workflow surface",
+    "evm": "EVM JSON-RPC and blockchain integration surface"
+  },
+  "truth_labels": ["VERIFIED", "SUPPORTED_HOSTED", "EXPERIMENTAL", "PLANNED", "DEPRECATED"],
+  "compatibility_rule": "A feature is one-to-one only when syntax, parse tree, semantics, runtime behavior, diagnostics, CLI behavior, generated layout, tests, and cross-platform packaging match the pinned canonical commit.",
+  "source_handbooks": [
+    "AGILANG Complete Book, Edition 2.1 (2026)",
+    "AGILANG Role-Based Full-Stack Learning Handbook, Edition 2.1 (2026)",
+    "AGILANG Instructor's Lecture Handbook, Edition 2.1 (2026)",
+    "AGILANG Complete Education and Reference Publishing System Master Blueprint (2026)",
+    "Applied Machine Learning and Efficient AI Systems v1.3 (2026)"
+  ]
+}

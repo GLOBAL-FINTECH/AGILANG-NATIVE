@@ -7,3 +7,5 @@ edition.workspace = true
 anyhow = { workspace = true }
 serde = { workspace = true }
 agilang-database-identity = { path = "../agilang-database-identity" }
+agilang-database-transport = { path = "../agilang-database-transport" }
+agilang-runtime-crypto = { path = "../agilang-runtime-crypto" }

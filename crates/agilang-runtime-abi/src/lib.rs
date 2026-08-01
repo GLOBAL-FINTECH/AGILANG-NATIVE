@@ -871,6 +871,13 @@ fn set_http_response(s: String) -> *const c_char {
     ptr
 }
 
+fn http_client_default() -> Result<agilang_runtime_http::HttpClient, AgilangError> {
+    agilang_runtime_http::HttpClient::new(agilang_runtime_http::TlsPolicy {
+        require_https: false,
+        allow_invalid_certificates: false,
+    })
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn agi_http_get_json(url_ptr: *const c_char) -> *const c_char {
     if url_ptr.is_null() {
@@ -881,10 +888,7 @@ pub unsafe extern "C" fn agi_http_get_json(url_ptr: *const c_char) -> *const c_c
         Err(_) => return set_http_response(String::new()),
     };
 
-    let client = match agilang_runtime_http::HttpClient::new(agilang_runtime_http::TlsPolicy {
-        require_https: false,
-        allow_invalid_certificates: false,
-    }) {
+    let client = match http_client_default() {
         Ok(c) => c,
         Err(_) => return set_http_response(String::new()),
     };
@@ -892,6 +896,7 @@ pub unsafe extern "C" fn agi_http_get_json(url_ptr: *const c_char) -> *const c_c
     let req = agilang_runtime_http::HttpRequest {
         method: "GET".to_string(),
         url: url.to_string(),
+        query: BTreeMap::new(),
         headers: BTreeMap::new(),
         body: Vec::new(),
         timeout_ms: Some(10_000),
@@ -933,10 +938,7 @@ pub unsafe extern "C" fn agi_http_post(
         }
     };
 
-    let client = match agilang_runtime_http::HttpClient::new(agilang_runtime_http::TlsPolicy {
-        require_https: false,
-        allow_invalid_certificates: false,
-    }) {
+    let client = match http_client_default() {
         Ok(c) => c,
         Err(_) => return set_http_response(String::new()),
     };
@@ -944,6 +946,7 @@ pub unsafe extern "C" fn agi_http_post(
     let req = agilang_runtime_http::HttpRequest {
         method: "POST".to_string(),
         url: url.to_string(),
+        query: BTreeMap::new(),
         headers: BTreeMap::new(),
         body: body.as_bytes().to_vec(),
         timeout_ms: Some(10_000),
@@ -980,10 +983,7 @@ pub unsafe extern "C" fn agi_http_post_json(
         }
     };
 
-    let client = match agilang_runtime_http::HttpClient::new(agilang_runtime_http::TlsPolicy {
-        require_https: false,
-        allow_invalid_certificates: false,
-    }) {
+    let client = match http_client_default() {
         Ok(c) => c,
         Err(_) => return set_http_response(String::new()),
     };
@@ -994,6 +994,7 @@ pub unsafe extern "C" fn agi_http_post_json(
     let req = agilang_runtime_http::HttpRequest {
         method: "POST".to_string(),
         url: url.to_string(),
+        query: BTreeMap::new(),
         headers,
         body: body.as_bytes().to_vec(),
         timeout_ms: Some(10_000),
@@ -1006,6 +1007,45 @@ pub unsafe extern "C" fn agi_http_post_json(
         }
         Ok(Err(e)) => set_http_response(format!("{{\"error\": \"{}\"}}", e)),
         Err(e) => set_http_response(format!("{{\"error\": \"{}\"}}", e)),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn agi_http_request_json(request_ptr: *const c_char) -> *const c_char {
+    if request_ptr.is_null() {
+        return set_http_response("{\"error\":\"request payload is required\"}".to_string());
+    }
+
+    let request_json = match std::ffi::CStr::from_ptr(request_ptr).to_str() {
+        Ok(s) => s,
+        Err(_) => return set_http_response("{\"error\":\"request payload must be UTF-8\"}".to_string()),
+    };
+
+    let request: agilang_runtime_http::HttpRequest = match serde_json::from_str(request_json) {
+        Ok(value) => value,
+        Err(err) => {
+            return set_http_response(
+                serde_json::json!({ "error": err.to_string() }).to_string(),
+            )
+        }
+    };
+
+    let client = match http_client_default() {
+        Ok(c) => c,
+        Err(err) => {
+            return set_http_response(
+                serde_json::json!({ "error": err.to_string() }).to_string(),
+            )
+        }
+    };
+
+    match agilang_runtime_async::block_on(client.execute(request)) {
+        Ok(Ok(resp)) => match serde_json::to_string(&resp) {
+            Ok(json) => set_http_response(json),
+            Err(err) => set_http_response(serde_json::json!({ "error": err.to_string() }).to_string()),
+        },
+        Ok(Err(err)) => set_http_response(serde_json::json!({ "error": err.to_string() }).to_string()),
+        Err(err) => set_http_response(serde_json::json!({ "error": err.to_string() }).to_string()),
     }
 }
 

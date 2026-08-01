@@ -12,6 +12,11 @@ pub enum Type {
     Bool,
     String,
     Bytes,
+    List(Box<Type>),
+    Vector,
+    Matrix,
+    Complex,
+    Optional(Box<Type>),
     Void,
     Never,
     Unknown,
@@ -31,6 +36,7 @@ impl Type {
         match name {
             "i32" => Self::I32,
             "i64" => Self::I64,
+            "int" => Self::I64,
             "u32" => Self::U32,
             "u64" => Self::U64,
             "f32" => Self::F32,
@@ -38,6 +44,9 @@ impl Type {
             "bool" => Self::Bool,
             "string" => Self::String,
             "bytes" => Self::Bytes,
+            "vector" => Self::Vector,
+            "matrix" => Self::Matrix,
+            "complex" => Self::Complex,
             "void" => Self::Void,
             _ => Self::Unknown,
         }
@@ -68,7 +77,19 @@ impl Type {
         if self.is_float() && other.is_float() {
             return true;
         }
-        self == other
+        match (self, other) {
+            (Self::List(left), Self::List(right)) => {
+                left.as_ref() == &Self::Unknown
+                    || right.as_ref() == &Self::Unknown
+                    || left.is_compatible(right)
+            }
+            (Self::Optional(left), Self::Optional(right)) => {
+                left.as_ref() == &Self::Unknown
+                    || right.as_ref() == &Self::Unknown
+                    || left.is_compatible(right)
+            }
+            _ => self == other,
+        }
     }
 }
 
@@ -84,6 +105,11 @@ impl fmt::Display for Type {
             Self::Bool => write!(f, "bool"),
             Self::String => write!(f, "string"),
             Self::Bytes => write!(f, "bytes"),
+            Self::List(inner) => write!(f, "list<{}>", inner),
+            Self::Vector => write!(f, "vector"),
+            Self::Matrix => write!(f, "matrix"),
+            Self::Complex => write!(f, "complex"),
+            Self::Optional(inner) => write!(f, "optional<{}>", inner),
             Self::Void => write!(f, "void"),
             Self::Never => write!(f, "never"),
             Self::Unknown => write!(f, "unknown"),

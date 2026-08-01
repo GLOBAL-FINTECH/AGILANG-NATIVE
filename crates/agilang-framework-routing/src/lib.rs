@@ -60,7 +60,12 @@ impl Router {
                 current_prefix.clear();
             }
 
-            if line.contains("Route.get(") {
+            if line.contains("Route.get(") || line.contains("Route.post(") {
+                let method = if line.contains("Route.post(") {
+                    HttpMethod::Post
+                } else {
+                    HttpMethod::Get
+                };
                 let path_start = line.find('"').or_else(|| line.find('\''));
                 if let Some(p_start) = path_start {
                     let sub = &line[p_start + 1..];
@@ -83,7 +88,7 @@ impl Router {
                                     .strip_prefix("App.Controllers.")
                                     .unwrap_or(controller_raw);
 
-                                self.add(HttpMethod::Get, full_path, controller, action);
+                                self.add(method.clone(), full_path, controller, action);
                             }
                         }
                     }
@@ -104,21 +109,26 @@ mod tests {
         let temp_dir = std::env::temp_dir().join("agi_route_test");
         fs::create_dir_all(&temp_dir).unwrap();
 
-        let web_agi = "Route.get(\"/\", HomeController.index)\nRoute.group(\"/api\", fn:\n    Route.get(\"/health\", HealthController.show)\n)\n";
+        let web_agi = "Route.get(\"/\", HomeController.index)\nRoute.post(\"/login\", LoginController.login)\nRoute.group(\"/api\", fn:\n    Route.get(\"/health\", HealthController.show)\n)\n";
         let file_path = temp_dir.join("web.agi");
         fs::write(&file_path, web_agi).unwrap();
 
         let mut router = Router::new();
         router.load_routes_from_file(&file_path).unwrap();
 
-        assert_eq!(router.routes.len(), 2);
+        assert_eq!(router.routes.len(), 3);
         assert_eq!(router.routes[0].path, "/");
         assert_eq!(router.routes[0].controller, "HomeController");
         assert_eq!(router.routes[0].action, "index");
 
-        assert_eq!(router.routes[1].path, "/api/health");
-        assert_eq!(router.routes[1].controller, "HealthController");
-        assert_eq!(router.routes[1].action, "show");
+        assert_eq!(router.routes[1].method, HttpMethod::Post);
+        assert_eq!(router.routes[1].path, "/login");
+        assert_eq!(router.routes[1].controller, "LoginController");
+        assert_eq!(router.routes[1].action, "login");
+
+        assert_eq!(router.routes[2].path, "/api/health");
+        assert_eq!(router.routes[2].controller, "HealthController");
+        assert_eq!(router.routes[2].action, "show");
 
         fs::remove_dir_all(temp_dir).ok();
     }

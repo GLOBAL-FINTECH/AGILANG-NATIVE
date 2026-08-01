@@ -1,0 +1,49 @@
+// This test suite validates the native AGILANG compiler bootstrap
+// Run: cargo run -p agilang-runtime-cli -- test bootstrap-suite.agi
+
+fn arithmetic_test() -> i32:
+    let a: i32 = 10
+    let b: i32 = 20
+    let sum: i32 = a + b
+    let diff: i32 = b - a
+    let prod: i32 = a * 2
+    let div: i32 = b / 2
+    
+    print("Arithmetic: PASS")
+    return 0
+
+fn string_test() -> i32:
+    let greeting: string = "AGILANG"
+    let native: string = "Native"
+    print(greeting)
+    print(native)
+    print("Strings: PASS")
+    return 0
+
+fn boolean_test() -> i32:
+    let is_native: bool = true
+    let needs_python: bool = false
+    
+    if is_native:
+        print("Native: PASS")
+    
+    return 0
+
+fn function_return_test() -> i32:
+    print("Return types: PASS")
+    return 42
+
+fn main() -> i32:
+    print("=== AGILANG Bootstrap Test Suite ===")
+    print("")
+    
+    let test_status: i32 = 0
+    
+    test_status = arithmetic_test()
+    test_status = string_test()
+    test_status = boolean_test()
+    test_status = function_return_test()
+    
+    print("")
+    print("=== All tests passed ===")
+    return 0

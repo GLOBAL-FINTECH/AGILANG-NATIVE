@@ -1,0 +1,6 @@
+fn main() -> i32:
+    let roles = ["admin", "validator", "developer"]
+    let user = {"name": "Izukanji", "role": "author"}
+    print(roles[0])
+    print(user["name"])
+    return 0

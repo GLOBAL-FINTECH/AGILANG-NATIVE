@@ -1,6 +1,12 @@
 use anyhow::{bail, Context, Result};
 use tracing_subscriber::EnvFilter;
 
+const AGILANG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn print_version() {
+    println!("AGILANG v{AGILANG_VERSION}");
+}
+
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -17,9 +23,9 @@ fn main() -> Result<()> {
         "smoke" => smoke_test(),
         "--version" | "version" => {
             let packed = agilang_runtime_abi::agi_runtime_abi_version();
+            print_version();
             println!(
-                "AGILANG Native Runtime {} (ABI {}.{}.{})",
-                env!("CARGO_PKG_VERSION"),
+                "Runtime ABI {}.{}.{}",
                 packed >> 16,
                 (packed >> 8) & 0xff,
                 packed & 0xff

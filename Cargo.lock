@@ -195,6 +195,8 @@ name = "agilang-database-auth"
 version = "0.7.0"
 dependencies = [
  "agilang-database-identity",
+ "agilang-database-transport",
+ "agilang-runtime-crypto",
  "anyhow",
  "serde",
 ]
@@ -306,11 +308,13 @@ dependencies = [
 name = "agilang-database-mysql-gateway"
 version = "0.7.0"
 dependencies = [
+ "agilang-database-agidb",
+ "agilang-database-driver",
  "agilang-database-parser",
- "agilang-database-policy",
- "agilang-database-prepared",
+ "agilang-framework-auth",
  "anyhow",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -463,9 +467,14 @@ dependencies = [
 name = "agilang-database-tcp"
 version = "0.7.0"
 dependencies = [
+ "agilang-database-auth",
+ "agilang-database-identity",
+ "agilang-database-security-kernel",
+ "agilang-database-session",
  "agilang-database-transport",
  "anyhow",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -481,8 +490,11 @@ dependencies = [
 name = "agilang-database-transport"
 version = "0.7.0"
 dependencies = [
+ "agilang-database-identity",
+ "agilang-database-security-kernel",
  "anyhow",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -625,12 +637,19 @@ dependencies = [
 name = "agilang-framework-server"
 version = "0.7.0"
 dependencies = [
+ "agilang-database-agidb",
+ "agilang-database-driver",
+ "agilang-framework-auth",
  "agilang-framework-config",
  "agilang-framework-core",
  "agilang-framework-http",
  "agilang-framework-routing",
  "agilang-framework-view",
+ "agilang-runtime-async",
+ "agilang-runtime-crypto",
+ "agilang-runtime-http",
  "chrono",
+ "serde_json",
 ]
 
 [[package]]
@@ -710,6 +729,10 @@ dependencies = [
  "agilang-build",
  "agilang-compiler",
  "agilang-database-benchmark",
+ "agilang-database-identity",
+ "agilang-database-mysql-gateway",
+ "agilang-database-security-kernel",
+ "agilang-database-tcp",
  "agilang-framework-http",
  "agilang-framework-migrations",
  "agilang-framework-routing",

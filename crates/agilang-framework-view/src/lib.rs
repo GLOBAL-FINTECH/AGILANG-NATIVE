@@ -57,8 +57,32 @@ impl ViewEngine {
 
         // Interpolate data values
         content = self.interpolate(&content, data);
+        self.compile_document(&content)
+    }
 
-        Ok(content)
+    fn compile_document(&self, content: &str) -> Result<String, String> {
+        if !content.lines().any(|line| {
+            let line = line.trim_start();
+            line.starts_with("@page ") || line.starts_with("@fetch ") || line.starts_with("@live ")
+        }) {
+            if content.contains("@page ")
+                || content.contains("@fetch ")
+                || content.contains("@live ")
+            {
+                return Err("AGS-E3101: UnprocessedDirective".to_string());
+            }
+            return Ok(content.to_string());
+        }
+
+        let registry = agilang_agi_ags_bridge::TypeRegistry::new();
+        agilang_ags_compiler::compile_ags_template(agilang_ags_compiler::CompileRequest {
+            source: content,
+            file_name: "<framework-view>",
+            type_registry: &registry,
+            initial_state: None,
+        })
+        .map(|output| output.html)
+        .map_err(|error| error.to_string())
     }
 
     fn extract_extends(&self, content: &str) -> Result<String, String> {
@@ -98,7 +122,9 @@ impl ViewEngine {
 
     fn interpolate(&self, content: &str, data: &HashMap<String, String>) -> String {
         let mut result = content.to_string();
-        while let Some(start) = result.find("{{") {
+        let mut cursor = 0;
+        while let Some(relative_start) = result[cursor..].find("{{") {
+            let start = cursor + relative_start;
             if let Some(end) = result[start..].find("}}") {
                 let real_end = start + end;
                 let raw_expr = &result[start + 2..real_end];
@@ -108,14 +134,21 @@ impl ViewEngine {
                     let parts: Vec<&str> = expr.split("??").collect();
                     let key = parts[0].trim();
                     let fallback = parts[1].trim().trim_matches('"').trim_matches('\'');
-                    data.get(key)
-                        .cloned()
-                        .unwrap_or_else(|| fallback.to_string())
+                    Some(
+                        data.get(key)
+                            .cloned()
+                            .unwrap_or_else(|| fallback.to_string()),
+                    )
                 } else {
-                    data.get(expr).cloned().unwrap_or_default()
+                    data.get(expr).cloned()
                 };
 
-                result.replace_range(start..real_end + 2, &replacement);
+                if let Some(replacement) = replacement {
+                    result.replace_range(start..real_end + 2, &replacement);
+                    cursor = start + replacement.len();
+                } else {
+                    cursor = real_end + 2;
+                }
             } else {
                 break;
             }
@@ -150,5 +183,38 @@ mod tests {
         assert!(output.contains("<html><body>"));
 
         fs::remove_dir_all(temp_dir).ok();
+    }
+
+    #[test]
+    fn consumes_document_directives_and_applies_page_metadata() {
+        let engine = ViewEngine::new(PathBuf::new());
+        let input = r#"@page title="Native Framework" seo_description="Native applications." robots="index,follow"
+@fetch framework from "/api/framework/status"
+@live framework from "/api/framework/status" every 2200
+
+<!DOCTYPE html>
+<html><head><title>Old title</title></head><body>Ready</body></html>"#;
+
+        let output = engine.compile_document(input).unwrap();
+        assert!(!output.contains("@page"));
+        assert!(!output.contains("@fetch"));
+        assert!(!output.contains("@live"));
+        assert!(output.contains("<title>Native Framework</title>"));
+        assert!(output.contains("<meta name=\"description\" content=\"Native applications.\">"));
+        assert!(output.contains("<meta name=\"robots\" content=\"index,follow\">"));
+        assert!(output.starts_with("<!DOCTYPE html>"));
+        assert!(output.contains("application/agilang-hydration"));
+        assert!(output.contains("\"interval_ms\":2200"));
+        assert!(output.contains("pagehide"));
+    }
+
+    #[test]
+    fn rejects_unprocessed_directives_after_compilation() {
+        let engine = ViewEngine::new(PathBuf::new());
+        let input = "<html><body><p>@live broken from \"/api/broken\" every 10</p></body></html>";
+        assert_eq!(
+            engine.compile_document(input).unwrap_err(),
+            "AGS-E3101: UnprocessedDirective"
+        );
     }
 }

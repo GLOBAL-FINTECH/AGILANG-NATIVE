@@ -33,8 +33,26 @@ pub enum Stmt {
         mutable: bool,
         span: Span,
     },
+    Assign {
+        target: Expr,
+        value: Expr,
+        span: Span,
+    },
     Return {
         value: Option<Expr>,
+        span: Span,
+    },
+    If {
+        condition: Expr,
+        then_body: Vec<Stmt>,
+        else_body: Vec<Stmt>,
+        span: Span,
+    },
+    ForIn {
+        key_name: String,
+        value_name: Option<String>,
+        iterable: Expr,
+        body: Vec<Stmt>,
         span: Span,
     },
     Expr(Expr),
@@ -46,6 +64,18 @@ pub enum Expr {
     Float(f64, Span),
     String(String, Span),
     Bool(bool, Span),
+    ListLiteral(Vec<Expr>, Span),
+    ObjectLiteral(Vec<(String, Expr)>, Span),
+    MemberAccess {
+        object: Box<Expr>,
+        member: String,
+        span: Span,
+    },
+    Index {
+        object: Box<Expr>,
+        index: Box<Expr>,
+        span: Span,
+    },
     Call {
         callee: Box<Expr>,
         args: Vec<Expr>,
@@ -64,6 +94,14 @@ pub enum BinaryOp {
     Subtract,
     Multiply,
     Divide,
+    Equal,
+    NotEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    And,
+    Or,
 }
 impl Expr {
     pub fn span(&self) -> Span {
@@ -72,8 +110,13 @@ impl Expr {
             | Self::Integer(_, s)
             | Self::Float(_, s)
             | Self::String(_, s)
-            | Self::Bool(_, s) => *s,
-            Self::Call { span, .. } | Self::Binary { span, .. } => *span,
+            | Self::Bool(_, s)
+            | Self::ListLiteral(_, s)
+            | Self::ObjectLiteral(_, s) => *s,
+            Self::MemberAccess { span, .. }
+            | Self::Index { span, .. }
+            | Self::Call { span, .. }
+            | Self::Binary { span, .. } => *span,
         }
     }
 }

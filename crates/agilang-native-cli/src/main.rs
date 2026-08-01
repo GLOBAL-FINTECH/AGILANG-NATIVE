@@ -1,8 +1,13 @@
 use agilang_compiler::{check, hir, parse, tokenize, SourceFile};
+use agilang_database_identity::{ApplicationIdentity, DatabaseIdentity};
+use agilang_database_mysql_gateway::{read_status as read_mysql_gateway_status, start_server as start_mysql_gateway, GatewayConfig, GatewayUser};
+use agilang_database_security_kernel::Capability;
+use agilang_database_tcp::{fetch_status, perform_handshake, start_server, TransportServerConfig};
 use anyhow::{bail, Context, Result};
 use std::{
     env, fs,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 const TARGET: &str = if cfg!(target_arch = "x86_64") {
@@ -10,6 +15,26 @@ const TARGET: &str = if cfg!(target_arch = "x86_64") {
 } else {
     "aarch64-pc-windows-msvc"
 };
+const AGILANG_VERSION: &str = env!("CARGO_PKG_VERSION");
+const ABI_VERSION: &str = "1.3.0";
+const LANGUAGE_SPEC_VERSION: &str = "Draft 0.7";
+
+fn print_version() {
+    println!("AGILANG v{AGILANG_VERSION}");
+}
+
+fn files_are_identical(left: &Path, right: &Path) -> bool {
+    let Ok(left_metadata) = fs::metadata(left) else {
+        return false;
+    };
+    let Ok(right_metadata) = fs::metadata(right) else {
+        return false;
+    };
+    left_metadata.len() == right_metadata.len()
+        && fs::read(left)
+            .and_then(|left_bytes| fs::read(right).map(|right_bytes| left_bytes == right_bytes))
+            .unwrap_or(false)
+}
 
 fn find_conflicting_installations() -> Vec<PathBuf> {
     let mut conflicts = vec![];
@@ -20,10 +45,10 @@ fn find_conflicting_installations() -> Vec<PathBuf> {
             if exe.exists() {
                 if let Some(ref active) = active_exe {
                     if let (Ok(p1), Ok(p2)) = (exe.canonicalize(), active.canonicalize()) {
-                        if p1 != p2 {
+                        if p1 != p2 && !files_are_identical(&p1, &p2) {
                             conflicts.push(exe);
                         }
-                    } else if exe != *active {
+                    } else if exe != *active && !files_are_identical(&exe, active) {
                         conflicts.push(exe);
                     }
                 } else {
@@ -39,6 +64,7 @@ fn main() -> Result<()> {
     let mut args = env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "help".into());
     match command.as_str() {
+        "ags" => command_ags(args.collect())?,
         "new" => {
             let name = args.next().context("project name is required")?;
             let remaining: Vec<String> = args.collect();
@@ -60,6 +86,11 @@ fn main() -> Result<()> {
         }
         "init" => {
             command_init()?;
+        }
+        "http-client" => {
+            let force = args.any(|arg| arg == "--force");
+            agilang_project_generator::install_http_client(force)?;
+            println!("Imported AGILANG HTTP client into the current project");
         }
         "check" => {
             let source = load_optional(args.next())?;
@@ -170,6 +201,46 @@ fn main() -> Result<()> {
                                             child_prefix,
                                             stmt_prefix,
                                             format_hir_expr(expr)
+                                        );
+                                    }
+                                    agilang_ir::HirStmt::Assign { target, value, .. } => {
+                                        println!(
+                                            "{}{}Assign {} = {}",
+                                            child_prefix,
+                                            stmt_prefix,
+                                            format_hir_expr(target),
+                                            format_hir_expr(value)
+                                        );
+                                    }
+                                    agilang_ir::HirStmt::If {
+                                        condition,
+                                        then_body,
+                                        else_body,
+                                        ..
+                                    } => {
+                                        println!(
+                                            "{}{}If {} then {} stmt(s) else {} stmt(s)",
+                                            child_prefix,
+                                            stmt_prefix,
+                                            format_hir_expr(condition),
+                                            then_body.len(),
+                                            else_body.len()
+                                        );
+                                    }
+                                    agilang_ir::HirStmt::ForIn {
+                                        key_name,
+                                        value_name,
+                                        ..
+                                    } => {
+                                        println!(
+                                            "{}{}For {}{} in ...",
+                                            child_prefix,
+                                            stmt_prefix,
+                                            key_name,
+                                            value_name
+                                                .as_ref()
+                                                .map(|name| format!(", {}", name))
+                                                .unwrap_or_default()
                                         );
                                     }
                                 }
@@ -536,6 +607,7 @@ fn main() -> Result<()> {
                 .unwrap_or_else(|_| "unknown".to_string());
             println!("CLI resolution");
             println!("  active: {}", active_exe);
+            println!("  version: AGILANG v{AGILANG_VERSION}");
             println!("  status: native");
             println!("  AGILANG native runtime status: healthy");
 
@@ -544,8 +616,8 @@ fn main() -> Result<()> {
                 println!("\nConflicting installations");
                 for c in conflicts {
                     println!("  found: {}", c.display());
-                    println!("  implementation: legacy Python");
-                    println!("  recommendation: rename to agilang-python or remove it from PATH");
+                    println!("  implementation: alternate AGILANG executable");
+                    println!("  recommendation: remove it from PATH or update it to this version");
                 }
             } else {
                 println!("\nNo conflicting installations found.");
@@ -557,29 +629,29 @@ fn main() -> Result<()> {
                 let exe_path = env::current_exe()
                     .map(|p| p.to_string_lossy().into_owned())
                     .unwrap_or_else(|_| "unknown".to_string());
-                println!("AGILANG Native Compiler {}", env!("CARGO_PKG_VERSION"));
-                println!("Runtime: {}", env!("CARGO_PKG_VERSION"));
-                println!("ABI: 1.0.0");
+                print_version();
+                println!("Compiler: {AGILANG_VERSION}");
+                println!("Runtime: {AGILANG_VERSION}");
+                println!("ABI: {ABI_VERSION}");
+                println!("Language Spec: {LANGUAGE_SPEC_VERSION}");
+                println!();
                 println!("Implementation: Rust native");
                 println!("Executable: {}", exe_path);
                 println!("Target: {}", TARGET);
             } else {
-                println!(
-                    "AGILANG Native Compiler Frontend {}",
-                    env!("CARGO_PKG_VERSION")
-                );
+                print_version();
             }
         }
         "lsp" => {
             let next_arg = args.next();
             if let Some(arg) = next_arg {
-                if arg == "doctor" {
+                if arg == "doctor" || arg == "--doctor" {
                     println!("AGILANG Language Server (LSP) Doctor Status:");
                     println!("  LSP engine: Native Rust");
                     println!("  Path binding: OK");
                     println!("  Diagnostics engine: semantic-checker-v0.4");
                     return Ok(());
-                } else if arg == "capabilities" {
+                } else if arg == "capabilities" || arg == "--capabilities" {
                     println!("AGILANG Language Server Capabilities:");
                     println!("  TextDocumentSync: Full (1)");
                     println!("  CompletionProvider: enabled");
@@ -592,7 +664,9 @@ fn main() -> Result<()> {
                     agilang_lsp::run_lsp_server()?;
                 } else {
                     println!("error: unknown argument `{}` for `lsp` command", arg);
-                    println!("Usage: agilang lsp [--stdio | doctor | capabilities]");
+                    println!(
+                        "Usage: agilang lsp [--stdio | doctor | --doctor | capabilities | --capabilities]"
+                    );
                 }
             } else {
                 agilang_lsp::run_lsp_server()?;
@@ -672,11 +746,10 @@ fn main() -> Result<()> {
             agilang_project_generator::validate_ai_context()?;
         }
         "ai:status" => {
-            println!("AGILANG AI Context Status: Active");
+            agilang_project_generator::validate_ai_context()?;
         }
         "ai:refresh" => {
-            println!("Refreshing AGILANG AI Context specifications...");
-            println!("Context refreshed successfully.");
+            bail!("ai:refresh is not implemented as a live refresh operation");
         }
         "make:migration" => {
             let name = args
@@ -935,40 +1008,76 @@ fn main() -> Result<()> {
             println!("\nStatus: hardened");
         }
         "transport:status" => {
+            let (addr, timeout_ms) = parse_transport_args(args.collect())?;
+            let snapshot = fetch_status(&addr, Duration::from_millis(timeout_ms))?;
             println!("AGTP Transport Status\n");
-            println!("Engine: AGIDB Native Transport");
-            println!("Local IPC: enabled (pipe: \\\\.\\pipe\\agidb_pipe)");
-            println!("TCP Listener: disabled (air-gapped mode active)");
-            println!("Active Sessions: 1");
+            println!("Listener: {}", snapshot.listener_addr);
+            println!("Air-gapped mode: {}", snapshot.air_gapped);
+            println!("Active Sessions: {}", snapshot.active_sessions.len());
+            println!("Known Peers: {}", snapshot.known_peers.len());
+            for peer in snapshot.known_peers {
+                println!("Peer: {}", peer);
+            }
             println!("Status: ready");
         }
+        "transport:serve" => {
+            let (addr, _timeout_ms) = parse_transport_args(args.collect())?;
+            let server = start_server(TransportServerConfig {
+                bind_addr: addr.clone(),
+                air_gapped: false,
+                database_identity: DatabaseIdentity::new("main_agidb"),
+                capabilities: vec![Capability::TableRead, Capability::TableWrite],
+            })?;
+            println!("AGTP transport listener started at {}", server.local_addr());
+            println!("Press Ctrl+C to stop.");
+            loop {
+                std::thread::sleep(Duration::from_secs(60));
+            }
+        }
         "transport:handshake" => {
-            println!("Executing AGTP Mutual Cryptographic Handshake...");
-            println!("Client Identity: app_a91b");
-            println!("Database Identity: main_agidb");
-            println!("Challenge Verification: PASS");
-            println!("Session Token: agtp_sess_778899");
+            let (addr, timeout_ms) = parse_transport_args(args.collect())?;
+            let result = perform_handshake(
+                &addr,
+                Duration::from_millis(timeout_ms),
+                ApplicationIdentity::new("app_client"),
+                vec![Capability::TableRead],
+            )?;
+            println!("AGTP Mutual Handshake\n");
+            println!("Peer: {}", addr);
+            println!("Database Identity: {}", result.database_identity.name);
+            println!("Application Identity: {}", result.session.application_name);
+            println!("Session ID: {:02x?}", result.session.session_id);
+            println!("Session Expires At: {}", result.session.expires_at);
             println!("Status: authenticated");
         }
-        "mysql-gateway:start" => {
-            let port = args
-                .find(|arg| arg.starts_with("--port="))
-                .and_then(|arg| arg.split('=').nth(1).and_then(|p| p.parse::<u16>().ok()))
-                .unwrap_or(3306);
+        "mysql-gateway:start" | "mysql-gateway:serve" => {
+            let config = parse_mysql_gateway_args(args.collect())?;
+            let server = start_mysql_gateway(config.clone())?;
             println!(
-                "Starting AGIDB MySQL Compatibility Gateway on port {}...",
-                port
+                "AGIDB MySQL gateway listening on {}",
+                server.local_addr()
             );
-            println!("Mode: Isolated Gateway -> Typed Parser");
-            println!("Status: listening");
+            println!("Status file: {}", config.status_path);
+            println!("Press Ctrl+C to stop.");
+            loop {
+                std::thread::sleep(Duration::from_secs(60));
+            }
         }
         "mysql-gateway:status" => {
+            let config = parse_mysql_gateway_args(args.collect())?;
+            let status = read_mysql_gateway_status(&config.status_path)?;
             println!("AGIDB MySQL Gateway Status\n");
-            println!("Port: 3306");
-            println!("Mode: isolated (typed parser converter)");
-            println!("Active connections: 2");
-            println!("Policy enforcement: ENABLED");
-            println!("Status: operational");
+            println!("Listener: {}", status.listener_addr);
+            println!("Status File: {}", status.status_path);
+            println!("Active connections: {}", status.active_connections);
+            println!("Total sessions: {}", status.total_sessions);
+            println!("Authenticated users: {}", status.authenticated_users.len());
+            for user in status.authenticated_users {
+                println!("User: {}", user);
+            }
+            println!("Max connections: {}", status.max_connections);
+            println!("Max packet size: {}", status.max_packet_size);
+            println!("Status: {}", if status.online { "operational" } else { "offline" });
         }
         "agidb:benchmark" => {
             let profile = args.next().unwrap_or_else(|| "connectivity".to_string());
@@ -1128,8 +1237,8 @@ fn command_init() -> Result<()> {
     fs::create_dir_all("tests")?;
 
     let toml = format!(
-        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\nentry = \"src/main.agi\"\n",
-        name
+        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\nentry = \"src/main.agi\"\ntoolchain = \"{}\"\n",
+        name, AGILANG_VERSION
     );
     fs::write("agilang.toml", toml)?;
     fs::write(
@@ -1147,6 +1256,64 @@ fn command_init() -> Result<()> {
         "Initialized AGILANG project `{}` in the current directory",
         name
     );
+    Ok(())
+}
+
+fn command_ags(args: Vec<String>) -> Result<()> {
+    if args.first().map(String::as_str) != Some("build") {
+        bail!("usage: agilang ags build <template.ags> --types <types.agi> --out <directory>");
+    }
+    let source_path = args.get(1).context("AGS template path is required")?;
+    let mut types_path = None;
+    let mut output_path = None;
+    let mut index = 2;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--types" if index + 1 < args.len() => {
+                types_path = Some(&args[index + 1]);
+                index += 2;
+            }
+            "--out" if index + 1 < args.len() => {
+                output_path = Some(&args[index + 1]);
+                index += 2;
+            }
+            option => bail!("unknown AGS build option `{}`", option),
+        }
+    }
+    let types_path = types_path.context("--types <types.agi> is required")?;
+    let output_path = PathBuf::from(output_path.context("--out <directory> is required")?);
+    let source = fs::read_to_string(source_path)
+        .with_context(|| format!("failed to read {}", source_path))?;
+    let type_source =
+        fs::read_to_string(types_path).with_context(|| format!("failed to read {}", types_path))?;
+    let registry =
+        agilang_agi_ags_bridge::parse_agi_types(&type_source).map_err(anyhow::Error::msg)?;
+    let output = agilang_ags_compiler::compile_ags(agilang_ags_compiler::CompileRequest {
+        source: &source,
+        file_name: source_path,
+        type_registry: &registry,
+        initial_state: Some(agilang_ags_compiler::test_chain_state()),
+    })?;
+    fs::create_dir_all(&output_path)?;
+    let stem = Path::new(source_path)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .context("template file name is not valid UTF-8")?;
+    fs::write(output_path.join("index.html"), output.html)?;
+    fs::write(output_path.join(format!("{stem}.js")), output.javascript)?;
+    fs::write(
+        output_path.join(format!("{stem}.view.json")),
+        serde_json::to_vec_pretty(&output.view)?,
+    )?;
+    fs::write(
+        output_path.join(format!("{stem}.dependencies.json")),
+        serde_json::to_vec_pretty(&output.dependencies.as_json())?,
+    )?;
+    fs::write(
+        output_path.join(format!("{stem}.manifest.json")),
+        serde_json::to_vec_pretty(&output.manifest)?,
+    )?;
+    println!("Built AGS artifacts in {}", output_path.display());
     Ok(())
 }
 
@@ -1195,10 +1362,14 @@ fn report(source: &SourceFile, errors: Vec<agilang_compiler::Diagnostic>) -> Res
 
 fn print_help() {
     println!(
-        "AGILANG Compiler Toolchain\n\n\
+        "AGILANG v{AGILANG_VERSION}\n\n\
+        General-Purpose Native Programming Language\n\n\
         Usage:\n  \
+          agilang <command> [options]\n\n\
+        Commands:\n  \
           agilang new <project> [--template <template>]\n  \
           agilang init\n  \
+          agilang http-client [--force]\n  \
           agilang check [<file>]\n  \
           agilang run [<file>]\n  \
           agilang build [<file>]\n  \
@@ -1236,6 +1407,75 @@ fn unknown_command(command: &str) {
     eprintln!("\nRun `agilang help` for available commands.");
 }
 
+fn parse_transport_args(args: Vec<String>) -> Result<(String, u64)> {
+    let mut addr = "127.0.0.1:46321".to_string();
+    let mut timeout_ms = 2000_u64;
+    for arg in args {
+        if let Some(value) = arg.strip_prefix("--addr=") {
+            addr = value.to_string();
+        } else if let Some(value) = arg.strip_prefix("--timeout-ms=") {
+            timeout_ms = value.parse().context("invalid --timeout-ms value")?;
+        }
+    }
+    Ok((addr, timeout_ms))
+}
+
+fn parse_mysql_gateway_args(args: Vec<String>) -> Result<GatewayConfig> {
+    let mut addr = "127.0.0.1:3307".to_string();
+    let mut db_path = "storage/database/main.agidb".to_string();
+    let mut username = "root".to_string();
+    let mut password = "secret123".to_string();
+    let mut max_connections = 32usize;
+    let mut max_packet_size = 1024 * 1024usize;
+    let mut connect_timeout_ms = 2000u64;
+    let mut query_timeout_ms = 2000u64;
+    let mut status_path: Option<String> = None;
+
+    for arg in args {
+        if let Some(value) = arg.strip_prefix("--addr=") {
+            addr = value.to_string();
+        } else if let Some(value) = arg.strip_prefix("--db-path=") {
+            db_path = value.to_string();
+        } else if let Some(value) = arg.strip_prefix("--user=") {
+            username = value.to_string();
+        } else if let Some(value) = arg.strip_prefix("--password=") {
+            password = value.to_string();
+        } else if let Some(value) = arg.strip_prefix("--max-connections=") {
+            max_connections = value.parse().context("invalid --max-connections value")?;
+        } else if let Some(value) = arg.strip_prefix("--max-packet-size=") {
+            max_packet_size = value.parse().context("invalid --max-packet-size value")?;
+        } else if let Some(value) = arg.strip_prefix("--connect-timeout-ms=") {
+            connect_timeout_ms = value.parse().context("invalid --connect-timeout-ms value")?;
+        } else if let Some(value) = arg.strip_prefix("--query-timeout-ms=") {
+            query_timeout_ms = value.parse().context("invalid --query-timeout-ms value")?;
+        } else if let Some(value) = arg.strip_prefix("--status-file=") {
+            status_path = Some(value.to_string());
+        }
+    }
+
+    let port = addr
+        .rsplit(':')
+        .next()
+        .context("mysql gateway address must include a port")?;
+    let status_path = status_path.unwrap_or_else(|| {
+        std::env::temp_dir()
+            .join(format!("agilang-mysql-gateway-{port}.json"))
+            .to_string_lossy()
+            .to_string()
+    });
+
+    Ok(GatewayConfig {
+        bind_addr: addr,
+        agidb_path: db_path,
+        status_path,
+        users: vec![GatewayUser::bootstrap(username, &password)?],
+        max_connections,
+        max_packet_size,
+        connect_timeout_ms,
+        query_timeout_ms,
+    })
+}
+
 fn format_hir_expr(expr: &agilang_ir::HirExpr) -> String {
     match expr {
         agilang_ir::HirExpr::Identifier(name, _, _) => name.clone(),
@@ -1243,6 +1483,32 @@ fn format_hir_expr(expr: &agilang_ir::HirExpr) -> String {
         agilang_ir::HirExpr::Float(val, ty, _) => format!("{}:{}", val, ty),
         agilang_ir::HirExpr::String(val, _, _) => format!("\"{}\":string", val),
         agilang_ir::HirExpr::Bool(val, _, _) => format!("{}:bool", val),
+        agilang_ir::HirExpr::ListLiteral(items, ty, _) => {
+            let rendered: Vec<String> = items.iter().map(format_hir_expr).collect();
+            format!("[{}]:{}", rendered.join(", "), ty)
+        }
+        agilang_ir::HirExpr::ObjectLiteral(items, ty, _) => {
+            let rendered: Vec<String> = items
+                .iter()
+                .map(|(key, value)| format!("\"{}\": {}", key, format_hir_expr(value)))
+                .collect();
+            format!("{{{}}}:{}", rendered.join(", "), ty)
+        }
+        agilang_ir::HirExpr::MemberAccess {
+            object, member, ty, ..
+        } => {
+            format!("{}.{}:{}", format_hir_expr(object), member, ty)
+        }
+        agilang_ir::HirExpr::Index {
+            object, index, ty, ..
+        } => {
+            format!(
+                "{}[{}]:{}",
+                format_hir_expr(object),
+                format_hir_expr(index),
+                ty
+            )
+        }
         agilang_ir::HirExpr::Call {
             callee, args, ty, ..
         } => {

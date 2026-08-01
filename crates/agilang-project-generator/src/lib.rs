@@ -2,11 +2,89 @@ use anyhow::{bail, Result};
 use std::fs;
 use std::path::PathBuf;
 
+const DEFAULT_WEB_VIEW: &str = include_str!("../templates/welcome.ags");
+const DEFAULT_WEB_CSS: &str = include_str!("../templates/assets/app.css");
+const DEFAULT_WEB_JS: &str = include_str!("../templates/assets/app.js");
+const DEFAULT_WEB_LOGO: &[u8] = include_bytes!("../templates/assets/agilang-logo.png");
+const DEFAULT_AGIDB_STORE: &[u8] =
+    b"AGIDB001{\n  \"format\": \"AGIDB001\",\n  \"version\": 1,\n  \"next_row_id\": 1,\n  \"tables\": {\n    \"users\": {\n      \"columns\": [\"id\", \"name\", \"email\", \"password_hash\", \"role\", \"created_at\", \"updated_at\"],\n      \"rows\": []\n    },\n    \"sessions\": {\n      \"columns\": [\"id\", \"user_id\", \"token\", \"expires_at\", \"created_at\"],\n      \"rows\": []\n    }\n  }\n}\n";
+const HTTP_CLIENT_APP_WRAPPER: &str = r#"fn http_request(method: string, url: string, query: string, headers: string, body: string, timeout_ms: i64) -> string:
+    return Native.Http.request({
+        "method": method,
+        "url": url,
+        "query": query,
+        "headers": headers,
+        "body": body,
+        "timeout_ms": timeout_ms
+    })
+
+fn http_get(url: string, query: string) -> string:
+    return Native.Http.request({
+        "method": "GET",
+        "url": url,
+        "query": query,
+        "headers": "{}",
+        "body": "",
+        "timeout_ms": 30000
+    })
+
+fn http_post(url: string, headers: string, body: string) -> string:
+    return Native.Http.request({
+        "method": "POST",
+        "url": url,
+        "query": "{}",
+        "headers": headers,
+        "body": body,
+        "timeout_ms": 30000
+    })
+
+fn http_post_json(url: string, body: string) -> string:
+    return Native.Http.request({
+        "method": "POST",
+        "url": url,
+        "query": "{}",
+        "headers": "{\"Content-Type\":\"application/json\"}",
+        "body": body,
+        "timeout_ms": 30000
+    })
+"#;
+const HTTP_CLIENT_RUNTIME_CONTRACT: &str = r#"# HTTP Client Runtime Contract
+
+This project-local wrapper delegates outbound HTTP requests to `Native.Http.request`.
+
+## Request shape
+
+`App.Http.HttpClient.request(options)` passes a map with these fields to the runtime:
+
+- `method` - HTTP method string such as `GET` or `POST`
+- `url` - absolute `http://` or `https://` URL
+- `query` - map of query keys to one or more values
+- `headers` - map of header names to header values
+- `body` - request body payload
+- `timeout_ms` - timeout in milliseconds
+
+## Query encoding
+
+Query parameters are encoded by the native runtime using RFC 3986 percent-encoding.
+Spaces become `%20`, not `+`.
+
+## Runtime dependency
+
+This wrapper requires an AGILANG runtime/toolchain build that exports the `http.request`
+intrinsic through `agi_http_request_json`.
+"#;
+
 pub fn generate_project(name: &str, template: &str) -> Result<()> {
     let path = PathBuf::from(name);
     if path.exists() {
         bail!("directory `{}` already exists", name);
     }
+    let project_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("project name must resolve to a final path segment"))?
+        .to_string();
 
     let mut files = vec![
         (
@@ -16,14 +94,22 @@ name = "{name}"
 version = "0.1.0"
 edition = "2026"
 type = "{template}"
+toolchain = "{toolchain_version}"
 
 [template]
 name = "{template}"
-version = "0.4.0"
+version = "{toolchain_version}"
 
 [application]
+id = "{name}"
 entry = "bootstrap/app.agi"
 environment = "local"
+
+[security]
+fail_closed = true
+require_tls_in_production = true
+reject_plaintext_production_env = true
+database_verification = true
 
 [server]
 host = "127.0.0.1"
@@ -39,6 +125,15 @@ cache = "storage/cache/views"
 
 [public]
 path = "public"
+
+[branding]
+logo = ".agilang/branding/agilang-logo.png"
+language_id = "agilang"
+template_language_id = "agilang-ags"
+
+[editor]
+syntax_grammar = ".agilang/editor/agilang.tmLanguage.json"
+ags_syntax_grammar = ".agilang/editor/ags.tmLanguage.json"
 
 [build]
 target = "native"
@@ -56,32 +151,92 @@ APP_PORT=8080
 FORCE_HTTPS=false
 TRUST_PROXY=false
 
-SESSION_SECURE=false
+SESSION_SECURE=true
 SESSION_HTTP_ONLY=true
-SESSION_SAME_SITE=Lax
+SESSION_SAME_SITE=Strict
+"#,
+        ),
+        (
+            ".gitignore",
+            r#".env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.secret
+vault-recovery/
+/build/
+/target/
+"#,
+        ),
+        (
+            ".env.development.agi.enc",
+            r#"AGIVLT
+version=1
+application={name}
+environment=development
+status=unsealed-placeholder
 "#,
         ),
         (
             "README.md",
             r#"# {name}
 
-Created with AGILANG CLI.
+Created with the native AGILANG CLI. This application runs with AGI backend code, AGS reactive frontend templates, generated browser JavaScript where required, and the Rust native runtime. Python is not required.
+
+The official logo and syntax definitions are stored under `.agilang/`.
 "#,
+        ),
+        (
+            ".vscode/settings.json",
+            r#"{
+  "files.associations": {
+    "*.agi": "agilang",
+    "*.ags": "agilang-ags"
+  }
+}
+"#,
+        ),
+        (
+            ".vscode/extensions.json",
+            r#"{
+  "recommendations": ["global-fintech.agilang-language-support"]
+}
+"#,
+        ),
+        (
+            ".agilang/editor/agilang.tmLanguage.json",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../editor/vscode-agilang/syntaxes/agilang.tmLanguage.json"
+            )),
+        ),
+        (
+            ".agilang/editor/ags.tmLanguage.json",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../editor/vscode-agilang/syntaxes/ags.tmLanguage.json"
+            )),
         ),
         (
             "bootstrap/app.agi",
             r#"use Framework.Application
 use App.Providers.AppServiceProvider
 use App.Providers.RouteServiceProvider
+use Native.Path
 
 fn bootstrap() -> Application:
-    let app = Application.create(base_path())
+    let app = Application.create(Native.Path.cwd())
 
     app.register(AppServiceProvider)
     app.register(RouteServiceProvider)
 
     app.load_config("config")
-    app.load_environment(".env")
+    app.load_encrypted_environment(".env." + app.environment() + ".agi.enc", {
+        "fail_closed": app.environment() != "local",
+        "reject_plaintext_production_env": true
+    })
     app.load_views("resources/views")
     app.public_path("public")
 
@@ -110,6 +265,94 @@ class HomeController:
 "#,
         ),
         (
+            "app/Controllers/Auth/LoginController.agi",
+            r#"module App.Controllers.Auth
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.View
+
+class LoginController:
+    fn show(request: Request) -> Response:
+        return View.render("auth/login", {
+            "title": "Sign in",
+            "csrf_field": ""
+        })
+
+    fn login(request: Request) -> Response:
+        return View.render("dashboard/user", {
+            "title": "Dashboard",
+            "user_name": "Local AGILANG User",
+            "database": "storage/database/main.agidb"
+        })
+"#,
+        ),
+        (
+            "app/Controllers/Auth/RegisterController.agi",
+            r#"module App.Controllers.Auth
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.View
+
+class RegisterController:
+    fn show(request: Request) -> Response:
+        return View.render("auth/register", {
+            "title": "Create account",
+            "csrf_field": ""
+        })
+
+    fn register(request: Request) -> Response:
+        return View.render("dashboard/user", {
+            "title": "Dashboard",
+            "user_name": "Local AGILANG User",
+            "database": "storage/database/main.agidb"
+        })
+"#,
+        ),
+        (
+            "app/Controllers/Auth/LogoutController.agi",
+            r#"module App.Controllers.Auth
+
+use Framework.Http.Request
+use Framework.Http.Response
+
+class LogoutController:
+    fn logout(request: Request) -> Response:
+        return Response.html("<h1>Signed out</h1><p>Your local session has been closed.</p><p><a href=\"/login\">Sign in again</a></p>")
+"#,
+        ),
+        (
+            "app/Controllers/DashboardController.agi",
+            r#"module App.Controllers
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.View
+
+class DashboardController:
+    fn index(request: Request) -> Response:
+        return View.render("dashboard/user", {
+            "title": "Dashboard",
+            "user_name": "Local AGILANG User",
+            "database": "storage/database/main.agidb"
+        })
+
+    fn user(request: Request) -> Response:
+        return View.render("dashboard/user", {
+            "title": "Dashboard",
+            "user_name": "Local AGILANG User",
+            "database": "storage/database/main.agidb"
+        })
+
+    fn admin(request: Request) -> Response:
+        return View.render("dashboard/admin", {
+            "title": "Admin Dashboard",
+            "database": "storage/database/main.agidb"
+        })
+"#,
+        ),
+        (
             "app/Controllers/Api/HealthController.agi",
             r#"module App.Controllers.Api
 
@@ -121,7 +364,7 @@ class HealthController:
         return Response.json({
             "status": "healthy",
             "framework": "AGILANG",
-            "version": "0.4.0"
+            "version": "0.5.0"
         })
 "#,
         ),
@@ -207,7 +450,7 @@ class RouteServiceProvider extends ServiceProvider:
 
 class ApplicationService:
     fn get_version() -> string:
-        return "0.4.0"
+        return "0.5.0"
 "#,
         ),
         (
@@ -248,7 +491,7 @@ return ServerConfig {
             r#"use Framework.Auth.AuthConfig
 
 return AuthConfig {
-    enabled: false,
+    enabled: true,
     default_role: "user",
     roles: [
         "user",
@@ -267,18 +510,139 @@ return AuthConfig {
         (
             "config/database.agi",
             r#"return {
-    "driver": "sqlite"
+    "primary": {
+        "driver": "agidb",
+        "database": "storage/database/main.agidb",
+        "credential_source": "vault:database/roles/{name}-runtime",
+        "tls": "verify-full",
+        "pool_min": 2,
+        "pool_max": 20,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 15000,
+        "prepared_statements_only": true,
+        "raw_sql_requires_unsafe": true,
+        "audit_queries": true
+    }
 }
+"#,
+        ),
+        (
+            "config/database.toml",
+            r#"[database.primary]
+driver = "agidb"
+database = "storage/database/main.agidb"
+credential_source = "vault:database/roles/{name}-runtime"
+tls = "verify-full"
+pool_min = 2
+pool_max = 20
+connection_timeout_ms = 5000
+statement_timeout_ms = 15000
+prepared_statements_only = true
+raw_sql_requires_unsafe = true
+audit_queries = true
+"#,
+        ),
+        (
+            "config/vault.toml",
+            r#"[vault]
+provider = "native"
+namespace = "apps/{name}/APP_ENV"
+address = "https://127.0.0.1:8720"
+authentication = "application_identity"
+fail_closed = true
+audit_access = true
+rotation_enabled = true
+"#,
+        ),
+        (
+            "security/policy.agi",
+            r#"use Framework.Security.Policy
+
+return Policy.secure_defaults({
+    "fail_closed": true,
+    "require_tls_in_production": true,
+    "reject_plaintext_production_env": true,
+    "prepared_statements_only": true,
+    "audit_security_events": true
+})
+"#,
+        ),
+        (
+            "security/permissions.agi",
+            r#"use Framework.Security.Permissions
+
+return Permissions.deny_by_default()
+    .allow("application", "vault.read", "apps/{name}/APP_ENV/*")
+    .allow("application", "database.connect", "primary")
+"#,
+        ),
+        (
+            "security/headers.agi",
+            r#"return {
+    "Content-Security-Policy": "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()"
+}
+"#,
+        ),
+        (
+            "security/rate-limits.agi",
+            r#"return {
+    "authentication": { "limit": 10, "window": "1m" },
+    "api_per_user": { "limit": 120, "window": "1m" },
+    "api_per_ip": { "limit": 500, "window": "1m" }
+}
+"#,
+        ),
+        (
+            "vault/policy.hcl",
+            r#"path "apps/{name}/*" {
+  capabilities = ["read"]
+}
+path "database/creds/{name}-runtime" {
+  capabilities = ["read"]
+}
+"#,
+        ),
+        (
+            "vault/application-identity.json",
+            r#"{
+  "application_id": "{name}",
+  "environment": "development",
+  "public_identity_key": "GENERATE_DURING_INITIALIZATION",
+  "private_key_storage": "operating-system-protected"
+}
+"#,
+        ),
+        (
+            "vault/README.md",
+            r#"# Application Vault
+
+This namespace is isolated to this application. Generate the application identity and seal
+environment secrets before deployment. Never commit recovery material or private keys.
 "#,
         ),
         (
             "routes/web.agi",
             r#"use Framework.Routing.Route
 use App.Controllers.HomeController
+use App.Controllers.Auth.LoginController
+use App.Controllers.Auth.RegisterController
+use App.Controllers.Auth.LogoutController
+use App.Controllers.DashboardController
 
 fn register_web() -> void:
     Route.get("/", HomeController.index)
     Route.get("/about", HomeController.about)
+    Route.get("/login", LoginController.show)
+    Route.post("/login", LoginController.login)
+    Route.get("/register", RegisterController.show)
+    Route.post("/register", RegisterController.register)
+    Route.get("/logout", LogoutController.logout)
+    Route.get("/dashboard", DashboardController.index)
+    Route.get("/dashboard/user", DashboardController.user)
+    Route.get("/dashboard/admin", DashboardController.admin)
 "#,
         ),
         (
@@ -594,6 +958,178 @@ peerConnection.createOffer()
 "##,
         ),
         (
+            "resources/views/auth/login.ags",
+            r#"@page title="Sign in" robots="noindex,nofollow"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/app.js" defer></script>
+</head>
+<body>
+    <main class="auth-shell">
+        <section class="auth-panel">
+            <a class="auth-brand" href="/">
+                <img src="/assets/images/agilang-logo.png" alt="AGILANG">
+                <span>AGILANG</span>
+            </a>
+            <h1>Sign in</h1>
+            <p>Use your local AGIDB-backed account to open the application dashboard.</p>
+            {{ error_message }}
+            <form method="POST" action="/login" class="auth-form">
+                {{ csrf_field }}
+                <label>Email<input type="email" name="email" required autocomplete="email"></label>
+                <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+                <button class="btn primary" type="submit">Sign in</button>
+            </form>
+            <p class="auth-alt">No account yet? <a href="/register">Create one</a></p>
+        </section>
+    </main>
+</body>
+</html>
+"#,
+        ),
+        (
+            "resources/views/auth/register.ags",
+            r#"@page title="Create account" robots="noindex,nofollow"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/app.js" defer></script>
+</head>
+<body>
+    <main class="auth-shell">
+        <section class="auth-panel">
+            <a class="auth-brand" href="/">
+                <img src="/assets/images/agilang-logo.png" alt="AGILANG">
+                <span>AGILANG</span>
+            </a>
+            <h1>Create account</h1>
+            <p>New users are stored in the local portable AGIDB database.</p>
+            {{ error_message }}
+            <form method="POST" action="/register" class="auth-form">
+                {{ csrf_field }}
+                <label>Name<input type="text" name="name" required autocomplete="name"></label>
+                <label>Email<input type="email" name="email" required autocomplete="email"></label>
+                <label>Password<input type="password" name="password" required autocomplete="new-password"></label>
+                <button class="btn primary" type="submit">Create account</button>
+            </form>
+            <p class="auth-alt">Already registered? <a href="/login">Sign in</a></p>
+        </section>
+    </main>
+</body>
+</html>
+"#,
+        ),
+        (
+            "resources/views/dashboard/user.ags",
+            r#"@page title="Dashboard" robots="noindex,nofollow"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/app.js" defer></script>
+</head>
+<body>
+    <main class="dashboard-shell">
+        <aside class="dashboard-nav">
+            <a class="auth-brand" href="/">
+                <img src="/assets/images/agilang-logo.png" alt="AGILANG">
+                <span>AGILANG</span>
+            </a>
+            <a class="active" href="/dashboard">Overview</a>
+            <a href="/dashboard/admin">Admin</a>
+            <form method="POST" action="/logout" class="inline-logout">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <button class="btn primary" type="submit">Sign out</button>
+            </form>
+        </aside>
+        <section class="dashboard-main">
+            <div class="dashboard-head">
+                <div>
+                    <p class="kicker">Local application</p>
+                    <h1>{{ title }}</h1>
+                </div>
+                <span class="badge">AGIDB active</span>
+            </div>
+            <div class="dashboard-grid">
+                <article class="card metric"><span>Database</span><strong>{{ database }}</strong><small>Portable AGIDB local store</small></article>
+                <article class="card metric"><span>Authentication</span><strong>Enabled</strong><small>Users and sessions are app-owned</small></article>
+                <article class="card metric"><span>Current user</span><strong>{{ user_name }}</strong><small>Rendered from the auth context</small></article>
+            </div>
+            <section class="card dashboard-panel">
+                <h2>Recent activity</h2>
+                <table>
+                    <thead><tr><th>Event</th><th>Status</th><th>Source</th></tr></thead>
+                    <tbody>
+                        <tr><td>Application boot</td><td>Ready</td><td>AGILANG runtime</td></tr>
+                        <tr><td>Database check</td><td>Writable</td><td>AGIDB</td></tr>
+                        <tr><td>Dashboard render</td><td>Complete</td><td>AGS</td></tr>
+                    </tbody>
+                </table>
+            </section>
+        </section>
+    </main>
+</body>
+</html>
+"#,
+        ),
+        (
+            "resources/views/dashboard/admin.ags",
+            r#"@page title="Admin Dashboard" robots="noindex,nofollow"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/app.js" defer></script>
+</head>
+<body>
+    <main class="dashboard-shell">
+        <aside class="dashboard-nav">
+            <a class="auth-brand" href="/">
+                <img src="/assets/images/agilang-logo.png" alt="AGILANG">
+                <span>AGILANG</span>
+            </a>
+            <a href="/dashboard">Overview</a>
+            <a class="active" href="/dashboard/admin">Admin</a>
+            <form method="POST" action="/logout" class="inline-logout">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <button class="btn primary" type="submit">Sign out</button>
+            </form>
+        </aside>
+        <section class="dashboard-main">
+            <div class="dashboard-head">
+                <div>
+                    <p class="kicker">Administration</p>
+                    <h1>{{ title }}</h1>
+                </div>
+                <span class="badge">AGIDB active</span>
+            </div>
+            <div class="dashboard-grid">
+                <article class="card metric"><span>Users table</span><strong>Ready</strong><small>{{ database }}</small></article>
+                <article class="card metric"><span>Sessions table</span><strong>Ready</strong><small>Local session persistence</small></article>
+                <article class="card metric"><span>Storage mode</span><strong>Portable</strong><small>No external database required</small></article>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
+"#,
+        ),
+        (
             "database/migrations/CreateUsersTable.agi",
             r#"use Framework.Database.Migration
 use Framework.Database.Schema
@@ -664,12 +1200,18 @@ test "health API returns healthy status":
             r#"use Framework.Testing.UnitTest
 use App.Services.ApplicationService
 
-test "version returns 0.4.0":
+test "version returns 0.5.0":
     let service = ApplicationService()
     assert(service.get_version() == "0.4.0")
 "#,
         ),
+        // Keep the application generator's default frontend in standalone files.
+        // These entries intentionally override the legacy inline scaffold above.
+        ("resources/views/welcome.ags", DEFAULT_WEB_VIEW),
+        ("public/assets/css/app.css", DEFAULT_WEB_CSS),
+        ("public/assets/js/app.js", DEFAULT_WEB_JS),
         ("storage/cache/.gitkeep", ""),
+        ("storage/database/.gitkeep", ""),
         ("storage/logs/.gitkeep", ""),
         ("storage/sessions/.gitkeep", ""),
         ("storage/uploads/.gitkeep", ""),
@@ -684,8 +1226,9 @@ test "version returns 0.4.0":
             fs::create_dir_all(parent)?;
         }
         let processed_content = content
-            .replace("{name}", name)
-            .replace("{template}", template);
+            .replace("{name}", &project_name)
+            .replace("{template}", template)
+            .replace("{toolchain_version}", env!("CARGO_PKG_VERSION"));
         fs::write(&full_path, processed_content)?;
     }
 
@@ -708,6 +1251,30 @@ test "version returns 0.4.0":
             }
         }
     }
+
+    let logo_path = path.join(".agilang/branding/agilang-logo.png");
+    if let Some(parent) = logo_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(
+        &logo_path,
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets/branding/agilang-logo.png"
+        )),
+    )?;
+
+    let hosted_logo_path = path.join("public/assets/images/agilang-logo.png");
+    if let Some(parent) = hosted_logo_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(hosted_logo_path, DEFAULT_WEB_LOGO)?;
+
+    let database_path = path.join("storage/database/main.agidb");
+    if let Some(parent) = database_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(database_path, DEFAULT_AGIDB_STORE)?;
 
     Ok(())
 }
@@ -740,24 +1307,58 @@ fn to_pascal_case(s: &str) -> String {
         .collect()
 }
 
-pub fn make_component(component: &str, name: &str) -> Result<()> {
-    // Determine project root by looking for agilang.toml in current or parents
+fn find_project_root() -> Result<PathBuf> {
     let mut dir = std::env::current_dir()?;
-    let mut root = None;
     loop {
         if dir.join("agilang.toml").exists() {
-            root = Some(dir.clone());
-            break;
+            return Ok(dir);
         }
         if !dir.pop() {
             break;
         }
     }
+    bail!("not in an AGILANG project (agilang.toml not found)")
+}
 
-    let project_root = match root {
-        Some(r) => r,
-        None => bail!("not in an AGILANG project (agilang.toml not found)"),
-    };
+pub fn install_http_client(force: bool) -> Result<()> {
+    let project_root = find_project_root()?;
+    let files = [
+        ("app/Http/HttpClient.agi", HTTP_CLIENT_APP_WRAPPER),
+        (
+            "docs/HTTP_CLIENT_RUNTIME_CONTRACT.md",
+            HTTP_CLIENT_RUNTIME_CONTRACT,
+        ),
+    ];
+
+    let mut exists = false;
+    for (relative_path, _) in &files {
+        if project_root.join(relative_path).exists() {
+            exists = true;
+            break;
+        }
+    }
+
+    if exists && !force {
+        bail!(
+            "HTTP client files already exist.\n\nUse:\n    agilang http-client --force"
+        );
+    }
+
+    for (relative_path, content) in &files {
+        let path = project_root.join(relative_path);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&path, content)?;
+        println!("Created {}", relative_path);
+    }
+
+    Ok(())
+}
+
+pub fn make_component(component: &str, name: &str) -> Result<()> {
+    // Determine project root by looking for agilang.toml in current or parents
+    let project_root = find_project_root()?;
 
     let normalized_name = normalize_path_name(name);
     let parts: Vec<&str> = normalized_name.split('/').collect();
@@ -1007,22 +1608,7 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
 }
 
 pub fn generate_auth(roles: Vec<String>, force: bool, repair: bool) -> Result<()> {
-    let mut dir = std::env::current_dir()?;
-    let mut root = None;
-    loop {
-        if dir.join("agilang.toml").exists() {
-            root = Some(dir.clone());
-            break;
-        }
-        if !dir.pop() {
-            break;
-        }
-    }
-
-    let project_root = match root {
-        Some(r) => r,
-        None => bail!("not in an AGILANG project (agilang.toml not found)"),
-    };
+    let project_root = find_project_root()?;
 
     let auth_files = [
         (
@@ -1485,22 +2071,7 @@ class DashboardController:
 }
 
 pub fn repair_template(dry_run: bool, force: bool) -> Result<()> {
-    let mut dir = std::env::current_dir()?;
-    let mut root = None;
-    loop {
-        if dir.join("agilang.toml").exists() {
-            root = Some(dir.clone());
-            break;
-        }
-        if !dir.pop() {
-            break;
-        }
-    }
-
-    let project_root = match root {
-        Some(r) => r,
-        None => bail!("not in an AGILANG project (agilang.toml not found)"),
-    };
+    let project_root = find_project_root()?;
 
     println!("Inspecting AGILANG web template...\n");
 
@@ -1515,7 +2086,7 @@ type = "web"
 
 [template]
 name = "web"
-version = "0.4.0"
+version = "0.5.0"
 
 [application]
 entry = "bootstrap/app.agi"
@@ -1535,6 +2106,15 @@ cache = "storage/cache/views"
 
 [public]
 path = "public"
+
+[branding]
+logo = ".agilang/branding/agilang-logo.png"
+language_id = "agilang"
+template_language_id = "agilang-ags"
+
+[editor]
+syntax_grammar = ".agilang/editor/agilang.tmLanguage.json"
+ags_syntax_grammar = ".agilang/editor/ags.tmLanguage.json"
 
 [build]
 target = "native"
@@ -1561,17 +2141,51 @@ SESSION_SAME_SITE=Lax
             "README.md",
             r#"# {name}
 
-Created with AGILANG CLI.
+Created with the native AGILANG CLI. This application runs with AGI backend code, AGS reactive frontend templates, generated browser JavaScript where required, and the Rust native runtime. Python is not required.
+
+The official logo and syntax definitions are stored under `.agilang/`.
 "#,
+        ),
+        (
+            ".vscode/settings.json",
+            r#"{
+  "files.associations": {
+    "*.agi": "agilang",
+    "*.ags": "agilang-ags"
+  }
+}
+"#,
+        ),
+        (
+            ".vscode/extensions.json",
+            r#"{
+  "recommendations": ["global-fintech.agilang-language-support"]
+}
+"#,
+        ),
+        (
+            ".agilang/editor/agilang.tmLanguage.json",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../editor/vscode-agilang/syntaxes/agilang.tmLanguage.json"
+            )),
+        ),
+        (
+            ".agilang/editor/ags.tmLanguage.json",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../editor/vscode-agilang/syntaxes/ags.tmLanguage.json"
+            )),
         ),
         (
             "bootstrap/app.agi",
             r#"use Framework.Application
 use App.Providers.AppServiceProvider
 use App.Providers.RouteServiceProvider
+use Native.Path
 
 fn bootstrap() -> Application:
-    let app = Application.create(base_path())
+    let app = Application.create(Native.Path.cwd())
 
     app.register(AppServiceProvider)
     app.register(RouteServiceProvider)
@@ -1617,7 +2231,7 @@ class HealthController:
         return Response.json({
             "status": "healthy",
             "framework": "AGILANG",
-            "version": "0.4.0"
+            "version": "0.5.0"
         })
 "#,
         ),
@@ -1703,7 +2317,7 @@ class RouteServiceProvider extends ServiceProvider:
 
 class ApplicationService:
     fn get_version() -> string:
-        return "0.4.0"
+        return "0.5.0"
 "#,
         ),
         (
@@ -2160,11 +2774,15 @@ test "health API returns healthy status":
             r#"use Framework.Testing.UnitTest
 use App.Services.ApplicationService
 
-test "version returns 0.4.0":
+test "version returns 0.5.0":
     let service = ApplicationService()
     assert(service.get_version() == "0.4.0")
 "#,
         ),
+        // Keep template repair aligned with newly generated applications.
+        ("resources/views/welcome.ags", DEFAULT_WEB_VIEW),
+        ("public/assets/css/app.css", DEFAULT_WEB_CSS),
+        ("public/assets/js/app.js", DEFAULT_WEB_JS),
         ("storage/cache/.gitkeep", ""),
         ("storage/logs/.gitkeep", ""),
         ("storage/sessions/.gitkeep", ""),
@@ -2180,6 +2798,8 @@ test "version returns 0.4.0":
 
     let mut missing = vec![];
     let mut empty = vec![];
+    let hosted_logo_relative = "public/assets/images/agilang-logo.png";
+    let hosted_logo_missing = !project_root.join(hosted_logo_relative).is_file();
 
     for (relative_path, _) in &files {
         let path = project_root.join(relative_path);
@@ -2193,7 +2813,7 @@ test "version returns 0.4.0":
         }
     }
 
-    if missing.is_empty() && empty.is_empty() && !force {
+    if missing.is_empty() && empty.is_empty() && !hosted_logo_missing && !force {
         println!("All template files are intact and verified!");
         return Ok(());
     }
@@ -2203,6 +2823,9 @@ test "version returns 0.4.0":
         for m in &missing {
             println!("  {}", m);
         }
+    }
+    if hosted_logo_missing {
+        println!("Missing:\n  {}", hosted_logo_relative);
     }
 
     if !empty.is_empty() {
@@ -2232,6 +2855,14 @@ test "version returns 0.4.0":
                 .replace("{template}", "web");
             fs::write(&path, processed_content)?;
         }
+    }
+
+    if hosted_logo_missing || force {
+        let hosted_logo_path = project_root.join(hosted_logo_relative);
+        if let Some(parent) = hosted_logo_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(hosted_logo_path, DEFAULT_WEB_LOGO)?;
     }
 
     println!("\nRepair completed.");
@@ -2398,22 +3029,7 @@ Build pipeline and feature/unit testing guides.
 }
 
 pub fn validate_ai_context() -> Result<()> {
-    let mut dir = std::env::current_dir()?;
-    let mut root = None;
-    loop {
-        if dir.join("agilang.toml").exists() {
-            root = Some(dir.clone());
-            break;
-        }
-        if !dir.pop() {
-            break;
-        }
-    }
-
-    let project_root = match root {
-        Some(r) => r,
-        None => bail!("not in an AGILANG project (agilang.toml not found)"),
-    };
+    let project_root = find_project_root()?;
 
     println!("AGILANG AI context validation\n");
 
@@ -2450,5 +3066,37 @@ pub fn validate_ai_context() -> Result<()> {
         Ok(())
     } else {
         bail!("\nStatus: invalid AI context");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn install_http_client_writes_wrapper_and_contract() {
+        let unique = format!(
+            "agilang-http-client-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let root = std::env::temp_dir().join(unique);
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("agilang.toml"), "[project]\nname = \"test\"\n").unwrap();
+
+        let previous = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&root).unwrap();
+
+        let result = install_http_client(false);
+
+        std::env::set_current_dir(previous).unwrap();
+
+        assert!(result.is_ok());
+        assert!(root.join("app/Http/HttpClient.agi").exists());
+        assert!(root.join("docs/HTTP_CLIENT_RUNTIME_CONTRACT.md").exists());
+
+        let _ = fs::remove_dir_all(root);
     }
 }

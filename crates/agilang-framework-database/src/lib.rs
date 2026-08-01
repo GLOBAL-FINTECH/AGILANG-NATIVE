@@ -3,6 +3,7 @@ use agilang_database_driver::{DatabaseConnection, DatabaseValue};
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use serde_json::Value;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -11,6 +12,9 @@ pub type TableRows = Vec<DatabaseRow>;
 
 static DATABASE_STORE: Lazy<Mutex<HashMap<String, TableRows>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+thread_local! {
+    static DATABASE_PATH_OVERRIDE: RefCell<Option<String>> = const { RefCell::new(None) };
+}
 
 #[derive(Debug, Clone)]
 pub struct WhereCondition {
@@ -204,13 +208,33 @@ impl QueryBuilder {
     }
 }
 
+pub fn set_thread_local_database_path(path: impl Into<String>) {
+    DATABASE_PATH_OVERRIDE.with(|slot| {
+        *slot.borrow_mut() = Some(path.into());
+    });
+}
+
+pub fn clear_thread_local_database_path() {
+    DATABASE_PATH_OVERRIDE.with(|slot| {
+        *slot.borrow_mut() = None;
+    });
+}
+
 fn default_agidb_connection() -> AgiDbConnection {
+    if let Some(path) = DATABASE_PATH_OVERRIDE.with(|slot| slot.borrow().clone()) {
+        return AgiDbConnection::new(path);
+    }
+
     #[cfg(test)]
     {
+        let thread_id = format!("{:?}", std::thread::current().id())
+            .replace("ThreadId(", "")
+            .replace(')', "");
         let path = std::env::temp_dir()
             .join(format!(
-                "agilang-framework-database-{}.agidb",
-                std::process::id()
+                "agilang-framework-database-{}-{}.agidb",
+                std::process::id(),
+                thread_id
             ))
             .to_string_lossy()
             .into_owned();

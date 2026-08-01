@@ -2,6 +2,8 @@ use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+const WINDOWS_SYSTEM_LIBRARIES: &str = "ws2_32.lib userenv.lib ntdll.lib bcrypt.lib advapi32.lib pdh.lib powrprof.lib iphlpapi.lib netapi32.lib secur32.lib ole32.lib oleaut32.lib propsys.lib psapi.lib shell32.lib wbemuuid.lib";
+
 pub struct Linker {
     vcvars_path: Option<PathBuf>,
 }
@@ -48,11 +50,8 @@ impl Linker {
             bat_content.push_str(&format!("call \"{}\" amd64\r\n", vcvars.to_string_lossy()));
         }
         bat_content.push_str(&format!(
-            "cl.exe /O2 /Fe:\"{}\" /Fo:\"{}\" \"{}\" \"{}\" ws2_32.lib userenv.lib ntdll.lib bcrypt.lib advapi32.lib\r\n",
-            out_exe_str,
-            obj_file_str,
-            c_file_str,
-            lib_path_str
+            "cl.exe /O2 /Fe:\"{}\" /Fo:\"{}\" \"{}\" \"{}\" {}\r\n",
+            out_exe_str, obj_file_str, c_file_str, lib_path_str, WINDOWS_SYSTEM_LIBRARIES
         ));
         std::fs::write(&bat_path, &bat_content)?;
 
@@ -78,5 +77,29 @@ impl Linker {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WINDOWS_SYSTEM_LIBRARIES;
+
+    #[test]
+    fn links_resource_discovery_windows_dependencies() {
+        for library in [
+            "pdh.lib",
+            "powrprof.lib",
+            "iphlpapi.lib",
+            "netapi32.lib",
+            "secur32.lib",
+            "ole32.lib",
+            "oleaut32.lib",
+            "propsys.lib",
+            "psapi.lib",
+            "shell32.lib",
+            "wbemuuid.lib",
+        ] {
+            assert!(WINDOWS_SYSTEM_LIBRARIES.contains(library));
+        }
     }
 }

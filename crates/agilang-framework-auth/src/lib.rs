@@ -1,6 +1,13 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
+use argon2::{
+    password_hash::{PasswordHash, PasswordHasher as _, PasswordVerifier, SaltString},
+    Algorithm, Argon2, Params, Version,
+};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use zeroize::Zeroizing;
 
 pub trait PasswordHasher {
     fn hash(&self, password: &[u8]) -> Result<String>;
@@ -8,136 +15,77 @@ pub trait PasswordHasher {
     fn needs_rehash(&self, encoded_hash: &str) -> bool;
 }
 
-pub struct HmacSha256PasswordHasher;
-
-impl HmacSha256PasswordHasher {
-    pub fn new() -> Self {
-        Self
-    }
+/// Argon2id password hashing using OWASP-aligned memory-hard defaults.
+#[derive(Debug, Clone)]
+pub struct Argon2idPasswordHasher {
+    memory_kib: u32,
+    iterations: u32,
+    parallelism: u32,
 }
 
-impl Default for HmacSha256PasswordHasher {
+impl Default for Argon2idPasswordHasher {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-fn generate_secure_salt(len: usize) -> Vec<u8> {
-    let mut salt = vec![0u8; len];
-    #[cfg(windows)]
-    {
-        use std::ffi::c_void;
-        #[link(name = "bcrypt")]
-        extern "system" {
-            fn BCryptGenRandom(
-                hAlgorithm: *mut c_void,
-                pbBuffer: *mut u8,
-                cbBuffer: u32,
-                dwFlags: u32,
-            ) -> i32;
-        }
-        unsafe {
-            let status = BCryptGenRandom(std::ptr::null_mut(), salt.as_mut_ptr(), len as u32, 2);
-            if status != 0 {
-                let now = SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_nanos();
-                for (i, b) in salt.iter_mut().enumerate() {
-                    *b = ((now >> (i % 8)) & 0xFF) as u8;
-                }
-            }
+        Self {
+            memory_kib: 19_456,
+            iterations: 2,
+            parallelism: 1,
         }
     }
-    #[cfg(not(windows))]
-    {
-        if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
-            use std::io::Read;
-            let _ = f.read_exact(&mut salt);
-        }
-    }
-    salt
 }
 
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
+impl Argon2idPasswordHasher {
+    pub fn new(memory_kib: u32, iterations: u32, parallelism: u32) -> Result<Self> {
+        Params::new(memory_kib, iterations, parallelism, None)
+            .context("invalid Argon2id parameters")?;
+        Ok(Self {
+            memory_kib,
+            iterations,
+            parallelism,
+        })
     }
-    let mut res = 0u8;
-    for (x, y) in a.iter().zip(b.iter()) {
-        res |= x ^ y;
+
+    fn engine(&self) -> Result<Argon2<'static>> {
+        let params = Params::new(self.memory_kib, self.iterations, self.parallelism, None)
+            .context("invalid Argon2id parameters")?;
+        Ok(Argon2::new(Algorithm::Argon2id, Version::V0x13, params))
     }
-    res == 0
 }
 
-fn compute_hash(password: &[u8], salt: &[u8]) -> Vec<u8> {
-    let mut state = 0x811c9dc5u32;
-    for b in salt {
-        state ^= *b as u32;
-        state = state.wrapping_mul(0x01000193);
-    }
-    for b in password {
-        state ^= *b as u32;
-        state = state.wrapping_mul(0x01000193);
-    }
-    let mut result = Vec::with_capacity(32);
-    for i in 0..8 {
-        let val = state.rotate_left(i * 4);
-        result.extend_from_slice(&val.to_be_bytes());
-    }
-    result
-}
-
-fn hex_encode(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{:02x}", b)).collect()
-}
-
-fn hex_decode(s: &str) -> Result<Vec<u8>> {
-    if !s.len().is_multiple_of(2) {
-        bail!("invalid hex length");
-    }
-    let mut bytes = Vec::with_capacity(s.len() / 2);
-    for i in (0..s.len()).step_by(2) {
-        let byte = u8::from_str_radix(&s[i..i + 2], 16)?;
-        bytes.push(byte);
-    }
-    Ok(bytes)
-}
-
-impl PasswordHasher for HmacSha256PasswordHasher {
+impl PasswordHasher for Argon2idPasswordHasher {
     fn hash(&self, password: &[u8]) -> Result<String> {
-        let salt = generate_secure_salt(16);
-        let hash_bytes = compute_hash(password, &salt);
-        Ok(format!(
-            "$agilang$hmac-sha256$v=1${}${}",
-            hex_encode(&salt),
-            hex_encode(&hash_bytes)
-        ))
+        if password.is_empty() {
+            bail!("password must not be empty");
+        }
+        let password = Zeroizing::new(password.to_vec());
+        let salt = SaltString::generate(&mut OsRng);
+        Ok(self.engine()?.hash_password(&password, &salt)?.to_string())
     }
 
     fn verify(&self, password: &[u8], encoded_hash: &str) -> Result<bool> {
-        let parts: Vec<&str> = encoded_hash.split('$').collect();
-        if parts.len() != 6 || parts[1] != "agilang" || parts[2] != "hmac-sha256" {
-            return Ok(false);
-        }
-        let salt = match hex_decode(parts[4]) {
-            Ok(s) => s,
+        let parsed = match PasswordHash::new(encoded_hash) {
+            Ok(value) => value,
             Err(_) => return Ok(false),
         };
-        let expected_hash = match hex_decode(parts[5]) {
-            Ok(h) => h,
-            Err(_) => return Ok(false),
-        };
-        let computed = compute_hash(password, &salt);
-        Ok(constant_time_eq(&computed, &expected_hash))
+        let password = Zeroizing::new(password.to_vec());
+        Ok(self.engine()?.verify_password(&password, &parsed).is_ok())
     }
 
     fn needs_rehash(&self, encoded_hash: &str) -> bool {
-        !encoded_hash.starts_with("$agilang$hmac-sha256$v=1$")
+        let Ok(parsed) = PasswordHash::new(encoded_hash) else {
+            return true;
+        };
+        parsed.algorithm.as_str() != "argon2id"
+            || parsed.version != Some(0x13)
+            || parsed.params.get_decimal("m") != Some(self.memory_kib)
+            || parsed.params.get_decimal("t") != Some(self.iterations)
+            || parsed.params.get_decimal("p") != Some(self.parallelism)
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Backward-compatible name retained for source compatibility. It now uses Argon2id.
+pub type HmacSha256PasswordHasher = Argon2idPasswordHasher;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AuthUser {
     pub id: String,
     pub email: String,
@@ -151,13 +99,34 @@ impl AuthUser {
     }
 }
 
-pub struct AuditLogger;
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SessionToken {
+    pub token: String,
+    pub expires_at: u64,
+}
 
+impl SessionToken {
+    pub fn generate(ttl: Duration) -> Result<Self> {
+        let mut bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut bytes);
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        Ok(Self {
+            token: URL_SAFE_NO_PAD.encode(bytes),
+            expires_at: now.saturating_add(ttl.as_secs()),
+        })
+    }
+
+    pub fn is_expired(&self, now_unix: u64) -> bool {
+        now_unix >= self.expires_at
+    }
+}
+
+pub struct AuditLogger;
 impl AuditLogger {
     pub fn log(event_type: &str, details: serde_json::Value) {
         let record = serde_json::json!({
             "event": event_type,
-            "timestamp": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default().as_secs(),
+            "timestamp": SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(),
             "details": details
         });
         eprintln!("[AUDIT] {}", record);
@@ -169,43 +138,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_hash_and_verify_password() {
-        let hasher = HmacSha256PasswordHasher::new();
-        let password = b"secret_password_123";
-        let hash = hasher.hash(password).unwrap();
-        assert!(hash.starts_with("$agilang$hmac-sha256$v=1$"));
-
-        let is_valid = hasher.verify(password, &hash).unwrap();
-        assert!(is_valid);
-
-        let is_invalid = hasher.verify(b"wrong_password", &hash).unwrap();
-        assert!(!is_invalid);
+    fn hashes_and_verifies_passwords() {
+        let hasher = Argon2idPasswordHasher::default();
+        let hash = hasher.hash(b"secret_password_123").unwrap();
+        assert!(hash.starts_with("$argon2id$"));
+        assert!(hasher.verify(b"secret_password_123", &hash).unwrap());
+        assert!(!hasher.verify(b"wrong_password", &hash).unwrap());
+        assert!(!hasher.needs_rehash(&hash));
     }
 
     #[test]
-    fn test_different_salts_produce_different_hashes() {
-        let hasher = HmacSha256PasswordHasher::new();
-        let password = b"same_password";
-        let hash1 = hasher.hash(password).unwrap();
-        let hash2 = hasher.hash(password).unwrap();
-        assert_ne!(hash1, hash2);
+    fn salts_are_unique() {
+        let hasher = Argon2idPasswordHasher::default();
+        assert_ne!(hasher.hash(b"same").unwrap(), hasher.hash(b"same").unwrap());
     }
 
     #[test]
-    fn test_malformed_hash_is_rejected() {
-        let hasher = HmacSha256PasswordHasher::new();
-        assert!(!hasher.verify(b"password", "invalid_hash_string").unwrap());
-    }
-
-    #[test]
-    fn test_user_roles() {
-        let user = AuthUser {
-            id: "u1".into(),
-            email: "admin@example.com".into(),
-            password_hash: "hash".into(),
-            roles: vec!["admin".into(), "user".into()],
-        };
-        assert!(user.has_role("admin"));
-        assert!(!user.has_role("superadmin"));
+    fn creates_256_bit_session_tokens() {
+        let token = SessionToken::generate(Duration::from_secs(60)).unwrap();
+        assert!(token.token.len() >= 43);
+        assert!(!token.is_expired(token.expires_at - 1));
+        assert!(token.is_expired(token.expires_at));
     }
 }

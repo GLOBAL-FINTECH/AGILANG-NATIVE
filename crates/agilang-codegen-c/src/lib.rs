@@ -7,6 +7,7 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("#include <stdio.h>\n");
     out.push_str("#include <stdbool.h>\n\n");
     out.push_str("#include <math.h>\n\n");
+    out.push_str("#include <string.h>\n\n");
     out.push_str("#include <stdlib.h>\n\n");
 
     out.push_str("typedef struct {\n");
@@ -29,7 +30,99 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("extern const char* agi_http_get(const char* url);\n");
     out.push_str("extern const char* agi_http_post(const char* url, const char* body);\n");
     out.push_str("extern const char* agi_http_get_json(const char* url);\n");
-    out.push_str("extern const char* agi_http_post_json(const char* url, const char* body);\n\n");
+    out.push_str("extern const char* agi_http_post_json(const char* url, const char* body);\n");
+    out.push_str("extern const char* agi_http_request_json(const char* request_json);\n\n");
+    out.push_str("static char* agi_json_escape_and_quote(const char* input) {\n");
+    out.push_str("    if (!input) input = \"\";\n");
+    out.push_str("    size_t len = 2;\n");
+    out.push_str("    for (const unsigned char* p = (const unsigned char*)input; *p; ++p) {\n");
+    out.push_str("        switch (*p) {\n");
+    out.push_str("            case '\\\\': case '\"': case '\\n': case '\\r': case '\\t': len += 2; break;\n");
+    out.push_str("            default: len += 1; break;\n");
+    out.push_str("        }\n");
+    out.push_str("    }\n");
+    out.push_str("    char* out = (char*)malloc(len + 1);\n");
+    out.push_str("    if (!out) return NULL;\n");
+    out.push_str("    size_t i = 0;\n");
+    out.push_str("    out[i++] = '\"';\n");
+    out.push_str("    for (const unsigned char* p = (const unsigned char*)input; *p; ++p) {\n");
+    out.push_str("        switch (*p) {\n");
+    out.push_str("            case '\\\\': out[i++]='\\\\'; out[i++]='\\\\'; break;\n");
+    out.push_str("            case '\"': out[i++]='\\\\'; out[i++]='\"'; break;\n");
+    out.push_str("            case '\\n': out[i++]='\\\\'; out[i++]='n'; break;\n");
+    out.push_str("            case '\\r': out[i++]='\\\\'; out[i++]='r'; break;\n");
+    out.push_str("            case '\\t': out[i++]='\\\\'; out[i++]='t'; break;\n");
+    out.push_str("            default: out[i++]=(char)(*p); break;\n");
+    out.push_str("        }\n");
+    out.push_str("    }\n");
+    out.push_str("    out[i++] = '\"';\n");
+    out.push_str("    out[i] = '\\0';\n");
+    out.push_str("    return out;\n");
+    out.push_str("}\n\n");
+    out.push_str("static char* agi_json_object(const char** keys, const char** values, size_t count) {\n");
+    out.push_str("    size_t len = 2;\n");
+    out.push_str("    for (size_t i = 0; i < count; ++i) {\n");
+    out.push_str("        len += strlen(keys[i]) + strlen(values[i]) + 4;\n");
+    out.push_str("        if (i + 1 < count) len += 1;\n");
+    out.push_str("    }\n");
+    out.push_str("    char* out = (char*)malloc(len + 1);\n");
+    out.push_str("    if (!out) return NULL;\n");
+    out.push_str("    size_t pos = 0;\n");
+    out.push_str("    out[pos++] = '{';\n");
+    out.push_str("    for (size_t i = 0; i < count; ++i) {\n");
+    out.push_str("        out[pos++] = '\"';\n");
+    out.push_str("        size_t key_len = strlen(keys[i]);\n");
+    out.push_str("        memcpy(out + pos, keys[i], key_len);\n");
+    out.push_str("        pos += key_len;\n");
+    out.push_str("        out[pos++] = '\"';\n");
+    out.push_str("        out[pos++] = ':';\n");
+    out.push_str("        size_t value_len = strlen(values[i]);\n");
+    out.push_str("        memcpy(out + pos, values[i], value_len);\n");
+    out.push_str("        pos += value_len;\n");
+    out.push_str("        if (i + 1 < count) out[pos++] = ',';\n");
+    out.push_str("    }\n");
+    out.push_str("    out[pos++] = '}';\n");
+    out.push_str("    out[pos] = '\\0';\n");
+    out.push_str("    return out;\n");
+    out.push_str("}\n\n");
+    out.push_str("static char* agi_json_array(const char** values, size_t count) {\n");
+    out.push_str("    size_t len = 2;\n");
+    out.push_str("    for (size_t i = 0; i < count; ++i) {\n");
+    out.push_str("        len += strlen(values[i]);\n");
+    out.push_str("        if (i + 1 < count) len += 1;\n");
+    out.push_str("    }\n");
+    out.push_str("    char* out = (char*)malloc(len + 1);\n");
+    out.push_str("    if (!out) return NULL;\n");
+    out.push_str("    size_t pos = 0;\n");
+    out.push_str("    out[pos++] = '[';\n");
+    out.push_str("    for (size_t i = 0; i < count; ++i) {\n");
+    out.push_str("        size_t value_len = strlen(values[i]);\n");
+    out.push_str("        memcpy(out + pos, values[i], value_len);\n");
+    out.push_str("        pos += value_len;\n");
+    out.push_str("        if (i + 1 < count) out[pos++] = ',';\n");
+    out.push_str("    }\n");
+    out.push_str("    out[pos++] = ']';\n");
+    out.push_str("    out[pos] = '\\0';\n");
+    out.push_str("    return out;\n");
+    out.push_str("}\n\n");
+    out.push_str("static char* agi_json_i64(int64_t value) {\n");
+    out.push_str("    char buffer[32];\n");
+    out.push_str("    snprintf(buffer, sizeof(buffer), \"%lld\", (long long)value);\n");
+    out.push_str("    size_t len = strlen(buffer);\n");
+    out.push_str("    char* out = (char*)malloc(len + 1);\n");
+    out.push_str("    if (!out) return NULL;\n");
+    out.push_str("    memcpy(out, buffer, len + 1);\n");
+    out.push_str("    return out;\n");
+    out.push_str("}\n\n");
+    out.push_str("static char* agi_json_f64(double value) {\n");
+    out.push_str("    char buffer[64];\n");
+    out.push_str("    snprintf(buffer, sizeof(buffer), \"%.17g\", value);\n");
+    out.push_str("    size_t len = strlen(buffer);\n");
+    out.push_str("    char* out = (char*)malloc(len + 1);\n");
+    out.push_str("    if (!out) return NULL;\n");
+    out.push_str("    memcpy(out, buffer, len + 1);\n");
+    out.push_str("    return out;\n");
+    out.push_str("}\n\n");
     out.push_str("static void agi_print_i64(int64_t value) {\n");
     out.push_str("    char buffer[32];\n");
     out.push_str("    snprintf(buffer, sizeof(buffer), \"%lld\", (long long)value);\n");
@@ -464,6 +557,28 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
         HirStmt::Expr(expr) => {
             format!("{}{};\n", ind, generate_expr(expr))
         }
+        HirStmt::If {
+            condition,
+            then_body,
+            else_body,
+            ..
+        } => {
+            let mut out = format!("{}if ({}) {{\n", ind, generate_expr(condition));
+            for stmt in then_body {
+                out.push_str(&generate_stmt(stmt, indent + 4));
+            }
+            out.push_str(&format!("{}}}", ind));
+            if !else_body.is_empty() {
+                out.push_str(" else {\n");
+                for stmt in else_body {
+                    out.push_str(&generate_stmt(stmt, indent + 4));
+                }
+                out.push_str(&format!("{}}}", ind));
+            }
+            out.push('\n');
+            out
+        }
+        HirStmt::ForIn { .. } => format!("{}/* unsupported for-in loop */;\n", ind),
     }
 }
 
@@ -504,6 +619,7 @@ fn generate_expr(expr: &HirExpr) -> String {
             }
             "/* unsupported list literal */ 0".to_string()
         }
+        HirExpr::ObjectLiteral(items, _, _) => generate_json_object_expr(items),
         HirExpr::MemberAccess { object, member, .. } => {
             format!("/* member access */ {}.{}", generate_expr(object), member)
         }
@@ -607,6 +723,9 @@ fn generate_intrinsic_call(name: &str, args: &[HirExpr]) -> Option<String> {
     }
     if name == "post" && arg_strs.len() == 3 {
         return Some(format!("agi_http_post({}, {})", arg_strs[1], arg_strs[2]));
+    }
+    if name == "request" && arg_strs.len() == 2 {
+        return Some(format!("agi_http_request_json({})", arg_strs[1]));
     }
 
     let list_elems = args.first().and_then(list_literal_numeric_elements);
@@ -809,6 +928,69 @@ fn generate_intrinsic_call(name: &str, args: &[HirExpr]) -> Option<String> {
             ))
         }
         _ => None,
+    }
+}
+
+fn generate_json_object_expr(items: &[(String, HirExpr)]) -> String {
+    let keys = items
+        .iter()
+        .map(|(key, _)| format!("\"{}\"", key.replace("\"", "\\\"")))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let values = items
+        .iter()
+        .map(|(key, value)| generate_json_value_expr(Some(key.as_str()), value))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "agi_json_object((const char*[]){{{}}}, (const char*[]){{{}}}, {})",
+        keys,
+        values,
+        items.len()
+    )
+}
+
+fn generate_json_array_expr(items: &[HirExpr]) -> String {
+    let values = items
+        .iter()
+        .map(|value| generate_json_value_expr(None, value))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "agi_json_array((const char*[]){{{}}}, {})",
+        values,
+        items.len()
+    )
+}
+
+fn generate_json_value_expr(key: Option<&str>, expr: &HirExpr) -> String {
+    match expr {
+        HirExpr::String(_, _, _) => {
+            if matches!(key, Some("query" | "headers")) {
+                generate_expr(expr)
+            } else {
+                format!("agi_json_escape_and_quote({})", generate_expr(expr))
+            }
+        }
+        HirExpr::Identifier(_, ty, _) => {
+            if matches!(key, Some("query" | "headers")) && ty == &Type::String {
+                generate_expr(expr)
+            } else if ty == &Type::String || ty == &Type::Unknown {
+                format!("agi_json_escape_and_quote({})", generate_expr(expr))
+            } else if matches!(ty, Type::I32 | Type::I64 | Type::U32 | Type::U64) {
+                format!("agi_json_i64((int64_t)({}))", generate_expr(expr))
+            } else if matches!(ty, Type::F32 | Type::F64) {
+                format!("agi_json_f64((double)({}))", generate_expr(expr))
+            } else {
+                generate_expr(expr)
+            }
+        }
+        HirExpr::Integer(_, _, _) => format!("agi_json_i64((int64_t)({}))", generate_expr(expr)),
+        HirExpr::Float(_, _, _) => format!("agi_json_f64((double)({}))", generate_expr(expr)),
+        HirExpr::Bool(_, _, _) => format!("(({}) ? \"true\" : \"false\")", generate_expr(expr)),
+        HirExpr::ObjectLiteral(items, _, _) => generate_json_object_expr(items),
+        HirExpr::ListLiteral(items, _, _) => generate_json_array_expr(items),
+        _ => format!("agi_json_escape_and_quote({})", generate_expr(expr)),
     }
 }
 

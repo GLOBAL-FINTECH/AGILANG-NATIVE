@@ -6,24 +6,45 @@ use agilang_source::{SourceFile, Span};
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     Fn,
+    Module,
+    Use,
+    Class,
+    Extends,
     Let,
     Const,
     Return,
     If,
     Else,
     While,
+    For,
+    In,
+    Throw,
     True,
     False,
+    And,
+    Or,
+    Not,
     Identifier(String),
     Integer(i64),
     Float(f64),
     String(String),
     Colon,
     Comma,
+    Dot,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
     LParen,
     RParen,
     Arrow,
     Equal,
+    EqualEqual,
+    BangEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
     Plus,
     Minus,
     Star,
@@ -83,9 +104,44 @@ impl<'a> Lexer<'a> {
                 b'#' => self.skip_comment(),
                 b':' => self.single(TokenKind::Colon),
                 b',' => self.single(TokenKind::Comma),
+                b'.' => self.single(TokenKind::Dot),
+                b'{' => self.single(TokenKind::LBrace),
+                b'}' => self.single(TokenKind::RBrace),
+                b'[' => self.single(TokenKind::LBracket),
+                b']' => self.single(TokenKind::RBracket),
                 b'(' => self.single(TokenKind::LParen),
                 b')' => self.single(TokenKind::RParen),
+                b'=' if self.peek(1) == Some(b'=') => {
+                    self.cursor += 2;
+                    self.tokens.push(Token {
+                        kind: TokenKind::EqualEqual,
+                        span: Span::new(start, self.cursor),
+                    });
+                }
                 b'=' => self.single(TokenKind::Equal),
+                b'!' if self.peek(1) == Some(b'=') => {
+                    self.cursor += 2;
+                    self.tokens.push(Token {
+                        kind: TokenKind::BangEqual,
+                        span: Span::new(start, self.cursor),
+                    });
+                }
+                b'<' if self.peek(1) == Some(b'=') => {
+                    self.cursor += 2;
+                    self.tokens.push(Token {
+                        kind: TokenKind::LessEqual,
+                        span: Span::new(start, self.cursor),
+                    });
+                }
+                b'>' if self.peek(1) == Some(b'=') => {
+                    self.cursor += 2;
+                    self.tokens.push(Token {
+                        kind: TokenKind::GreaterEqual,
+                        span: Span::new(start, self.cursor),
+                    });
+                }
+                b'<' => self.single(TokenKind::Less),
+                b'>' => self.single(TokenKind::Greater),
                 b'+' => self.single(TokenKind::Plus),
                 b'*' => self.single(TokenKind::Star),
                 b'/' => self.single(TokenKind::Slash),
@@ -206,14 +262,24 @@ impl<'a> Lexer<'a> {
         let text = &self.source.text()[start..self.cursor];
         let kind = match text {
             "fn" => TokenKind::Fn,
+            "module" => TokenKind::Module,
+            "use" => TokenKind::Use,
+            "class" => TokenKind::Class,
+            "extends" => TokenKind::Extends,
             "let" => TokenKind::Let,
             "const" => TokenKind::Const,
             "return" => TokenKind::Return,
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
             "while" => TokenKind::While,
+            "for" => TokenKind::For,
+            "in" => TokenKind::In,
+            "throw" => TokenKind::Throw,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
+            "and" => TokenKind::And,
+            "or" => TokenKind::Or,
+            "not" => TokenKind::Not,
             _ => TokenKind::Identifier(text.to_owned()),
         };
         self.tokens.push(Token {
@@ -345,5 +411,20 @@ mod tests {
         let t = lex(&s).unwrap();
         assert!(t.iter().any(|x| x.kind == TokenKind::Indent));
         assert!(t.iter().any(|x| x.kind == TokenKind::Dedent));
+    }
+
+    #[test]
+    fn lexes_modern_postfix_and_comparisons() {
+        let s = SourceFile::new(
+            "x.agi",
+            "fn main() -> i32:\n    let ok = values[0].score >= 1.0 and values[1] != 0.0\n    return 0\n",
+        );
+        let t = lex(&s).unwrap();
+        assert!(t.iter().any(|x| x.kind == TokenKind::LBracket));
+        assert!(t.iter().any(|x| x.kind == TokenKind::RBracket));
+        assert!(t.iter().any(|x| x.kind == TokenKind::Dot));
+        assert!(t.iter().any(|x| x.kind == TokenKind::GreaterEqual));
+        assert!(t.iter().any(|x| x.kind == TokenKind::BangEqual));
+        assert!(t.iter().any(|x| x.kind == TokenKind::And));
     }
 }

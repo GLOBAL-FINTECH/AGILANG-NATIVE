@@ -6,6 +6,8 @@ edition.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+agilang-database-agidb = { path = "../agilang-database-agidb" }
+agilang-database-driver = { path = "../agilang-database-driver" }
 agilang-database-parser = { path = "../agilang-database-parser" }
-agilang-database-prepared = { path = "../agilang-database-prepared" }
-agilang-database-policy = { path = "../agilang-database-policy" }
+agilang-framework-auth = { path = "../agilang-framework-auth" }

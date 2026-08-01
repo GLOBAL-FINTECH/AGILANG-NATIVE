@@ -1,0 +1,7 @@
+{
+  "schema": "AGILANG-FILE-ASSOCIATIONS-1",
+  "languages": [
+    {"extension": ".agi", "language_id": "agilang", "description": "AGILANG backend source", "icon": "assets/branding/agilang-logo.png"},
+    {"extension": ".ags", "language_id": "agilang-ags", "description": "AGILANG reactive template", "icon": "assets/branding/agilang-logo.png"}
+  ]
+}

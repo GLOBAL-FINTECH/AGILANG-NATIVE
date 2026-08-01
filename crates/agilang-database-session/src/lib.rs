@@ -2,6 +2,7 @@ use agilang_database_security_kernel::Capability;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgtpSession {
@@ -17,13 +18,22 @@ pub struct AgtpSession {
 
 impl AgtpSession {
     pub fn new(app_id: [u8; 16], db_id: [u8; 16], capabilities: Vec<Capability>) -> Self {
+        let issued_at = unix_seconds();
+        let session_seed = issued_at
+            .to_le_bytes()
+            .into_iter()
+            .cycle()
+            .take(16)
+            .collect::<Vec<_>>();
+        let mut session_id = [0u8; 16];
+        session_id.copy_from_slice(&session_seed[..16]);
         Self {
-            session_id: [0x77; 16],
+            session_id,
             application_id: app_id,
             database_id: db_id,
             capabilities,
-            issued_at: 1774000000,
-            expires_at: 1774003600,
+            issued_at,
+            expires_at: issued_at + 3600,
             next_sequence: 1,
             seen_nonces: HashSet::new(),
         }
@@ -48,6 +58,13 @@ impl AgtpSession {
     }
 }
 
+fn unix_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_secs())
+        .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,12 +76,10 @@ mod tests {
 
         assert!(session.validate_request(1, nonce1).is_ok());
 
-        // Out of order sequence
         let err_seq = session.validate_request(5, [0x22u8; 32]);
         assert!(err_seq.is_err());
         assert!(err_seq.unwrap_err().to_string().contains("E6601"));
 
-        // Replayed nonce
         let err_replay = session.validate_request(2, nonce1);
         assert!(err_replay.is_err());
         assert!(err_replay.unwrap_err().to_string().contains("E6602"));

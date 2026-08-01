@@ -4,8 +4,18 @@ members = [
   "crates/agilang-runtime-core",
   "crates/agilang-runtime-async",
   "crates/agilang-runtime-platform",
+  "crates/agilang-runtime-compute",
+  "crates/agilang-runtime-accelerator",
+  "crates/agilang-runtime-crypto",
+  "crates/agilang-runtime-resource",
+  "crates/agilang-runtime-realtime",
+  "crates/agilang-runtime-webrtc",
+  "crates/agilang-runtime-http",
+  "crates/agilang-runtime-llm",
+  "crates/agilang-runtime-evm",
   "crates/agilang-runtime-abi",
   "crates/agilang-runtime-cli",
+  "crates/agilang-compat-audit",
   "crates/agilang-source",
   "crates/agilang-diagnostics",
   "crates/agilang-lexer",
@@ -76,10 +86,19 @@ members = [
   "crates/agilang-database-blockchain-store",
   "crates/agilang-database-snapshot",
   "crates/agilang-database-benchmark",
+  "crates/agilang-ags-lexer",
+  "crates/agilang-ags-ast",
+  "crates/agilang-ags-parser",
+  "crates/agilang-view-ir",
+  "crates/agilang-ags-semantic", "crates/agilang-ags-ssr", "crates/agilang-ags-hydration", "crates/agilang-ags-plugins",
+  "crates/agilang-agi-ags-bridge",
+  "crates/agilang-ags-compiler",
+  "crates/agilang-sibaq-integration",
+  "crates/agilang-vault-core",
 ]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.7.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["AGILANG Project"]
@@ -97,3 +116,9 @@ thiserror = "2.0"
 tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "time", "sync", "net", "fs", "io-util", "signal"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+argon2 = { version = "0.5", features = ["std"] }
+base64 = "0.22"
+rand_core = { version = "0.6", features = ["getrandom"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2"] }
+url = "2.5"
+zeroize = { version = "1.8", features = ["derive"] }

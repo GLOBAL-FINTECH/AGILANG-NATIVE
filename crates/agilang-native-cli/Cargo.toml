@@ -25,4 +25,10 @@ agilang-lsp = { path = "../agilang-lsp" }
 agilang-framework-migrations = { path = "../agilang-framework-migrations" }
 agilang-database-benchmark = { path = "../agilang-database-benchmark" }
 chrono = "0.4"
-
+agilang-ags-compiler = { path = "../agilang-ags-compiler" }
+agilang-agi-ags-bridge = { path = "../agilang-agi-ags-bridge" }
+serde_json.workspace = true
+agilang-database-tcp = { path = "../agilang-database-tcp" }
+agilang-database-identity = { path = "../agilang-database-identity" }
+agilang-database-security-kernel = { path = "../agilang-database-security-kernel" }
+agilang-database-mysql-gateway = { path = "../agilang-database-mysql-gateway" }

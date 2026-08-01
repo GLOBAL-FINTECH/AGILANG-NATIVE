@@ -1,3 +1,5 @@
+use agilang_database_identity::{ApplicationIdentity, DatabaseIdentity};
+use agilang_database_security_kernel::Capability;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +25,65 @@ impl AgtpTransportFrame {
             payload,
         })
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HandshakeChallenge {
+    pub challenge_nonce: [u8; 32],
+    pub database_identity: DatabaseIdentity,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransportSessionInfo {
+    pub session_id: [u8; 16],
+    pub application_name: String,
+    pub database_name: String,
+    pub capabilities: Vec<Capability>,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub peer_addr: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransportStatusSnapshot {
+    pub listener_addr: String,
+    pub air_gapped: bool,
+    pub active_sessions: Vec<TransportSessionInfo>,
+    pub known_peers: Vec<String>,
+    pub started_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TransportRequest {
+    Status,
+    HandshakeInit {
+        client_identity: ApplicationIdentity,
+        requested_capabilities: Vec<Capability>,
+    },
+    HandshakeFinish {
+        client_identity: ApplicationIdentity,
+        requested_capabilities: Vec<Capability>,
+        challenge_nonce: [u8; 32],
+        client_signature: Vec<u8>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TransportResponse {
+    Status {
+        snapshot: TransportStatusSnapshot,
+    },
+    HandshakeChallenge {
+        challenge: HandshakeChallenge,
+    },
+    HandshakeComplete {
+        session: TransportSessionInfo,
+        server_signature: Vec<u8>,
+    },
+    Error {
+        code: String,
+        message: String,
+    },
 }
 
 #[cfg(test)]

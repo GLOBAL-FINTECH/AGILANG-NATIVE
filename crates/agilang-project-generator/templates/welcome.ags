@@ -1,0 +1,283 @@
+@page title="AGILANG v0.7.0 — Native Framework" seo_description="AGILANG is a general-purpose native programming language and framework for web, AI, realtime, blockchain, and systems development." robots="index,follow"
+@fetch framework from "/api/framework/status"
+@live framework from "/api/framework/status" every 2200
+@fetch runtime from "/api/runtime/status"
+@live runtime from "/api/runtime/status" every 2200
+@fetch chain from "/api/blockchain/status"
+@live chain from "/api/blockchain/status" every 2200
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGILANG v0.7.0 — Native Framework</title>
+<meta name="description" content="AGILANG is a general-purpose native programming language and framework for web, AI, realtime, blockchain, and systems development.">
+<link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="container nav">
+    <a class="brand" href="#home" data-page="home">
+      <img src="/assets/images/agilang-logo.png" alt="AGILANG logo">
+      <div><span class="brand-name">AGILANG</span><span class="version">v0.7.0</span></div>
+    </a>
+    <nav class="menu">
+      <a href="#home" data-page="home" class="active">Home</a>
+      <a href="#about" data-page="about">About</a>
+      <a href="#dashboard" data-page="dashboard">Dashboard</a>
+      <a href="#docs">Docs</a><a href="#api">API</a><a href="#examples">Examples</a>
+      <a href="#community">Community</a><a href="#github">GitHub</a><a href="#status">Status</a>
+    </nav>
+    <div class="actions">
+      <button class="btn violet" data-page="auth" data-tab="login">Login</button>
+      <button class="btn primary" data-page="auth" data-tab="register">Get Started</button>
+    </div>
+  </div>
+</header>
+
+<main>
+<section id="home" class="page-section active" style="padding-top:0" data-ags-page="home">
+  <div class="container hero">
+    <div class="hero-grid">
+      <article class="card hero-copy">
+        <div class="kicker"><span class="dot"></span> Native language platform</div>
+        <h1>AGILANG</h1>
+        <h2>General-Purpose Native Framework</h2>
+        <p>Build modern applications with a native compiler, AGS reactive UI, AI and tensor computation, WebRTC, WebSocket, blockchain, cryptography, and hybrid CPU/GPU execution.</p>
+        <div class="hero-actions">
+          <button class="btn primary" data-page="auth" data-tab="register">🚀 Get Started</button>
+          <a class="btn violet" href="#docs">▣ Read Documentation</a>
+        </div>
+      </article>
+      <article class="card hero-logo"><img src="/assets/images/agilang-logo.png" alt="AGILANG"></article>
+      <article class="card status">
+        <div class="status-head"><span class="status-title">FRAMEWORK STATUS</span><span class="badge">● HEALTHY</span></div>
+        <div class="status-grid">
+          <div class="status-item"><span class="status-icon">◎</span><div><b>HTTP Server</b><small>{{ framework.http_address }}</small></div></div>
+          <div class="status-item"><span class="status-icon">▣</span><div><b>Database</b><small>{{ framework.database_status }}</small></div></div>
+          <div class="status-item"><span class="status-icon">↯</span><div><b>WebSocket</b><small>{{ framework.websocket_status }}</small></div></div>
+          <div class="status-item"><span class="status-icon">⌁</span><div><b>Runtime</b><small>{{ framework.runtime_status }}</small></div></div>
+          <div class="status-item"><span class="status-icon">◉</span><div><b>WebRTC</b><small>{{ framework.webrtc_status }}</small></div></div>
+          <div class="status-item"><span class="status-icon">◇</span><div><b>AI Runtime</b><small>{{ framework.ai_status }}</small></div></div>
+          <div class="status-item"><span class="status-icon">⌁</span><div><b>STUN/TURN</b><small>{{ framework.stun_turn_status }}</small></div></div>
+          <div class="status-item"><span class="status-icon">◈</span><div><b>ABI Version</b><small>{{ framework.abi_version }}</small></div></div>
+        </div>
+        <button class="mini-btn">View Full System Status →</button>
+      </article>
+    </div>
+
+    <div class="card strip">
+      <div class="metric"><span class="metric-icon">&lt;/&gt;</span><div><small>Version</small><strong>AGILANG v0.7.0</strong></div></div>
+      <div class="metric"><span class="metric-icon">⌘</span><div><small>Compiler</small><strong>0.7.0</strong></div></div>
+      <div class="metric"><span class="metric-icon">▦</span><div><small>Runtime</small><strong>0.7.0</strong></div></div>
+      <div class="metric"><span class="metric-icon">⊞</span><div><small>Platform</small><strong>{{ runtime.platform }}</strong></div></div>
+      <div class="metric"><span class="metric-icon">CPU</span><div><small>Compute</small><strong>{{ runtime.compute_mode }}</strong></div></div>
+      <div class="metric"><span class="metric-icon">RAM</span><div><small>Memory</small><strong>{{ runtime.total_memory }}</strong></div></div>
+      <div class="metric"><span class="metric-icon">SSD</span><div><small>Storage</small><strong>{{ runtime.storage }}</strong></div></div>
+    </div>
+
+    <div class="main-grid">
+      <section class="card section-card">
+        <h3>BUILT FOR EVERYTHING</h3>
+        <div class="feature-grid">
+          <div class="feature"><i>◎</i><div><b>Web Development</b><small>Fast, reactive, secure</small></div></div>
+          <div class="feature"><i>◉</i><div><b>AI & Machine Learning</b><small>Native tensors and training</small></div></div>
+          <div class="feature"><i>▣</i><div><b>WebRTC & Realtime</b><small>P2P, streaming, calls</small></div></div>
+          <div class="feature"><i>◇</i><div><b>Blockchain & Crypto</b><small>Smart contracts and nodes</small></div></div>
+          <div class="feature"><i>⌨</i><div><b>Systems Programming</b><small>Low-level performance</small></div></div>
+          <div class="feature"><i>▱</i><div><b>Cross Platform</b><small>Windows, Linux, macOS</small></div></div>
+        </div>
+      </section>
+
+      <section class="card section-card">
+        <h3>QUICK START</h3>
+        <div class="codebox"><span class="c"># 1. Create a project</span><br><span class="v">agilang</span> new myapp<br><br><span class="c"># 2. Enter project</span><br><span class="k">cd</span> myapp<br><br><span class="c"># 3. Start server</span><br><span class="v">agilang</span> serve<br><br><span class="c"># 4. Open browser</span><br>http://{{ framework.http_address }}</div>
+      </section>
+
+      <section class="card section-card">
+        <div class="live-head"><h3>AGS REACTIVE UI (LIVE)</h3><span class="live">● Live</span></div>
+        <div class="stats">
+          <div class="stat"><small>CPU Usage</small><strong id="cpu">{{ runtime.cpu_usage }}</strong><div class="spark"></div></div>
+          <div class="stat"><small>Memory Usage</small><strong id="memory">{{ runtime.memory_usage }}</strong><div class="spark"></div></div>
+          <div class="stat"><small>Connected Users</small><strong id="users">{{ framework.connected_users }}</strong><div class="spark"></div></div>
+          <div class="stat"><small>Blockchain Height</small><strong id="height">{{ chain.height }}</strong><div class="spark"></div></div>
+        </div>
+        <div class="live-note"><b style="color:#b57cff">ϟ Live Updates via AGS Reactivity</b><br><span class="form-note">No full-page refresh. Realtime application state streams.</span></div>
+      </section>
+    </div>
+
+    <section class="card auth-preview">
+      <div class="auth-grid">
+        <div><h3>AUTHENTICATION</h3><p class="form-note">Complete secure authentication system with login, registration, recovery, verification, and 2FA.</p><button class="btn" data-page="auth" data-tab="login">🔒 Login Now</button></div>
+        <div><b>Login</b><input placeholder="Email or username"><input type="password" placeholder="Password"><button class="mini-btn" data-page="auth" data-tab="login">Sign In</button></div>
+        <div><b>Register</b><input placeholder="Full name"><input placeholder="Email"><button class="mini-btn purple" data-page="auth" data-tab="register">Create Account</button></div>
+        <div><b>Reset Password</b><input placeholder="Email address"><button class="mini-btn" data-page="auth" data-tab="forgot">Send Reset Link</button></div>
+        <div><b>2FA Verification</b><input placeholder="6-digit code"><button class="mini-btn" data-page="auth" data-tab="twofa">Verify Code</button></div>
+      </div>
+    </section>
+  </div>
+</section>
+
+<section id="about" class="page-section" data-ags-page="about">
+  <div class="container">
+    <div class="kicker"><span class="dot"></span> About AGILANG</div>
+    <h2 class="section-title">A native language platform for the next generation of software.</h2>
+    <p class="lead">AGILANG combines systems-level control with application-level productivity. It is designed for native execution, reactive web experiences, artificial intelligence, realtime communication, cryptography, blockchain, and cross-platform deployment.</p>
+    <div class="about-grid">
+      <article class="card about-copy">
+        <h3>Why AGILANG exists</h3>
+        <p>Modern developers are forced to combine multiple languages, runtimes, build systems, and frameworks before they can create a complete application. AGILANG is designed to unify that workflow through one coherent language, compiler, runtime, framework, and package ecosystem.</p>
+        <p>Its native core prioritizes performance and direct system access, while AGS provides reactive user-interface development without full-page refreshes. Runtime capabilities cover HTTP, HTTPS, WebSocket, WebRTC, databases, AI tensors, cryptography, CPU/GPU dispatch, and RAM/SSD-aware computation.</p>
+      </article>
+      <article class="card mission">
+        <h3>Platform identity</h3>
+        <div class="status-item"><span class="status-icon">N</span><div><b>Native First</b><small>Runs without a Python dependency.</small></div></div>
+        <div class="status-item"><span class="status-icon">R</span><div><b>Realtime by Design</b><small>AGS, WebSocket and WebRTC.</small></div></div>
+        <div class="status-item"><span class="status-icon">I</span><div><b>Interoperable</b><small>C ABI, WebAssembly and external SDKs.</small></div></div>
+      </article>
+    </div>
+    <div class="values">
+      <article class="card value"><h3>Performance</h3><p class="form-note">Optimized native builds, resource-aware scheduling, accelerator support, and explicit capability discovery.</p></article>
+      <article class="card value"><h3>Security</h3><p class="form-note">Safe defaults, strong cryptographic primitives, validation, authentication, and auditable runtime behavior.</p></article>
+      <article class="card value"><h3>Developer Experience</h3><p class="form-note">One CLI for projects, migrations, authentication, formatting, testing, publishing, and deployment.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="auth" class="page-section" data-ags-page="auth">
+  <div class="container auth-shell">
+    <article class="card auth-visual">
+      <img src="/assets/images/agilang-logo.png" alt="AGILANG logo">
+      <h2>Build securely.<br>Move faster.</h2>
+      <p class="lead">A complete authentication experience for AGILANG applications, including registration, login, password recovery, email verification, two-factor authentication, and session security.</p>
+    </article>
+    <article class="card auth-panel">
+      <div class="tabs">
+        <button class="tab active" data-tab="login">Login</button>
+        <button class="tab" data-tab="register">Register</button>
+        <button class="tab" data-tab="forgot">Forgot Password</button>
+        <button class="tab" data-tab="verify">Verify Email</button>
+        <button class="tab" data-tab="twofa">2FA</button>
+      </div>
+
+      <form class="form-pane active" data-pane="login">
+        <h2>Welcome back</h2><p class="form-note">Sign in to continue to your AGILANG application.</p>
+        <div class="demo-accounts"><b>Demo accounts</b><span>admin@local.agilang / admin123</span><span>user@local.agilang / user123</span></div>
+        <div class="field"><label>Email or username</label><input data-auth-email type="text" placeholder="name@example.com" value="admin@local.agilang"></div>
+        <div class="field"><label>Password</label><input data-auth-password type="password" placeholder="Enter password" value="admin123"></div>
+        <div class="field"><label><input type="checkbox" style="width:auto;margin-right:8px">Remember this device</label></div>
+        <p class="form-message" data-auth-message></p>
+        <button class="btn primary" data-action="login" type="button" style="width:100%">Sign In</button>
+      </form>
+
+      <form class="form-pane" data-pane="register">
+        <h2>Create your account</h2><p class="form-note">Register securely and start building with AGILANG.</p>
+        <div class="form-grid">
+          <div class="field"><label>First name</label><input data-register-first placeholder="First name"></div>
+          <div class="field"><label>Last name</label><input data-register-last placeholder="Last name"></div>
+          <div class="field full"><label>Email address</label><input data-register-email type="email" placeholder="name@example.com"></div>
+          <div class="field"><label>Password</label><input data-register-password type="password" placeholder="Create password"></div>
+          <div class="field"><label>Confirm password</label><input data-register-confirm type="password" placeholder="Confirm password"></div>
+          <div class="field"><label>Role</label><select data-register-role><option value="user">User</option><option value="admin">Admin</option></select></div>
+          <div class="field full"><label><input data-register-terms type="checkbox" style="width:auto;margin-right:8px">I agree to the Terms and Privacy Policy.</label></div>
+        </div>
+        <p class="form-message" data-register-message></p>
+        <button class="btn primary" data-action="register" type="button" style="width:100%">Create Account</button>
+      </form>
+
+      <form class="form-pane" data-pane="forgot">
+        <h2>Reset your password</h2><p class="form-note">A secure recovery link will be sent to your registered email address.</p>
+        <div class="field"><label>Email address</label><input type="email" placeholder="name@example.com"></div>
+        <button class="btn primary" type="button" style="width:100%">Send Reset Link</button>
+      </form>
+
+      <form class="form-pane" data-pane="verify">
+        <h2>Verify your email</h2><p class="form-note">Enter the verification code sent to your email address.</p>
+        <div class="field"><label>Verification code</label><input inputmode="numeric" maxlength="6" placeholder="000000"></div>
+        <button class="btn primary" type="button" style="width:100%">Verify Email</button>
+      </form>
+
+      <form class="form-pane" data-pane="twofa">
+        <h2>Two-factor authentication</h2><p class="form-note">Enter the six-digit code from your authenticator application.</p>
+        <div class="field"><label>Authentication code</label><input inputmode="numeric" maxlength="6" placeholder="000000"></div>
+        <div class="field"><label>Backup code</label><input placeholder="Optional backup code"></div>
+        <button class="btn primary" type="button" style="width:100%">Verify and Continue</button>
+      </form>
+    </article>
+  </div>
+</section>
+
+<section id="dashboard" class="page-section" data-ags-page="dashboard">
+  <div class="container dashboard-shell-preview">
+    <aside class="card dashboard-side">
+      <img src="/assets/images/agilang-logo.png" alt="AGILANG logo">
+      <h3>Application</h3>
+      <p class="form-note">Role-aware dashboard with users, admin visibility, and CRUD records.</p>
+      <div class="status-item"><span class="status-icon">U</span><div><b data-current-name>Guest</b><small>Signed-in identity</small></div></div>
+      <div class="status-item"><span class="status-icon">R</span><div><b data-current-role>guest</b><small>Current role</small></div></div>
+      <button class="btn violet" data-page="auth" data-tab="login">Switch Account</button>
+      <button class="btn primary" data-action="logout" type="button">Logout</button>
+    </aside>
+
+    <section class="dashboard-main">
+      <div data-dashboard-guest class="card dashboard-panel">
+        <h2>Sign in required</h2>
+        <p>Use the Login or Register tab to open the user dashboard. Admin users can also view the user table.</p>
+        <button class="btn primary" data-page="auth" data-tab="login">Go to Login</button>
+      </div>
+
+      <div data-dashboard-app hidden>
+        <div class="dashboard-head">
+          <div>
+            <p class="kicker"><span class="dot"></span> Authenticated workspace</p>
+            <h2 class="dashboard-title">Welcome, <span data-current-name>Guest</span></h2>
+            <p class="form-note">Current role: <span class="role-badge" data-current-role>guest</span></p>
+          </div>
+          <button class="btn violet" data-action="logout" type="button">Logout</button>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="card metric"><span>Role</span><strong data-current-role>guest</strong><small>User and admin branches are separate.</small></article>
+          <article class="card metric"><span>Records</span><strong data-total-records>0</strong><small>User sees own records, admin sees all.</small></article>
+          <article class="card metric" data-admin-only hidden><span>Users</span><strong data-total-users>0</strong><small>Admin-only user registry.</small></article>
+        </div>
+
+        <section class="card dashboard-panel">
+          <h2>CRUD records</h2>
+          <div class="crud-form">
+            <input data-record-title placeholder="Record title">
+            <select data-record-status><option>Pending</option><option>Active</option><option>Done</option></select>
+            <button class="btn primary" data-action="create-record" type="button">Create Record</button>
+          </div>
+          <p class="form-message" data-crud-message></p>
+          <table>
+            <thead><tr><th>ID</th><th>Title</th><th>Owner</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody data-records></tbody>
+          </table>
+        </section>
+
+        <section class="card dashboard-panel" data-admin-only hidden>
+          <h2>Admin users</h2>
+          <p>Admins can inspect registered accounts and roles.</p>
+          <table>
+            <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+            <tbody data-users></tbody>
+          </table>
+        </section>
+      </div>
+    </section>
+  </div>
+</section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-row">
+    <div class="footer-brand"><img src="/assets/images/agilang-logo.png" alt=""><div><b>AGILANG <span class="version">v0.7.0</span></b><br><small>General-Purpose Native Framework</small></div></div>
+    <div>About &nbsp; Documentation &nbsp; API Reference &nbsp; Examples &nbsp; Community &nbsp; GitHub</div>
+    <div>© 2026 AGILANG Framework.</div>
+  </div>
+</footer>
+
+<script src="/assets/js/app.js" defer></script>
+</body>
+</html>
