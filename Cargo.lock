@@ -777,6 +777,7 @@ dependencies = [
  "agilang-runtime-async",
  "agilang-runtime-crypto",
  "agilang-runtime-http",
+ "agilang-runtime-webrtc",
  "anyhow",
  "base64",
  "chrono",

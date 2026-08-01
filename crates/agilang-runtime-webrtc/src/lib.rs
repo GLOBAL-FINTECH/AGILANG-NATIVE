@@ -98,3 +98,67 @@ pub fn capabilities_json() -> RuntimeResult<Vec<u8>> {
     serde_json::to_vec(&capabilities())
         .map_err(|e| AgilangError::new(ErrorCode::Serialization, e.to_string()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_signal(kind: SignalKind, to: &str, payload: &str) -> SignalEnvelope {
+        SignalEnvelope {
+            session_id: Uuid::new_v4(),
+            from: "alice".to_string(),
+            to: to.to_string(),
+            kind,
+            payload: payload.to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn signaling_hub_preserves_fifo_delivery_per_peer() {
+        let hub = SignalingHub::default();
+        let offer = sample_signal(SignalKind::Offer, "bob", "offer-sdp");
+        let candidate = sample_signal(SignalKind::IceCandidate, "bob", "candidate-1");
+        hub.publish(offer.clone()).await;
+        hub.publish(candidate.clone()).await;
+
+        assert_eq!(hub.receive("bob").await.unwrap().payload, offer.payload);
+        assert_eq!(hub.receive("bob").await.unwrap().payload, candidate.payload);
+        assert!(hub.receive("bob").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn signaling_hub_isolates_peer_queues() {
+        let hub = SignalingHub::default();
+        hub.publish(sample_signal(SignalKind::Offer, "bob", "offer")).await;
+        hub.publish(sample_signal(SignalKind::Answer, "carol", "answer")).await;
+
+        assert_eq!(hub.receive("carol").await.unwrap().payload, "answer");
+        assert_eq!(hub.receive("bob").await.unwrap().payload, "offer");
+        assert!(hub.receive("dave").await.is_none());
+    }
+
+    #[test]
+    fn capabilities_report_signaling_and_explain_provider_boundary() {
+        let caps = capabilities();
+        assert!(caps.signaling);
+        assert!(!caps.peer_connection);
+        assert!(!caps.turn_server);
+        assert!(caps.explanation.contains("signaling"));
+    }
+
+    #[test]
+    fn full_provider_guard_fails_closed_without_feature() {
+        let error = require_full_provider().unwrap_err();
+        assert_eq!(error.code, ErrorCode::Unsupported);
+        assert!(error.message.contains("full-webrtc"));
+    }
+
+    #[test]
+    fn capabilities_json_serializes_current_state() {
+        let json = capabilities_json().unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&json).unwrap();
+        assert_eq!(value["signaling"], true);
+        assert_eq!(value["peer_connection"], false);
+        assert!(value["explanation"].as_str().unwrap().contains("signaling"));
+    }
+}

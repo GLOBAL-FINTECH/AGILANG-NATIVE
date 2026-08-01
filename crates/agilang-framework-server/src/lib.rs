@@ -926,10 +926,7 @@ fn handle_auth_request(
 
 fn builtin_api_response(path: &str) -> Option<String> {
     match path {
-        "/api/framework/status" => Some(
-            r#"{"http_address":"127.0.0.1:8080","database_status":"AGIDB ready","websocket_status":"ready","runtime_status":"native","webrtc_status":"ready","ai_status":"native tensors","stun_turn_status":"local STUN","abi_version":"1.1","connected_users":1}"#
-                .to_string(),
-        ),
+        "/api/framework/status" => Some(framework_status_json()),
         "/api/runtime/status" => Some(
             r#"{"platform":"native","compute_mode":"CPU","total_memory":"available","storage":"AGIDB","cpu_usage":"12%","memory_usage":"6.4 GB"}"#
                 .to_string(),
@@ -945,6 +942,26 @@ fn builtin_api_response(path: &str) -> Option<String> {
         }
         _ => None,
     }
+}
+
+fn framework_status_json() -> String {
+    let webrtc = agilang_runtime_webrtc::capabilities();
+    serde_json::json!({
+        "http_address": "127.0.0.1:8080",
+        "database_status": "AGIDB ready",
+        "websocket_status": "ready",
+        "runtime_status": "native",
+        "webrtc_status": if webrtc.peer_connection { "native" } else { "signaling-only" },
+        "webrtc_signaling": webrtc.signaling,
+        "webrtc_peer_connection": webrtc.peer_connection,
+        "webrtc_data_channel": webrtc.data_channel,
+        "stun_turn_status": if webrtc.turn_server { "provider-ready" } else { "not-enabled" },
+        "webrtc_explanation": webrtc.explanation,
+        "ai_status": "native tensors",
+        "abi_version": "1.1",
+        "connected_users": 1
+    })
+    .to_string()
 }
 
 fn cj_http_client() -> Result<agilang_runtime_http::HttpClient, String> {
@@ -1872,6 +1889,9 @@ mod tests {
         let crud = builtin_api_response("/api/crud/status").unwrap();
 
         assert!(framework.contains("\"database_status\":\"AGIDB ready\""));
+        assert!(framework.contains("\"webrtc_status\":\"signaling-only\""));
+        assert!(framework.contains("\"webrtc_signaling\":true"));
+        assert!(framework.contains("\"webrtc_peer_connection\":false"));
         assert!(runtime.contains("\"storage\":\"AGIDB\""));
         assert!(chain.contains("\"height\""));
         assert!(auth.contains("\"roles\":[\"user\",\"admin\"]"));
