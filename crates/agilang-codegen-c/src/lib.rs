@@ -1548,6 +1548,7 @@ mod tests {
         let program = HirProgram {
             structs: vec![],
             enums: vec![],
+            aliases: vec![],
             functions: vec![],
         };
         let c_code = generate(&program);

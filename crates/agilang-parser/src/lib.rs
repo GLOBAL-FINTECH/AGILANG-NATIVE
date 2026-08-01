@@ -23,6 +23,7 @@ impl<'a> Parser<'a> {
         let mut imports = vec![];
         let mut structs = vec![];
         let mut enums = vec![];
+        let mut aliases = vec![];
         let mut functions = vec![];
         self.skip_newlines();
         while !self.at(&TokenKind::Eof) {
@@ -41,6 +42,7 @@ impl<'a> Parser<'a> {
                 Some(Item::Import(import_decl)) => imports.push(import_decl),
                 Some(Item::Struct(struct_decl)) => structs.push(struct_decl),
                 Some(Item::Enum(enum_decl)) => enums.push(enum_decl),
+                Some(Item::Alias(alias_decl)) => aliases.push(alias_decl),
                 Some(Item::Functions(mut parsed)) => functions.append(&mut parsed),
                 None => self.synchronize(),
             }
@@ -52,6 +54,7 @@ impl<'a> Parser<'a> {
                 imports,
                 structs,
                 enums,
+                aliases,
                 functions,
             })
         } else {
@@ -70,6 +73,9 @@ impl<'a> Parser<'a> {
         }
         if self.at(&TokenKind::Enum) {
             return self.enum_item();
+        }
+        if self.at(&TokenKind::Type) {
+            return self.type_alias_item();
         }
         if self.at(&TokenKind::Class) {
             return self.class_item().map(Item::Functions);
@@ -150,6 +156,19 @@ impl<'a> Parser<'a> {
         Some(Item::Enum(EnumDecl {
             name,
             variants,
+            span: Span::new(start, end),
+        }))
+    }
+    fn type_alias_item(&mut self) -> Option<Item> {
+        let start = self.expect(&TokenKind::Type, "E179", "expected `type`")?.span.start;
+        let (name, _) = self.identifier("expected alias name")?;
+        self.expect(&TokenKind::Equal, "E180", "expected `=` after alias name")?;
+        let target = self.type_ref()?;
+        let end = target.span.end;
+        self.line_end();
+        Some(Item::Alias(TypeAliasDecl {
+            name,
+            target,
             span: Span::new(start, end),
         }))
     }
@@ -920,6 +939,7 @@ enum Item {
     Import(ImportDecl),
     Struct(StructDecl),
     Enum(EnumDecl),
+    Alias(TypeAliasDecl),
     Functions(Vec<Function>),
 }
 #[cfg(test)]
@@ -938,6 +958,7 @@ mod tests {
         assert!(p.imports.is_empty());
         assert!(p.structs.is_empty());
         assert!(p.enums.is_empty());
+        assert!(p.aliases.is_empty());
         assert_eq!(p.functions[0].name, "main");
         assert_eq!(p.functions[0].body.len(), 2);
     }
@@ -990,6 +1011,18 @@ mod tests {
         );
         let p = parse(&lex(&s).unwrap()).unwrap();
         assert!(matches!(p.functions[0].body[1], Stmt::Match { .. }));
+    }
+
+    #[test]
+    fn parses_type_alias_declaration() {
+        let s = SourceFile::new(
+            "x.agi",
+            "type UserId = i64\n\nfn main() -> i32:\n    let id: UserId = 7\n    return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        assert_eq!(p.aliases.len(), 1);
+        assert_eq!(p.aliases[0].name, "UserId");
+        assert_eq!(p.aliases[0].target.name, "i64");
     }
 
     #[test]

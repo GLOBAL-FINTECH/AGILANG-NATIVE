@@ -1,10 +1,11 @@
 use agilang_ast::{
-    BinaryOp, EnumDecl, Expr, Function, MatchPattern, Program, Stmt, StructDecl, TypeRef,
+    BinaryOp, EnumDecl, Expr, Function, MatchPattern, Program, Stmt, StructDecl, TypeAliasDecl,
+    TypeRef,
 };
 use agilang_diagnostics::Diagnostic;
 use agilang_ir::{
     HirBinaryOp, HirEnum, HirEnumVariant, HirExpr, HirFunction, HirMatchArm, HirMatchPattern,
-    HirParameter, HirProgram, HirStmt, HirStruct, HirStructField,
+    HirParameter, HirProgram, HirStmt, HirStruct, HirStructField, HirTypeAlias,
 };
 use agilang_source::Span;
 use agilang_symbols::{Symbol, SymbolKind, SymbolTable};
@@ -19,6 +20,7 @@ pub struct Analyser {
     loop_depth: usize,
     struct_defs: HashMap<String, StructDecl>,
     enum_defs: HashMap<String, EnumDecl>,
+    alias_defs: HashMap<String, TypeAliasDecl>,
 }
 
 impl Analyser {
@@ -134,6 +136,7 @@ impl Analyser {
             loop_depth: 0,
             struct_defs: HashMap::new(),
             enum_defs: HashMap::new(),
+            alias_defs: HashMap::new(),
         }
     }
 
@@ -167,6 +170,22 @@ impl Analyser {
                         "E1002",
                         format!("duplicate symbol `{}`", enum_decl.name),
                         enum_decl.span,
+                    )
+                    .with_hint(format!(
+                        "first declared at span {}..{}",
+                        existing.span.start, existing.span.end
+                    )),
+                );
+            }
+        }
+
+        for alias_decl in &program.aliases {
+            if let Some(existing) = self.alias_defs.insert(alias_decl.name.clone(), alias_decl.clone()) {
+                self.errors.push(
+                    Diagnostic::error(
+                        "E1002",
+                        format!("duplicate symbol `{}`", alias_decl.name),
+                        alias_decl.span,
                     )
                     .with_hint(format!(
                         "first declared at span {}..{}",
@@ -224,6 +243,7 @@ impl Analyser {
         let mut hir_functions = vec![];
         let mut hir_structs = vec![];
         let mut hir_enums = vec![];
+        let mut hir_aliases = vec![];
         for struct_decl in &program.structs {
             if let Some(hir_struct) = self.analyse_struct(struct_decl) {
                 hir_structs.push(hir_struct);
@@ -232,6 +252,11 @@ impl Analyser {
         for enum_decl in &program.enums {
             if let Some(hir_enum) = self.analyse_enum(enum_decl) {
                 hir_enums.push(hir_enum);
+            }
+        }
+        for alias_decl in &program.aliases {
+            if let Some(hir_alias) = self.analyse_alias(alias_decl) {
+                hir_aliases.push(hir_alias);
             }
         }
         // Second pass: analyse function bodies
@@ -246,6 +271,7 @@ impl Analyser {
                 HirProgram {
                     structs: hir_structs,
                     enums: hir_enums,
+                    aliases: hir_aliases,
                     functions: hir_functions,
                 },
                 self.scopes,
@@ -304,18 +330,74 @@ impl Analyser {
     }
 
     fn resolve_known_type_name(&self, name: &str) -> Type {
+        self.resolve_known_type_name_inner(name, &mut Vec::new())
+    }
+
+    fn resolve_known_type_name_inner(&self, name: &str, trail: &mut Vec<String>) -> Type {
         let ty = Type::from_str(name);
         if ty != Type::Unknown {
-            ty
+            return ty;
         } else if self.struct_defs.contains_key(name) {
-            Type::Struct(name.to_string())
+            return Type::Struct(name.to_string());
         } else if self.enum_defs.contains_key(name) {
-            Type::Enum(name.to_string())
-        } else if is_framework_type_name(name) {
+            return Type::Enum(name.to_string());
+        }
+
+        if let Some(alias_decl) = self.alias_defs.get(name) {
+            if trail.iter().any(|segment| segment == name) {
+                return Type::Error;
+            }
+            trail.push(name.to_string());
+            let resolved = self.resolve_known_type_name_inner(&alias_decl.target.name, trail);
+            trail.pop();
+            return resolved;
+        }
+
+        if is_framework_type_name(name) {
             Type::Unknown
         } else {
             Type::Unknown
         }
+    }
+
+    fn validate_alias_target(&mut self, alias_decl: &TypeAliasDecl, trail: &mut Vec<String>) -> Type {
+        if trail.iter().any(|segment| segment == &alias_decl.name) {
+            self.errors.push(Diagnostic::error(
+                "E2210",
+                format!("cyclic type alias `{}`", alias_decl.name),
+                alias_decl.span,
+            ));
+            return Type::Error;
+        }
+
+        trail.push(alias_decl.name.clone());
+        let target_name = alias_decl.target.name.clone();
+        let resolved = if let Some(next_alias) = self.alias_defs.get(&target_name).cloned() {
+            self.validate_alias_target(&next_alias, trail)
+        } else {
+            let resolved = self.resolve_known_type_name(&alias_decl.target.name);
+            if resolved == Type::Unknown {
+                self.errors.push(Diagnostic::error(
+                    "E1004",
+                    format!("unknown type `{}`", alias_decl.target.name),
+                    alias_decl.target.span,
+                ));
+                Type::Error
+            } else {
+                resolved
+            }
+        };
+        trail.pop();
+        resolved
+    }
+
+    fn analyse_alias(&mut self, alias_decl: &TypeAliasDecl) -> Option<HirTypeAlias> {
+        let target = self.validate_alias_target(alias_decl, &mut Vec::new());
+        Some(HirTypeAlias {
+            name: alias_decl.name.clone(),
+            target,
+            span: alias_decl.span,
+        })
     }
 
     fn analyse_struct(&mut self, struct_decl: &StructDecl) -> Option<HirStruct> {
@@ -2080,6 +2162,28 @@ mod tests {
         let src = "fn main() -> i32:\n    match 42:\n        _:\n            return 0\n";
         let errs = check_source(src).unwrap_err();
         assert!(errs.iter().any(|e| e.code == "E2201"));
+    }
+
+    #[test]
+    fn test_type_alias_resolves_to_underlying_type() {
+        let src = "type UserId = i64\n\nfn main() -> i32:\n    let id: UserId = 7\n    return id\n";
+        let hir = check_source(src).unwrap();
+        assert_eq!(hir.aliases.len(), 1);
+        assert_eq!(hir.aliases[0].target, Type::I64);
+    }
+
+    #[test]
+    fn test_unknown_type_alias_target_is_rejected() {
+        let src = "type UserId = MissingType\n\nfn main() -> i32:\n    return 0\n";
+        let errs = check_source(src).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E1004"));
+    }
+
+    #[test]
+    fn test_cyclic_type_alias_is_rejected() {
+        let src = "type UserId = AccountId\ntype AccountId = UserId\n\nfn main() -> i32:\n    return 0\n";
+        let errs = check_source(src).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2210"));
     }
 }
 

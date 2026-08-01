@@ -11,6 +11,7 @@ pub enum TokenKind {
     Use,
     Struct,
     Enum,
+    Type,
     Class,
     Extends,
     Let,
@@ -306,6 +307,7 @@ impl<'a> Lexer<'a> {
             "use" => TokenKind::Use,
             "struct" => TokenKind::Struct,
             "enum" => TokenKind::Enum,
+            "type" => TokenKind::Type,
             "class" => TokenKind::Class,
             "extends" => TokenKind::Extends,
             "let" => TokenKind::Let,
@@ -527,5 +529,12 @@ mod tests {
         );
         let t = lex(&s).unwrap();
         assert!(t.iter().any(|x| x.kind == TokenKind::Match));
+    }
+
+    #[test]
+    fn lexes_type_alias_keyword() {
+        let s = SourceFile::new("x.agi", "type UserId = i64\n");
+        let t = lex(&s).unwrap();
+        assert!(t.iter().any(|x| x.kind == TokenKind::Type));
     }
 }

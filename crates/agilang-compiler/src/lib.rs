@@ -4,7 +4,7 @@ pub use agilang_diagnostics::Diagnostic;
 pub use agilang_lexer::{Token, TokenKind};
 pub use agilang_source::SourceFile;
 
-use agilang_ast::{EnumDecl, Function, ImportDecl, ModuleDecl, StructDecl};
+use agilang_ast::{EnumDecl, Function, ImportDecl, ModuleDecl, StructDecl, TypeAliasDecl};
 use agilang_source::Span;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -56,6 +56,7 @@ fn build_module_graph(entry: &SourceFile) -> Result<ModuleGraph, Vec<Diagnostic>
     let mut functions = vec![];
     let mut structs = vec![];
     let mut enums = vec![];
+    let mut aliases = vec![];
     let mut imports = vec![];
     let mut module_name = None;
     let mut module_order = HashMap::<PathBuf, usize>::new();
@@ -71,6 +72,7 @@ fn build_module_graph(entry: &SourceFile) -> Result<ModuleGraph, Vec<Diagnostic>
         &mut imports,
         &mut structs,
         &mut enums,
+        &mut aliases,
         &mut functions,
         &mut diagnostics,
     );
@@ -82,6 +84,7 @@ fn build_module_graph(entry: &SourceFile) -> Result<ModuleGraph, Vec<Diagnostic>
                 imports,
                 structs,
                 enums,
+                aliases,
                 functions,
             },
         })
@@ -102,6 +105,7 @@ fn load_module_recursive(
     collected_imports: &mut Vec<ImportDecl>,
     collected_structs: &mut Vec<StructDecl>,
     collected_enums: &mut Vec<EnumDecl>,
+    collected_aliases: &mut Vec<TypeAliasDecl>,
     collected_functions: &mut Vec<Function>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
@@ -191,6 +195,7 @@ fn load_module_recursive(
             collected_imports,
             collected_structs,
             collected_enums,
+            collected_aliases,
             collected_functions,
             diagnostics,
         );
@@ -205,6 +210,7 @@ fn load_module_recursive(
     }
     collected_structs.extend(program.structs);
     collected_enums.extend(program.enums);
+    collected_aliases.extend(program.aliases);
     collected_functions.extend(program.functions);
 }
 
@@ -285,6 +291,7 @@ mod tests {
         assert!(program.imports.is_empty());
         assert!(program.structs.is_empty());
         assert!(program.enums.is_empty());
+        assert!(program.aliases.is_empty());
         assert_eq!(program.functions.len(), 1);
     }
 
@@ -363,6 +370,33 @@ mod tests {
         let source = SourceFile::load(root.join("app").join("Main.agi")).unwrap();
         let hir = hir(&source).unwrap();
         assert_eq!(hir.enums.len(), 1);
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn resolves_imported_type_aliases_across_files() {
+        let root = unique_temp_dir("aliases");
+        fs::create_dir_all(root.join("app").join("Models")).unwrap();
+        fs::write(
+            root.join("agilang.toml"),
+            "[project]\nname='demo'\nversion='0.1.0'\n\n[application]\nentry='app/Main.agi'\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("app").join("Main.agi"),
+            "module App.Main\nimport App.Models.UserId\n\nfn main() -> i32:\n    let id: UserId = 7\n    return id\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("app").join("Models").join("UserId.agi"),
+            "module App.Models.UserId\n\ntype UserId = i32\n",
+        )
+        .unwrap();
+
+        let source = SourceFile::load(root.join("app").join("Main.agi")).unwrap();
+        let hir = hir(&source).unwrap();
+        assert_eq!(hir.aliases.len(), 1);
+        assert_eq!(hir.functions.len(), 1);
         fs::remove_dir_all(root).ok();
     }
 

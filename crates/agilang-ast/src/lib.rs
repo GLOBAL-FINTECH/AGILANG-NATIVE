@@ -7,6 +7,7 @@ pub struct Program {
     pub imports: Vec<ImportDecl>,
     pub structs: Vec<StructDecl>,
     pub enums: Vec<EnumDecl>,
+    pub aliases: Vec<TypeAliasDecl>,
     pub functions: Vec<Function>,
 }
 
@@ -46,6 +47,13 @@ pub struct EnumDecl {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumVariant {
     pub name: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeAliasDecl {
+    pub name: String,
+    pub target: TypeRef,
     pub span: Span,
 }
 

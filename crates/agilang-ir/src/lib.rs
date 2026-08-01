@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct HirProgram {
     pub structs: Vec<HirStruct>,
     pub enums: Vec<HirEnum>,
+    pub aliases: Vec<HirTypeAlias>,
     pub functions: Vec<HirFunction>,
 }
 
@@ -54,6 +55,13 @@ pub enum HirMatchPattern {
     Wildcard {
         span: Span,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirTypeAlias {
+    pub name: String,
+    pub target: Type,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
