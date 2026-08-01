@@ -1,0 +1,124 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/agilang-runtime-core",
+  "crates/agilang-runtime-async",
+  "crates/agilang-runtime-platform",
+  "crates/agilang-runtime-compute",
+  "crates/agilang-runtime-accelerator",
+  "crates/agilang-runtime-crypto",
+  "crates/agilang-runtime-resource",
+  "crates/agilang-runtime-realtime",
+  "crates/agilang-runtime-webrtc",
+  "crates/agilang-runtime-http",
+  "crates/agilang-runtime-llm",
+  "crates/agilang-runtime-evm",
+  "crates/agilang-runtime-abi",
+  "crates/agilang-runtime-cli",
+  "crates/agilang-compat-audit",
+  "crates/agilang-source",
+  "crates/agilang-diagnostics",
+  "crates/agilang-lexer",
+  "crates/agilang-ast",
+  "crates/agilang-parser",
+  "crates/agilang-compiler",
+  "crates/agilang-native-cli",
+  "crates/agilang-types",
+  "crates/agilang-symbols",
+  "crates/agilang-ir",
+  "crates/agilang-semantic",
+  "crates/agilang-codegen-c",
+  "crates/agilang-linker",
+  "crates/agilang-project-generator",
+  "crates/agilang-build",
+  "crates/agilang-framework-core",
+  "crates/agilang-framework-config",
+  "crates/agilang-framework-container",
+  "crates/agilang-framework-http",
+  "crates/agilang-framework-routing",
+  "crates/agilang-framework-middleware",
+  "crates/agilang-framework-view",
+  "crates/agilang-framework-server",
+  "crates/agilang-lsp",
+  "crates/agilang-framework-auth",
+  "crates/agilang-framework-session",
+  "crates/agilang-framework-security",
+  "crates/agilang-framework-validation",
+  "crates/agilang-framework-rate-limit",
+  "crates/agilang-framework-database",
+  "crates/agilang-framework-schema",
+  "crates/agilang-framework-migrations",
+  "crates/agilang-framework-seeding",
+  "crates/agilang-database-driver",
+  "crates/agilang-database-sqlite",
+  "crates/agilang-database-postgres",
+  "crates/agilang-database-mysql",
+  "crates/agilang-database-pool",
+  "crates/agilang-database-transactions",
+  "crates/agilang-database-agidb",
+  "crates/agilang-database-storage",
+  "crates/agilang-database-wal",
+  "crates/agilang-database-recovery",
+  "crates/agilang-database-index",
+  "crates/agilang-database-agtp",
+  "crates/agilang-database-security-kernel",
+  "crates/agilang-database-vault",
+  "crates/agilang-database-crypto",
+  "crates/agilang-database-keyring",
+  "crates/agilang-database-audit",
+  "crates/agilang-database-sql",
+  "crates/agilang-database-parser",
+  "crates/agilang-database-planner",
+  "crates/agilang-database-prepared",
+  "crates/agilang-database-policy",
+  "crates/agilang-database-query-security",
+  "crates/agilang-database-identity",
+  "crates/agilang-database-auth",
+  "crates/agilang-database-session",
+  "crates/agilang-database-transport",
+  "crates/agilang-database-ipc",
+  "crates/agilang-database-tcp",
+  "crates/agilang-database-mysql-gateway",
+  "crates/agilang-database-mvcc",
+  "crates/agilang-database-scheduler",
+  "crates/agilang-database-group-commit",
+  "crates/agilang-database-page-cache",
+  "crates/agilang-database-blockchain-store",
+  "crates/agilang-database-snapshot",
+  "crates/agilang-database-benchmark",
+  "crates/agilang-ags-lexer",
+  "crates/agilang-ags-ast",
+  "crates/agilang-ags-parser",
+  "crates/agilang-view-ir",
+  "crates/agilang-ags-semantic", "crates/agilang-ags-ssr", "crates/agilang-ags-hydration", "crates/agilang-ags-plugins",
+  "crates/agilang-agi-ags-bridge",
+  "crates/agilang-ags-compiler",
+  "crates/agilang-sibaq-integration",
+  "crates/agilang-vault-core",
+]
+
+[workspace.package]
+version = "0.7.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["AGILANG Project"]
+rust-version = "1.81"
+repository = "https://github.com/GLOBAL-FINTECH/agilang"
+
+[workspace.dependencies]
+anyhow = "1.0"
+bytes = { version = "1.7", features = ["serde"] }
+once_cell = "1.20"
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "time", "sync", "net", "fs", "io-util", "signal"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+argon2 = { version = "0.5", features = ["std"] }
+base64 = "0.22"
+rand_core = { version = "0.6", features = ["getrandom"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2"] }
+url = "2.5"
+zeroize = { version = "1.8", features = ["derive"] }

@@ -1,0 +1,6 @@
+fn main() -> i32:
+    let chain_id: i64 = 1990
+    let active: bool = true
+    let name: string = "SIBAQ"
+    print(name)
+    return 0

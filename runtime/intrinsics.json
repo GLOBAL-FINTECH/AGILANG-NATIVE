@@ -1,0 +1,81 @@
+{
+  "schema": "AGILANG-NATIVE-INTRINSICS-1",
+  "version": "0.7.0",
+  "intrinsics": [
+    {
+      "name": "compute.capabilities",
+      "abi": "agi_compute_capabilities_json",
+      "effect": "system-read"
+    },
+    {
+      "name": "accelerator.devices",
+      "abi": "agi_accelerator_capabilities_json",
+      "effect": "system-read"
+    },
+    {
+      "name": "tensor.create_f64",
+      "abi": "agi_tensor_create_f64",
+      "effect": "allocate"
+    },
+    {
+      "name": "tensor.matmul",
+      "abi": "agi_tensor_matmul",
+      "effect": "allocate,compute"
+    },
+    {
+      "name": "tensor.relu",
+      "abi": "agi_tensor_relu",
+      "effect": "allocate,compute"
+    },
+    {
+      "name": "tensor.softmax",
+      "abi": "agi_tensor_softmax",
+      "effect": "allocate,compute"
+    },
+    {
+      "name": "crypto.sha256",
+      "abi": "agi_crypto_sha256",
+      "effect": "compute"
+    },
+    {
+      "name": "crypto.hmac_sha256",
+      "abi": "agi_crypto_hmac_sha256",
+      "effect": "compute,secret-read"
+    },
+    {
+      "name": "crypto.random",
+      "abi": "agi_crypto_random",
+      "effect": "os-random"
+    },
+    {
+      "name": "crypto.constant_time_eq",
+      "abi": "agi_crypto_constant_time_eq",
+      "effect": "compute,secret-read"
+    },
+    {
+      "name": "resource.capabilities",
+      "abi": "agi_resource_capabilities_json",
+      "effect": "system-read"
+    },
+    {
+      "name": "webrtc.capabilities",
+      "abi": "agi_webrtc_capabilities_json",
+      "effect": "system-read"
+    },
+    {
+      "name": "http.request",
+      "abi": "agi_http_request_json",
+      "effect": "network"
+    },
+    {
+      "name": "realtime.websocket.connect",
+      "runtime": "agilang-runtime-realtime",
+      "effect": "network"
+    },
+    {
+      "name": "compute.storage_tier",
+      "runtime": "agilang-runtime-resource",
+      "effect": "system-read"
+    }
+  ]
+}

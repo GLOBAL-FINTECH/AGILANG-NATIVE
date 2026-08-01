@@ -1,0 +1,6 @@
+fn main() -> i32:
+    print("Testing HTTP/HTTPS GET JSON...")
+    let telemetry: string = http.get_json("https://rpc.sibaq.us/api/status")
+    print("Response:")
+    print(telemetry)
+    return 0

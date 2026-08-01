@@ -1,0 +1,6 @@
+fn authorize_transfer(user, account):
+    if not user["authenticated"]:
+        return {"ok": false, "error": "authentication_required"}
+    if account["owner_id"] != user["id"]:
+        return {"ok": false, "error": "forbidden"}
+    return {"ok": true}

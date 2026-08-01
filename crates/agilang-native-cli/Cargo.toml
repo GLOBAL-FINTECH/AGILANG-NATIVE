@@ -1,0 +1,34 @@
+[package]
+name = "agilang-native-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "agilang"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+agilang-compiler = { path = "../agilang-compiler" }
+agilang-types = { path = "../agilang-types" }
+agilang-symbols = { path = "../agilang-symbols" }
+agilang-ir = { path = "../agilang-ir" }
+agilang-build = { path = "../agilang-build" }
+agilang-project-generator = { path = "../agilang-project-generator" }
+agilang-framework-server = { path = "../agilang-framework-server" }
+agilang-framework-routing = { path = "../agilang-framework-routing" }
+agilang-framework-view = { path = "../agilang-framework-view" }
+agilang-framework-http = { path = "../agilang-framework-http" }
+agilang-lsp = { path = "../agilang-lsp" }
+agilang-framework-migrations = { path = "../agilang-framework-migrations" }
+agilang-database-benchmark = { path = "../agilang-database-benchmark" }
+chrono = "0.4"
+agilang-ags-compiler = { path = "../agilang-ags-compiler" }
+agilang-agi-ags-bridge = { path = "../agilang-agi-ags-bridge" }
+serde_json.workspace = true
+agilang-database-tcp = { path = "../agilang-database-tcp" }
+agilang-database-identity = { path = "../agilang-database-identity" }
+agilang-database-security-kernel = { path = "../agilang-database-security-kernel" }
+agilang-database-mysql-gateway = { path = "../agilang-database-mysql-gateway" }

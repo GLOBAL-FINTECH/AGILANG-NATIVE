@@ -1,0 +1,95 @@
+@page
+    title="Smart Chain Dashboard"
+    seo_description="Live Smart Chain execution and validator status."
+
+@live chain: ChainStatus
+    from "/api/status"
+    every 1000
+    initial server
+    retry exponential
+    timeout 5000
+
+<main class="shell explorer-shell">
+    <header class="explorer-header">
+        <div>
+            <p class="eyebrow">Canonical Intelligence Layer</p>
+            <h1>SIBAQ Smart Chain</h1>
+            <p>
+                Every canonical transaction, receipt, state transition,
+                and proof root live from the chain database.
+            </p>
+        </div>
+
+        <div class="network-pill">
+            <i></i>
+            <span>{{ chain.status }}</span>
+            <small>Chain {{ chain.chain_id }}</small>
+        </div>
+    </header>
+
+    <section class="stats">
+        <article>
+            <span>Block height</span>
+            <strong>{{ chain.height }}</strong>
+        </article>
+
+        <article>
+            <span>Finalized</span>
+            <strong>{{ chain.finalized_height }}</strong>
+        </article>
+
+        <article>
+            <span>Validators</span>
+            <strong>{{ chain.validator_count }}</strong>
+        </article>
+
+        <article>
+            <span>Status</span>
+            <strong>{{ chain.status }}</strong>
+        </article>
+
+        <article>
+            <span>Transactions</span>
+            <strong>{{ chain.transaction_count }}</strong>
+        </article>
+    </section>
+
+    <section class="card-grid">
+        <article class="card">
+            <span>Chain ID</span>
+            <strong>{{ chain.chain_id }}</strong>
+        </article>
+
+        <article class="card">
+            <span>Symbol</span>
+            <strong>{{ chain.symbol }}</strong>
+        </article>
+
+        <article class="card">
+            <span>Consensus</span>
+            <strong>{{ chain.consensus }}</strong>
+        </article>
+    </section>
+
+    <section class="head-card">
+        <span>Canonical head</span>
+        <code>{{ chain.head_hash }}</code>
+    </section>
+</main>
+
+@loading chain:
+    <section class="status-panel">
+        <p>Connecting to SIBAQ Smart Chain...</p>
+    </section>
+
+@error chain as error:
+    <section class="status-panel error">
+        <h2>Chain telemetry unavailable</h2>
+        <p>{{ error.message }}</p>
+        <button on:click="chain.retry">Retry</button>
+    </section>
+
+@stale chain:
+    <span class="stale-indicator">
+        Last update {{ chain.last_success_at }}
+    </span>

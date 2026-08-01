@@ -1,0 +1,14 @@
+[package]
+name = "agilang-database-tcp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+agilang-database-transport = { path = "../agilang-database-transport" }
+serde_json = { workspace = true }
+agilang-database-auth = { path = "../agilang-database-auth" }
+agilang-database-identity = { path = "../agilang-database-identity" }
+agilang-database-security-kernel = { path = "../agilang-database-security-kernel" }
+agilang-database-session = { path = "../agilang-database-session" }

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "AGILANG AGS",
+  "scopeName": "text.agilang.ags",
+  "patterns": [
+    {
+      "name": "meta.embedded.expression.ags",
+      "begin": "{{",
+      "end": "}}",
+      "patterns": [
+        {
+          "include": "source.agilang"
+        }
+      ]
+    },
+    {
+      "name": "meta.embedded.block.ags",
+      "begin": "<script\\s+ags>",
+      "end": "</script>",
+      "patterns": [
+        {
+          "include": "source.agilang"
+        }
+      ]
+    },
+    {
+      "include": "text.html.basic"
+    }
+  ]
+}

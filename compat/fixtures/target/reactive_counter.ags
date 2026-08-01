@@ -1,0 +1,6 @@
+<script ags>
+state count = 0
+fn increment():
+    count = count + 1
+</script>
+<button on:click="increment">Count: {{ count }}</button>

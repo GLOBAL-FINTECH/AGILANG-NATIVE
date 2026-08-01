@@ -1,0 +1,12 @@
+[package]
+name = "agilang-runtime-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+agilang-runtime-core = { path = "../agilang-runtime-core" }
+rand_core.workspace = true
+zeroize.workspace = true
+serde.workspace = true

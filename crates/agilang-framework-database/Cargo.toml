@@ -1,0 +1,12 @@
+[package]
+name = "agilang-framework-database"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+agilang-database-agidb = { path = "../agilang-database-agidb" }
+agilang-database-driver = { path = "../agilang-database-driver" }

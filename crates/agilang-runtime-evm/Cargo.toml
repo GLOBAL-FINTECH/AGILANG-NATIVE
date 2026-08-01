@@ -1,0 +1,10 @@
+[package]
+name = "agilang-runtime-evm"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agilang-runtime-core = { path = "../agilang-runtime-core" }
+agilang-runtime-http = { path = "../agilang-runtime-http" }
+serde = { workspace = true }
+serde_json = { workspace = true }

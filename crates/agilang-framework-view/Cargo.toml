@@ -1,0 +1,8 @@
+[package]
+name = "agilang-framework-view"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agilang-agi-ags-bridge = { path = "../agilang-agi-ags-bridge" }
+agilang-ags-compiler = { path = "../agilang-ags-compiler" }

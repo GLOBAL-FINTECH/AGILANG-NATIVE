@@ -1,0 +1,6 @@
+[package]
+name = "agilang-framework-http"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

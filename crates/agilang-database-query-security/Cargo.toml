@@ -1,0 +1,13 @@
+[package]
+name = "agilang-database-query-security"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+agilang-database-sql = { path = "../agilang-database-sql" }
+agilang-database-parser = { path = "../agilang-database-parser" }
+agilang-database-planner = { path = "../agilang-database-planner" }
+agilang-database-prepared = { path = "../agilang-database-prepared" }
+agilang-database-policy = { path = "../agilang-database-policy" }

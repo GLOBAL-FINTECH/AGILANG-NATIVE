@@ -1,0 +1,41 @@
+{
+  "name": "agilang-language",
+  "displayName": "AGILANG Language Support",
+  "description": "Language support for AGILANG (.agi) and AGILANG Reactive Template (.ags) files",
+  "version": "0.3.0",
+  "publisher": "agilang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "agilang",
+        "aliases": ["AGILANG", "agilang"],
+        "extensions": [".agi"],
+        "configuration": "./language-configuration/agilang.json"
+      },
+      {
+        "id": "agilang-template",
+        "aliases": ["AGILANG Reactive Template", "AGS"],
+        "extensions": [".ags"],
+        "configuration": "./language-configuration/agilang-template.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "agilang",
+        "scopeName": "source.agi",
+        "path": "./syntaxes/agilang.tmLanguage.json"
+      },
+      {
+        "language": "agilang-template",
+        "scopeName": "source.ags",
+        "path": "./syntaxes/agilang-template.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "name": "agilang-language-support",
+  "displayName": "AGILANG Language Support",
+  "description": "Native AGI and AGS syntax highlighting, language identifiers, icons and editor integration.",
+  "version": "0.5.0",
+  "publisher": "global-fintech",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "icon": "icons/agilang-logo.png",
+  "contributes": {
+    "languages": [
+      {
+        "id": "agilang",
+        "aliases": [
+          "AGILANG",
+          "AGI"
+        ],
+        "extensions": [
+          ".agi"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/agilang-logo.png",
+          "dark": "./icons/agilang-logo.png"
+        }
+      },
+      {
+        "id": "agilang-ags",
+        "aliases": [
+          "AGILANG AGS",
+          "AGS"
+        ],
+        "extensions": [
+          ".ags"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/ags-logo.png",
+          "dark": "./icons/ags-logo.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "agilang",
+        "scopeName": "source.agilang",
+        "path": "./syntaxes/agilang.tmLanguage.json"
+      },
+      {
+        "language": "agilang-ags",
+        "scopeName": "text.agilang.ags",
+        "path": "./syntaxes/ags.tmLanguage.json"
+      }
+    ]
+  }
+}
+

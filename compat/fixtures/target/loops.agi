@@ -1,0 +1,5 @@
+fn sum_transactions(items):
+    let total = 0
+    for item in items:
+        total = total + item["amount"]
+    return total

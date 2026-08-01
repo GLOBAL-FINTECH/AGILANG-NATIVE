@@ -1,0 +1,17 @@
+[package]
+name = "agilang-lsp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+agilang-source = { path = "../agilang-source" }
+agilang-lexer = { path = "../agilang-lexer" }
+agilang-parser = { path = "../agilang-parser" }
+agilang-semantic = { path = "../agilang-semantic" }
+agilang-symbols = { path = "../agilang-symbols" }
+agilang-types = { path = "../agilang-types" }
+agilang-compiler = { path = "../agilang-compiler" }
+agilang-diagnostics = { path = "../agilang-diagnostics" }
+once_cell = { workspace = true }

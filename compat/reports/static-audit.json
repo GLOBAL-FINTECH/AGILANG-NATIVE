@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "matrix_features": 16,
+  "verified_fixtures": 3,
+  "target_fixtures": 8,
+  "errors": [],
+  "notice": "Static audit only; executable parity requires Rust and canonical differential tests."
+}

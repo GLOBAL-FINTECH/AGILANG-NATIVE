@@ -1,0 +1,49 @@
+// examples/agi/routes_api_status.agi
+// HTTP endpoint for chain status
+// Route: GET /api/status
+// Returns: JSON with current chain state or error
+
+module App.Routes.ApiStatus
+
+use Framework.Http
+use App.Blockchain.SibaqStatus
+
+@get "/api/status"
+async fn status(request: Request) -> Response:
+    match await load_chain_status():
+        Ok(chain):
+            return Response.json({
+                "ok": true,
+                "chain": chain
+            }, status=200)
+
+        Err(error):
+            match error:
+                ChainError.WrongChain { expected, received }:
+                    return Response.json({
+                        "ok": false,
+                        "error": "Chain ID mismatch",
+                        "message": "Expected chain 1990, but RPC returned " + 
+                            received.to_string()
+                    }, status=503)
+
+                ChainError.Timeout { message }:
+                    return Response.json({
+                        "ok": false,
+                        "error": "Timeout",
+                        "message": message
+                    }, status=504)
+
+                ChainError.NetworkError { message }:
+                    return Response.json({
+                        "ok": false,
+                        "error": "Network error",
+                        "message": message
+                    }, status=502)
+
+                ChainError.InvalidResponse { message }:
+                    return Response.json({
+                        "ok": false,
+                        "error": "Invalid response from RPC",
+                        "message": message
+                    }, status=503)

@@ -1,0 +1,73 @@
+// examples/agi/sibaq_status.agi
+// SIBAQ Smart Chain status provider
+// Fetches real-time chain state from https://rpc.sibaq.us
+
+module App.Blockchain.SibaqStatus
+
+use std.http
+use std.json
+use std.time
+use blockchain.evm
+
+const SIBAQ_RPC: string = "https://rpc.sibaq.us"
+const SIBAQ_CHAIN_ID: i64 = 1990
+const SIBAQ_SYMBOL: string = "SBQ"
+
+struct ChainStatus:
+    chain_id: i64
+    symbol: string
+    status: string
+    height: i64
+    finalized_height: i64
+    validator_count: i64
+    transaction_count: i64
+    consensus: string
+    head_hash: string
+    updated_at: string
+
+enum ChainError:
+    WrongChain { expected: i64, received: i64 }
+    NetworkError { message: string }
+    InvalidResponse { message: string }
+    Timeout { message: string }
+
+// load_chain_status fetches current chain state from SIBAQ RPC
+// Returns error if chain_id ≠ 1990 to prevent displaying wrong-chain data
+async fn load_chain_status() -> Result<ChainStatus, ChainError>:
+    // Create RPC client with timeout
+    let client = evm.rpc_client({
+        "url": SIBAQ_RPC,
+        "timeout_ms": 5000
+    })
+
+    // Verify we're on the correct chain
+    let chain_id = await client.chain_id()
+
+    if chain_id != SIBAQ_CHAIN_ID:
+        return Err(ChainError.WrongChain {
+            "expected": SIBAQ_CHAIN_ID,
+            "received": chain_id
+        })
+
+    // Get block number and full block data
+    let block_number = await client.block_number()
+    let block = await client.get_block_by_number(block_number, false)
+
+    // Fetch additional telemetry from /api/status endpoint
+    let telemetry = await http.get_json(
+        SIBAQ_RPC + "/api/status"
+    )
+
+    // Build normalized response
+    return Ok(ChainStatus {
+        "chain_id": chain_id,
+        "symbol": SIBAQ_SYMBOL,
+        "status": telemetry.status ?? "online",
+        "height": block_number,
+        "finalized_height": telemetry.finalized_height ?? block_number,
+        "validator_count": telemetry.validator_count ?? 0,
+        "transaction_count": telemetry.transaction_count ?? 0,
+        "consensus": telemetry.consensus ?? "Proof of Stake",
+        "head_hash": block.hash,
+        "updated_at": time.now_iso8601()
+    })

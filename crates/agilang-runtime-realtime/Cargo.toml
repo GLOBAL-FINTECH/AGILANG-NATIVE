@@ -1,0 +1,14 @@
+[package]
+name = "agilang-runtime-realtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+agilang-runtime-core = { path = "../agilang-runtime-core" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+futures-util = "0.3"
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+url.workspace = true

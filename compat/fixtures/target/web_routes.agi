@@ -1,0 +1,5 @@
+fn web_routes():
+    return [
+        {"method": "GET", "path": "/", "handler": "HomeController.index"},
+        {"method": "POST", "path": "/payments", "handler": "PaymentController.store"}
+    ]

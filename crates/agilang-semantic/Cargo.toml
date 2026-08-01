@@ -1,0 +1,17 @@
+[package]
+name = "agilang-semantic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+agilang-source = { path = "../agilang-source" }
+agilang-diagnostics = { path = "../agilang-diagnostics" }
+agilang-ast = { path = "../agilang-ast" }
+agilang-types = { path = "../agilang-types" }
+agilang-symbols = { path = "../agilang-symbols" }
+agilang-ir = { path = "../agilang-ir" }
+agilang-lexer = { path = "../agilang-lexer" }
+agilang-parser = { path = "../agilang-parser" }
+serde = { workspace = true, features = ["derive"] }

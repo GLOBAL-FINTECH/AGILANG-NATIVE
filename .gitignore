@@ -1,0 +1,15 @@
+/target
+*.log
+.DS_Store
+
+# Local development environments and generated packages
+.venv/
+build/
+.git/
+*.zip
+tmp_http_e2e/
+agilang_status_scan_app_local/
+crates/agilang-framework-seeding/storage/
+*.out
+*.err
+nul*

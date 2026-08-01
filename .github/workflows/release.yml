@@ -1,0 +1,38 @@
+name: Native Runtime Release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['runtime-v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+          - os: macos-13
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - os: macos-14
+            target: aarch64-apple-darwin
+            archive: tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo test --workspace --release --all-features --target ${{ matrix.target }}
+      - run: cargo build --workspace --release --all-features --target ${{ matrix.target }}
+      - shell: bash
+        run: ./scripts/package.sh '${{ matrix.target }}' '${{ matrix.archive }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agilang-runtime-${{ matrix.target }}
+          path: dist/*.${{ matrix.archive == 'zip' && 'zip' || 'gz' }}

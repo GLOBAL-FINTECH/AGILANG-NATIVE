@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "AGILANG",
+  "patterns": [
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#comments"
+    }
+  ],
+  "repository": {
+    "keywords": {
+      "patterns": [{
+        "name": "keyword.control.agilang",
+        "match": "\\b(fn|let|const|return|if|else|while|true|false)\\b"
+      }]
+    },
+    "strings": {
+      "name": "string.quoted.double.agilang",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.agilang",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [{
+        "name": "comment.line.number-sign.agilang",
+        "match": "#.*$"
+      }]
+    }
+  },
+  "scopeName": "source.agi"
+}

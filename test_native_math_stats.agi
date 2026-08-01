@@ -1,0 +1,15 @@
+fn main() -> i32:
+    let a = exp(1.0)
+    let b = sqrt(49.0)
+    let c = pow(2.0, 10.0)
+    let values = [1.0, 2.0, 3.0, 4.0, 5.0]
+    let mode_values = [1.0, 2.0, 2.0, 3.0, 4.0]
+    let m = mean(values)
+    let v = variance(values)
+    let d = stddev(values)
+    let md = median(values)
+    let mo = mode(mode_values)
+    let q = quantile(values, 0.5)
+    let p = percentile(values, 50.0)
+    print(a, b, c, m, v, d, md, mo, q, p)
+    return 0
