@@ -1,4 +1,5 @@
 use agilang_framework_http::HttpMethod;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Route {
@@ -11,6 +12,12 @@ pub struct Route {
 #[derive(Default)]
 pub struct Router {
     pub routes: Vec<Route>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RouteMatch<'a> {
+    pub route: &'a Route,
+    pub params: HashMap<String, String>,
 }
 
 impl Router {
@@ -27,10 +34,13 @@ impl Router {
         });
     }
 
-    pub fn match_route(&self, method: &HttpMethod, path: &str) -> Option<&Route> {
-        self.routes
-            .iter()
-            .find(|r| &r.method == method && r.path == path)
+    pub fn match_route<'a>(&'a self, method: &HttpMethod, path: &str) -> Option<RouteMatch<'a>> {
+        self.routes.iter().find_map(|route| {
+            if &route.method != method {
+                return None;
+            }
+            match_path(&route.path, path).map(|params| RouteMatch { route, params })
+        })
     }
 
     pub fn load_routes_from_file(&mut self, file_path: &std::path::Path) -> std::io::Result<()> {
@@ -60,12 +70,7 @@ impl Router {
                 current_prefix.clear();
             }
 
-            if line.contains("Route.get(") || line.contains("Route.post(") {
-                let method = if line.contains("Route.post(") {
-                    HttpMethod::Post
-                } else {
-                    HttpMethod::Get
-                };
+            if let Some(method) = parse_method(line) {
                 let path_start = line.find('"').or_else(|| line.find('\''));
                 if let Some(p_start) = path_start {
                     let sub = &line[p_start + 1..];
@@ -99,6 +104,55 @@ impl Router {
     }
 }
 
+fn parse_method(line: &str) -> Option<HttpMethod> {
+    if line.contains("Route.get(") {
+        Some(HttpMethod::Get)
+    } else if line.contains("Route.post(") {
+        Some(HttpMethod::Post)
+    } else if line.contains("Route.put(") {
+        Some(HttpMethod::Put)
+    } else if line.contains("Route.patch(") {
+        Some(HttpMethod::Patch)
+    } else if line.contains("Route.delete(") {
+        Some(HttpMethod::Delete)
+    } else {
+        None
+    }
+}
+
+fn match_path(pattern: &str, path: &str) -> Option<HashMap<String, String>> {
+    let pattern_segments = split_segments(pattern);
+    let path_segments = split_segments(path);
+    if pattern_segments.len() != path_segments.len() {
+        return None;
+    }
+
+    let mut params = HashMap::new();
+    for (pattern_segment, path_segment) in pattern_segments.iter().zip(path_segments.iter()) {
+        if let Some(name) = pattern_segment
+            .strip_prefix('{')
+            .and_then(|segment| segment.strip_suffix('}'))
+        {
+            params.insert(name.to_string(), path_segment.to_string());
+            continue;
+        }
+        if pattern_segment != path_segment {
+            return None;
+        }
+    }
+    Some(params)
+}
+
+fn split_segments(path: &str) -> Vec<&str> {
+    if path == "/" {
+        return Vec::new();
+    }
+    path.trim_matches('/')
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,14 +163,14 @@ mod tests {
         let temp_dir = std::env::temp_dir().join("agi_route_test");
         fs::create_dir_all(&temp_dir).unwrap();
 
-        let web_agi = "Route.get(\"/\", HomeController.index)\nRoute.post(\"/login\", LoginController.login)\nRoute.group(\"/api\", fn:\n    Route.get(\"/health\", HealthController.show)\n)\n";
+        let web_agi = "Route.get(\"/\", HomeController.index)\nRoute.post(\"/login\", LoginController.login)\nRoute.put(\"/posts/{id}\", PostController.update)\nRoute.group(\"/api\", fn:\n    Route.get(\"/health\", HealthController.show)\n)\n";
         let file_path = temp_dir.join("web.agi");
         fs::write(&file_path, web_agi).unwrap();
 
         let mut router = Router::new();
         router.load_routes_from_file(&file_path).unwrap();
 
-        assert_eq!(router.routes.len(), 3);
+        assert_eq!(router.routes.len(), 4);
         assert_eq!(router.routes[0].path, "/");
         assert_eq!(router.routes[0].controller, "HomeController");
         assert_eq!(router.routes[0].action, "index");
@@ -126,9 +180,20 @@ mod tests {
         assert_eq!(router.routes[1].controller, "LoginController");
         assert_eq!(router.routes[1].action, "login");
 
-        assert_eq!(router.routes[2].path, "/api/health");
-        assert_eq!(router.routes[2].controller, "HealthController");
-        assert_eq!(router.routes[2].action, "show");
+        assert_eq!(router.routes[2].method, HttpMethod::Put);
+        assert_eq!(router.routes[2].path, "/posts/{id}");
+        assert_eq!(router.routes[2].controller, "PostController");
+        assert_eq!(router.routes[2].action, "update");
+
+        assert_eq!(router.routes[3].path, "/api/health");
+        assert_eq!(router.routes[3].controller, "HealthController");
+        assert_eq!(router.routes[3].action, "show");
+
+        let route_match = router
+            .match_route(&HttpMethod::Put, "/posts/42")
+            .expect("route should match");
+        assert_eq!(route_match.route.controller, "PostController");
+        assert_eq!(route_match.params.get("id").map(String::as_str), Some("42"));
 
         fs::remove_dir_all(temp_dir).ok();
     }

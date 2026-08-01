@@ -1,3 +1,5 @@
+mod controller_runtime;
+
 use agilang_database_agidb::AgiDbConnection;
 use agilang_database_driver::{DatabaseConnection, DatabaseRow, DatabaseValue};
 use agilang_framework_auth::{Argon2idPasswordHasher, PasswordHasher, SessionToken};
@@ -465,6 +467,22 @@ fn redirect_response(location: &str) -> Response {
         status: 302,
         headers,
         body: Vec::new(),
+    }
+}
+
+fn build_json_response(status: u16, body: String) -> Response {
+    let mut response = Response::json(&body);
+    response.status = status;
+    response
+}
+
+fn build_text_response(status: u16, content_type: &str, body: String) -> Response {
+    let mut headers = HashMap::new();
+    headers.insert("Content-Type".to_string(), content_type.to_string());
+    Response {
+        status,
+        headers,
+        body: body.into_bytes(),
     }
 }
 
@@ -1677,99 +1695,19 @@ pub fn handle_client(
                 );
                 return Ok(());
             } else {
-                // Serves static files from public/ first
-                let public_path = project_root
-                    .join("public")
-                    .join(path.trim_start_matches('/'));
-                // AGS templates are executable source and must only be exposed through
-                // ViewEngine. Never serve a misplaced `.ags` file as a static asset.
-                let is_ags_source =
-                    public_path.extension().and_then(|value| value.to_str()) == Some("ags");
-                if public_path.is_file() && !path.ends_with('/') && !is_ags_source {
-                    if let Ok(content) = std::fs::read(public_path) {
-                        let ext = Path::new(path)
-                            .extension()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("");
-                        let mime = match ext {
-                            "css" => "text/css",
-                            "js" => "application/javascript",
-                            "svg" => "image/svg+xml",
-                            "png" => "image/png",
-                            "jpg" | "jpeg" => "image/jpeg",
-                            "webp" => "image/webp",
-                            "ico" => "image/x-icon",
-                            "html" => "text/html",
-                            _ => "application/octet-stream",
-                        };
-
-                        let response = format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                        mime,
-                        content.len()
-                    );
-                        stream.write_all(response.as_bytes()).ok();
-                        stream.write_all(&content).ok();
-                        stream.flush().ok();
-                        println!(
-                            "{} {:?} {} 200 {}ms",
-                            now,
-                            req.method,
-                            path,
-                            start_time.elapsed().as_millis()
-                        );
-                        return Ok(());
-                    }
-                }
-
-                // Route matching
-                match router.match_route(&req.method, path) {
-                    None => (
-                        404,
-                        "<h1>404 Not Found</h1><p>Route not defined.</p>".to_string(),
-                        "text/html; charset=utf-8",
-                    ),
-                    Some(route) => {
-                        let controllers_dir = project_root.join("app/Controllers");
-                        let controller_file =
-                            find_controller_file(&controllers_dir, &route.controller);
-
-                        if let Some(file) = controller_file {
-                            match evaluate_controller_action(&file, &route.action) {
-                                Err(e) => (
-                                    500,
-                                    format!("<h1>500 Internal Server Error</h1><pre>{}</pre>", e),
-                                    "text/html; charset=utf-8",
-                                ),
-                                Ok(ControllerResult::Html(html)) => {
-                                    (200, html, "text/html; charset=utf-8")
-                                }
-                                Ok(ControllerResult::Json(status, json)) => {
-                                    (status, json, "application/json")
-                                }
-                                Ok(ControllerResult::Render(view, data)) => {
-                                    match view_engine.render(&view, &data) {
-                                        Ok(html) => (200, html, "text/html; charset=utf-8"),
-                                        Err(e) => (
-                                            500,
-                                            format!(
-                                                "<h1>500 Internal Server Error</h1><pre>{}</pre>",
-                                                e
-                                            ),
-                                            "text/html; charset=utf-8",
-                                        ),
-                                    }
-                                }
-                            }
-                        } else {
-                            (
-                            500,
-                            format!("<h1>500 Internal Server Error</h1><p>Controller `{}` not found.</p>", route.controller),
-                            "text/html; charset=utf-8",
-                        )
-                        }
-                    }
-                }
+                let response =
+                    controller_runtime::execute_request(router, view_engine, project_root, req);
+                let status = response.status;
+                write_framework_response(&mut stream, response)?;
+                println!(
+                    "{} {:?} {} {} {}ms",
+                    now,
+                    req.method,
+                    path,
+                    status,
+                    start_time.elapsed().as_millis()
+                );
+                return Ok(());
             }
         }
     };
@@ -2094,10 +2032,13 @@ impl CertificateGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agilang_framework_database::{DatabaseConfig, FrameworkDriver};
+    use agilang_framework_migrations::{MigrationExecutor, MigrationFile};
+    use agilang_project_generator::{generate_project, make_component};
     use std::fs;
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
     use std::path::PathBuf;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex, OnceLock};
     use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -2155,6 +2096,11 @@ mod tests {
         );
         let engine = ViewEngine::new(views);
         (root, engine)
+    }
+
+    fn project_generation_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
     }
 
     fn request(
@@ -2217,6 +2163,47 @@ mod tests {
         handle_auth_request(&req, view_engine, project_root)
             .unwrap()
             .expect("auth route should be handled")
+    }
+
+    fn invoke_app(project_root: &Path, req: Request) -> Response {
+        let mut router = Router::new();
+        router
+            .load_routes_from_file(&project_root.join("routes/web.agi"))
+            .unwrap();
+        router
+            .load_routes_from_file(&project_root.join("routes/api.agi"))
+            .unwrap();
+        let engine = ViewEngine::new(project_root.join("resources/views"));
+        controller_runtime::execute_request(&router, &engine, project_root, &req)
+    }
+
+    fn json_request(
+        method: HttpMethod,
+        path: &str,
+        cookie: Option<&str>,
+        csrf: Option<&str>,
+        body: &str,
+        ip_octet: u8,
+    ) -> Request {
+        let mut headers = HashMap::new();
+        headers.insert("content-type".to_string(), "application/json".to_string());
+        if let Some(cookie) = cookie {
+            headers.insert("cookie".to_string(), cookie.to_string());
+        }
+        if let Some(csrf) = csrf {
+            headers.insert("x-csrf-token".to_string(), csrf.to_string());
+        }
+        Request {
+            method,
+            path: path.to_string(),
+            query: HashMap::new(),
+            headers,
+            body: body.as_bytes().to_vec(),
+            remote_addr: Some(SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::new(127, 0, 0, ip_octet),
+                5000 + ip_octet as u16,
+            ))),
+        }
     }
 
     fn cookie_from(response: &Response) -> String {
@@ -2309,6 +2296,230 @@ mod tests {
     fn user_rows(project_root: &Path) -> Vec<DatabaseRow> {
         let mut conn = open_auth_db(project_root).unwrap();
         conn.query("SELECT * FROM users", &[]).unwrap()
+    }
+
+    fn setup_generated_post_project(name: &str, driver: FrameworkDriver) -> PathBuf {
+        let _lock = project_generation_lock().lock().unwrap();
+        let root = unique_test_root(name);
+        let root_str = root.to_string_lossy().to_string();
+        generate_project(&root_str, "web").unwrap();
+
+        let previous = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&root).unwrap();
+        make_component("resource", "Post", true).unwrap();
+        std::env::set_current_dir(&previous).unwrap();
+
+        let api_routes = r#"use Framework.Routing.Route
+use App.Controllers.Api.HealthController
+use App.Controllers.PostController
+
+fn register_api() -> void:
+    Route.group("/api", fn:
+        Route.get("/health", HealthController.show)
+        Route.get("/posts", PostController.index)
+        Route.get("/posts/{id}", PostController.show)
+        Route.post("/posts", PostController.store)
+        Route.put("/posts/{id}", PostController.update)
+        Route.delete("/posts/{id}", PostController.destroy)
+        Route.post("/posts/{id}/restore", PostController.restore)
+    )
+"#;
+        fs::write(root.join("routes/api.agi"), api_routes).unwrap();
+
+        let model_path = root.join("app/Models/Post.agi");
+        let model = fs::read_to_string(&model_path).unwrap();
+        fs::write(&model_path, model.replace("hidden = []", "hidden = [\"deleted_at\"]")).unwrap();
+
+        if driver == FrameworkDriver::Sqlite {
+            let config_path = root.join("config/database.agi");
+            let config = fs::read_to_string(&config_path).unwrap();
+            fs::write(
+                &config_path,
+                config.replacen("\"default\": \"agidb\"", "\"default\": \"sqlite\"", 1),
+            )
+            .unwrap();
+        }
+
+        root
+    }
+
+    fn post_database_config(project_root: &Path, driver: FrameworkDriver) -> DatabaseConfig {
+        match driver {
+            FrameworkDriver::Agidb => DatabaseConfig::agidb(
+                project_root
+                    .join("storage/database/main.agidb")
+                    .to_string_lossy(),
+            ),
+            FrameworkDriver::Sqlite => DatabaseConfig::sqlite(
+                project_root
+                    .join("storage/database/main.sqlite")
+                    .to_string_lossy(),
+            ),
+            FrameworkDriver::Mysql => unreachable!("mysql lane is not part of this default test"),
+        }
+    }
+
+    fn post_migration_file() -> MigrationFile {
+        MigrationFile::new(
+            "20260801_create_posts_table",
+            vec![
+                "CREATE TABLE posts (id INTEGER, name TEXT, created_at TEXT, updated_at TEXT, deleted_at TEXT)"
+                    .to_string(),
+            ],
+            vec!["DROP TABLE IF EXISTS posts".to_string()],
+            "create posts table",
+        )
+    }
+
+    fn promote_user_to_admin(project_root: &Path, email: &str) {
+        let mut conn = open_auth_db(project_root).unwrap();
+        conn.execute(
+            "UPDATE users SET role = ? WHERE email = ?",
+            &[
+                DatabaseValue::Text("admin".to_string()),
+                DatabaseValue::Text(email.to_string()),
+            ],
+        )
+        .unwrap();
+    }
+
+    fn run_generated_post_flow(driver: FrameworkDriver, name: &str) {
+        clear_auth_runtime_state();
+        let root = setup_generated_post_project(name, driver.clone());
+        let config = post_database_config(&root, driver);
+        let mut executor = MigrationExecutor::connect(&config).unwrap();
+        executor.run_migrations(&[post_migration_file()], false).unwrap();
+
+        let unauthorized = invoke_app(
+            &root,
+            json_request(HttpMethod::Post, "/api/posts", None, None, r#"{"name":"Nope"}"#, 60),
+        );
+        assert_eq!(unauthorized.status, 403, "{}", response_text(&unauthorized));
+
+        let email = format!("{name}@example.com");
+        let engine = ViewEngine::new(root.join("resources/views"));
+        let auth_cookie = register_user(&root, &engine, 61, &email, "Password123!", "Poster");
+        promote_user_to_admin(&root, &email);
+
+        let dashboard = invoke(
+            &root,
+            &engine,
+            request(HttpMethod::Get, "/dashboard", Some(&auth_cookie), None, 61),
+        );
+        let csrf = csrf_from(&dashboard);
+
+        let csrf_denied = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/posts",
+                Some(&auth_cookie),
+                None,
+                r#"{"name":"Missing Csrf"}"#,
+                61,
+            ),
+        );
+        assert_eq!(csrf_denied.status, 403);
+
+        let invalid = invoke_app(
+            &root,
+            json_request(HttpMethod::Post, "/api/posts", Some(&auth_cookie), Some(&csrf), "{}", 61),
+        );
+        assert_eq!(invalid.status, 422, "{}", response_text(&invalid));
+
+        let create = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/posts",
+                Some(&auth_cookie),
+                Some(&csrf),
+                r#"{"name":"First Post","deleted_at":"2020-01-01T00:00:00Z"}"#,
+                61,
+            ),
+        );
+        assert_eq!(create.status, 201, "{}", response_text(&create));
+        let created: serde_json::Value = serde_json::from_str(&response_text(&create)).unwrap();
+        let post_id = created["data"]["id"].as_i64().unwrap();
+        assert_eq!(created["data"]["name"], "First Post");
+        assert!(created["data"].get("deleted_at").is_none());
+
+        let list = invoke_app(&root, request(HttpMethod::Get, "/api/posts", None, None, 62));
+        assert_eq!(list.status, 200);
+        assert!(response_text(&list).contains("First Post"));
+
+        let show = invoke_app(
+            &root,
+            request(HttpMethod::Get, &format!("/api/posts/{post_id}"), None, None, 62),
+        );
+        assert_eq!(show.status, 200);
+        assert!(response_text(&show).contains("First Post"));
+        assert!(!response_text(&show).contains("deleted_at"));
+
+        let missing = invoke_app(&root, request(HttpMethod::Get, "/api/posts/999999", None, None, 62));
+        assert_eq!(missing.status, 404);
+
+        let update = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Put,
+                &format!("/api/posts/{post_id}"),
+                Some(&auth_cookie),
+                Some(&csrf),
+                r#"{"name":"Updated Post","created_at":"tampered"}"#,
+                61,
+            ),
+        );
+        assert_eq!(update.status, 200, "{}", response_text(&update));
+        assert!(response_text(&update).contains("Updated Post"));
+        assert!(!response_text(&update).contains("tampered"));
+
+        let delete = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Delete,
+                &format!("/api/posts/{post_id}"),
+                Some(&auth_cookie),
+                Some(&csrf),
+                "{}",
+                61,
+            ),
+        );
+        assert_eq!(delete.status, 200);
+
+        let after_delete = invoke_app(
+            &root,
+            request(HttpMethod::Get, &format!("/api/posts/{post_id}"), None, None, 62),
+        );
+        assert_eq!(after_delete.status, 404);
+
+        let restore = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                &format!("/api/posts/{post_id}/restore"),
+                Some(&auth_cookie),
+                Some(&csrf),
+                "{}",
+                61,
+            ),
+        );
+        assert_eq!(restore.status, 200, "{}", response_text(&restore));
+
+        let after_restore = invoke_app(
+            &root,
+            request(HttpMethod::Get, &format!("/api/posts/{post_id}"), None, None, 62),
+        );
+        assert_eq!(after_restore.status, 200);
+        assert!(response_text(&after_restore).contains("Updated Post"));
+
+        let after_restart = invoke_app(
+            &root,
+            request(HttpMethod::Get, &format!("/api/posts/{post_id}"), None, None, 62),
+        );
+        assert_eq!(after_restart.status, 200);
+
+        fs::remove_dir_all(root).ok();
     }
 
     #[test]
@@ -2816,5 +3027,15 @@ mod tests {
             .contains("Max-Age=0"));
 
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn generated_post_resource_executes_end_to_end_on_agidb() {
+        run_generated_post_flow(FrameworkDriver::Agidb, "generated_post_agidb");
+    }
+
+    #[test]
+    fn generated_post_resource_executes_end_to_end_on_sqlite() {
+        run_generated_post_flow(FrameworkDriver::Sqlite, "generated_post_sqlite");
     }
 }
