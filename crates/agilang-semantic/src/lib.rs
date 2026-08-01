@@ -1,9 +1,13 @@
-use agilang_ast::{BinaryOp, Expr, Function, Program, Stmt, TypeRef};
+use agilang_ast::{BinaryOp, Expr, Function, Program, Stmt, StructDecl, TypeRef};
 use agilang_diagnostics::Diagnostic;
-use agilang_ir::{HirBinaryOp, HirExpr, HirFunction, HirParameter, HirProgram, HirStmt};
+use agilang_ir::{
+    HirBinaryOp, HirExpr, HirFunction, HirParameter, HirProgram, HirStmt, HirStruct,
+    HirStructField,
+};
 use agilang_source::Span;
 use agilang_symbols::{Symbol, SymbolKind, SymbolTable};
 use agilang_types::{FunctionType, Type};
+use std::collections::HashMap;
 
 pub struct Analyser {
     scopes: Vec<SymbolTable>,
@@ -11,6 +15,7 @@ pub struct Analyser {
     current_return_type: Option<Type>,
     current_local_symbols: Vec<Symbol>,
     loop_depth: usize,
+    struct_defs: HashMap<String, StructDecl>,
 }
 
 impl Analyser {
@@ -124,6 +129,7 @@ impl Analyser {
             current_return_type: None,
             current_local_symbols: vec![],
             loop_depth: 0,
+            struct_defs: HashMap::new(),
         }
     }
 
@@ -131,32 +137,37 @@ impl Analyser {
         mut self,
         program: &Program,
     ) -> Result<(HirProgram, Vec<SymbolTable>), Vec<Diagnostic>> {
+        for struct_decl in &program.structs {
+            if let Some(existing) = self
+                .struct_defs
+                .insert(struct_decl.name.clone(), struct_decl.clone())
+            {
+                self.errors.push(
+                    Diagnostic::error(
+                        "E1002",
+                        format!("duplicate symbol `{}`", struct_decl.name),
+                        struct_decl.span,
+                    )
+                    .with_hint(format!(
+                        "first declared at span {}..{}",
+                        existing.span.start, existing.span.end
+                    )),
+                );
+            }
+        }
+
         // First pass: declare all functions in global scope
         for func in &program.functions {
             let mut param_types = vec![];
             for param in &func.params {
                 let ty = match &param.ty {
-                    Some(tr) => {
-                        let t = Type::from_str(&tr.name);
-                        if t == Type::Unknown && is_framework_type_name(&tr.name) {
-                            Type::Unknown
-                        } else {
-                            t
-                        }
-                    }
+                    Some(tr) => self.resolve_known_type_name(&tr.name),
                     None => Type::Unknown,
                 };
                 param_types.push(ty);
             }
             let ret_type = match &func.return_type {
-                Some(tr) => {
-                    let t = Type::from_str(&tr.name);
-                    if t == Type::Unknown && is_framework_type_name(&tr.name) {
-                        Type::Unknown
-                    } else {
-                        t
-                    }
-                }
+                Some(tr) => self.resolve_known_type_name(&tr.name),
                 None => Type::Void,
             };
 
@@ -191,6 +202,12 @@ impl Analyser {
         }
 
         let mut hir_functions = vec![];
+        let mut hir_structs = vec![];
+        for struct_decl in &program.structs {
+            if let Some(hir_struct) = self.analyse_struct(struct_decl) {
+                hir_structs.push(hir_struct);
+            }
+        }
         // Second pass: analyse function bodies
         for func in &program.functions {
             if let Some(hir_func) = self.analyse_function(func) {
@@ -201,6 +218,7 @@ impl Analyser {
         if self.errors.is_empty() {
             Ok((
                 HirProgram {
+                    structs: hir_structs,
                     functions: hir_functions,
                 },
                 self.scopes,
@@ -245,7 +263,7 @@ impl Analyser {
     }
 
     fn resolve_type_ref(&mut self, tr: &TypeRef) -> Type {
-        let ty = Type::from_str(&tr.name);
+        let ty = self.resolve_known_type_name(&tr.name);
         if ty != Type::Unknown || is_framework_type_name(&tr.name) {
             ty
         } else {
@@ -256,6 +274,50 @@ impl Analyser {
             ));
             Type::Error
         }
+    }
+
+    fn resolve_known_type_name(&self, name: &str) -> Type {
+        let ty = Type::from_str(name);
+        if ty != Type::Unknown {
+            ty
+        } else if self.struct_defs.contains_key(name) {
+            Type::Struct(name.to_string())
+        } else if is_framework_type_name(name) {
+            Type::Unknown
+        } else {
+            Type::Unknown
+        }
+    }
+
+    fn analyse_struct(&mut self, struct_decl: &StructDecl) -> Option<HirStruct> {
+        let mut fields = vec![];
+        let mut field_names = HashMap::new();
+        for field in &struct_decl.fields {
+            if let Some(existing_span) = field_names.insert(field.name.clone(), field.span) {
+                self.errors.push(
+                    Diagnostic::error(
+                        "E1002",
+                        format!("duplicate field `{}` in struct `{}`", field.name, struct_decl.name),
+                        field.span,
+                    )
+                    .with_hint(format!(
+                        "first declared at span {}..{}",
+                        existing_span.start, existing_span.end
+                    )),
+                );
+                continue;
+            }
+            fields.push(HirStructField {
+                name: field.name.clone(),
+                ty: self.resolve_type_ref(&field.ty),
+                span: field.span,
+            });
+        }
+        Some(HirStruct {
+            name: struct_decl.name.clone(),
+            fields,
+            span: struct_decl.span,
+        })
     }
 
     fn analyse_function(&mut self, func: &Function) -> Option<HirFunction> {
@@ -456,7 +518,28 @@ impl Analyser {
                             }
                         }
                     }
-                    HirExpr::MemberAccess { .. } => {}
+                    HirExpr::MemberAccess { object, member, span, .. } => {
+                        if let HirExpr::Identifier(name, _, target_span) = object.as_ref() {
+                            if let Some(sym) = self.lookup(name) {
+                                if !sym.mutable {
+                                    self.errors.push(Diagnostic::error(
+                                        "E2010",
+                                        format!(
+                                            "cannot assign through immutable struct symbol `{}.{}`",
+                                            name, member
+                                        ),
+                                        *target_span,
+                                    ));
+                                }
+                            }
+                        } else {
+                            self.errors.push(Diagnostic::error(
+                                "E2011",
+                                "invalid assignment target",
+                                *span,
+                            ));
+                        }
+                    }
                     _ => {
                         self.errors.push(Diagnostic::error(
                             "E2011",
@@ -715,10 +798,69 @@ impl Analyser {
             Expr::ObjectLiteral(items, span) => {
                 let mut hir_items = vec![];
                 for (key, value) in items {
-                    let hir_value = self.analyse_expr(value, None)?;
+                    let expected_field_ty = match expected_ty {
+                        Some(Type::Struct(struct_name)) => self
+                            .struct_defs
+                            .get(struct_name)
+                            .and_then(|decl| decl.fields.iter().find(|field| field.name == *key))
+                            .map(|field| self.resolve_known_type_name(&field.ty.name)),
+                        _ => None,
+                    };
+                    let hir_value = self.analyse_expr(value, expected_field_ty.as_ref())?;
                     hir_items.push((key.clone(), hir_value));
                 }
-                Some(HirExpr::ObjectLiteral(hir_items, Type::Unknown, *span))
+                if let Some(Type::Struct(struct_name)) = expected_ty {
+                    if let Some(struct_decl) = self.struct_defs.get(struct_name).cloned() {
+                        for field in &struct_decl.fields {
+                            if !hir_items.iter().any(|(name, _)| name == &field.name) {
+                                self.errors.push(Diagnostic::error(
+                                    "E2013",
+                                    format!(
+                                        "missing field `{}` for struct `{}`",
+                                        field.name, struct_name
+                                    ),
+                                    *span,
+                                ));
+                            }
+                        }
+                        for (name, value) in &hir_items {
+                            match struct_decl.fields.iter().find(|field| field.name == *name) {
+                                Some(field) => {
+                                    let expected_field_ty = self.resolve_known_type_name(&field.ty.name);
+                                    if !expected_field_ty.is_compatible(value.ty()) {
+                                        self.errors.push(Diagnostic::error(
+                                            "E2001",
+                                            format!(
+                                                "type mismatch for field `{}`: expected `{}`, found `{}`",
+                                                name,
+                                                expected_field_ty,
+                                                value.ty()
+                                            ),
+                                            value.span(),
+                                        ));
+                                    }
+                                }
+                                None => {
+                                    self.errors.push(Diagnostic::error(
+                                        "E2014",
+                                        format!(
+                                            "unknown field `{}` for struct `{}`",
+                                            name, struct_name
+                                        ),
+                                        value.span(),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    Some(HirExpr::ObjectLiteral(
+                        hir_items,
+                        Type::Struct(struct_name.clone()),
+                        *span,
+                    ))
+                } else {
+                    Some(HirExpr::ObjectLiteral(hir_items, Type::Unknown, *span))
+                }
             }
             Expr::MemberAccess {
                 object,
@@ -727,6 +869,27 @@ impl Analyser {
             } => {
                 let hir_object = self.analyse_expr(object, None)?;
                 let result_ty = match hir_object.ty() {
+                    Type::Struct(struct_name) => {
+                        if let Some(struct_decl) = self.struct_defs.get(struct_name) {
+                            if let Some(field) =
+                                struct_decl.fields.iter().find(|field| field.name == *member)
+                            {
+                                self.resolve_known_type_name(&field.ty.name)
+                            } else {
+                                self.errors.push(Diagnostic::error(
+                                    "E2014",
+                                    format!(
+                                        "unknown field `{}` for struct `{}`",
+                                        member, struct_name
+                                    ),
+                                    *span,
+                                ));
+                                Type::Error
+                            }
+                        } else {
+                            Type::Error
+                        }
+                    }
                     Type::Error => Type::Error,
                     _ => Type::Unknown,
                 };

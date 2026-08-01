@@ -21,6 +21,7 @@ impl<'a> Parser<'a> {
     fn program(mut self) -> Result<Program, Vec<Diagnostic>> {
         let mut module_name = None;
         let mut imports = vec![];
+        let mut structs = vec![];
         let mut functions = vec![];
         self.skip_newlines();
         while !self.at(&TokenKind::Eof) {
@@ -37,6 +38,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Some(Item::Import(import_decl)) => imports.push(import_decl),
+                Some(Item::Struct(struct_decl)) => structs.push(struct_decl),
                 Some(Item::Functions(mut parsed)) => functions.append(&mut parsed),
                 None => self.synchronize(),
             }
@@ -46,6 +48,7 @@ impl<'a> Parser<'a> {
             Ok(Program {
                 module_name,
                 imports,
+                structs,
                 functions,
             })
         } else {
@@ -58,6 +61,9 @@ impl<'a> Parser<'a> {
         }
         if self.at(&TokenKind::Import) || self.at(&TokenKind::Use) {
             return self.import_item();
+        }
+        if self.at(&TokenKind::Struct) {
+            return self.struct_item();
         }
         if self.at(&TokenKind::Class) {
             return self.class_item().map(Item::Functions);
@@ -79,6 +85,37 @@ impl<'a> Parser<'a> {
         self.line_end();
         Some(Item::Import(ImportDecl {
             path,
+            span: Span::new(start, end),
+        }))
+    }
+    fn struct_item(&mut self) -> Option<Item> {
+        let start = self.expect(&TokenKind::Struct, "E159", "expected `struct`")?.span.start;
+        let (name, _) = self.identifier("expected struct name")?;
+        self.expect(&TokenKind::Colon, "E160", "expected `:`")?;
+        self.expect(&TokenKind::Newline, "E161", "expected newline")?;
+        self.expect(&TokenKind::Indent, "E162", "expected indented struct body")?;
+        let mut fields = vec![];
+        while !self.at(&TokenKind::Dedent) && !self.at(&TokenKind::Eof) {
+            if self.eat(&TokenKind::Newline).is_some() {
+                continue;
+            }
+            let (field_name, field_span) = self.identifier("expected field name")?;
+            self.expect(&TokenKind::Colon, "E163", "expected `:` after field name")?;
+            let ty = self.type_ref()?;
+            self.line_end();
+            fields.push(StructField {
+                name: field_name,
+                ty,
+                span: field_span,
+            });
+        }
+        let end = self
+            .expect(&TokenKind::Dedent, "E164", "expected end of struct body")
+            .map(|t| t.span.end)
+            .unwrap_or(start);
+        Some(Item::Struct(StructDecl {
+            name,
+            fields,
             span: Span::new(start, end),
         }))
     }
@@ -794,6 +831,7 @@ fn stmt_span_end(stmt: &Stmt) -> usize {
 enum Item {
     Module(ModuleDecl),
     Import(ImportDecl),
+    Struct(StructDecl),
     Functions(Vec<Function>),
 }
 #[cfg(test)]
@@ -810,6 +848,7 @@ mod tests {
         let p = parse(&lex(&s).unwrap()).unwrap();
         assert!(p.module_name.is_none());
         assert!(p.imports.is_empty());
+        assert!(p.structs.is_empty());
         assert_eq!(p.functions[0].name, "main");
         assert_eq!(p.functions[0].body.len(), 2);
     }
@@ -825,6 +864,20 @@ mod tests {
         assert_eq!(p.imports.len(), 2);
         assert_eq!(p.imports[0].path, "App.Services.TaxService");
         assert_eq!(p.imports[1].path, "App.Models.Invoice");
+    }
+
+    #[test]
+    fn parses_struct_declaration() {
+        let s = SourceFile::new(
+            "x.agi",
+            "struct Point:\n    x: i32\n    y: i32\n\nfn main() -> i32:\n    return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        assert_eq!(p.structs.len(), 1);
+        assert_eq!(p.structs[0].name, "Point");
+        assert_eq!(p.structs[0].fields.len(), 2);
+        assert_eq!(p.structs[0].fields[0].name, "x");
+        assert_eq!(p.structs[0].fields[1].name, "y");
     }
 
     #[test]

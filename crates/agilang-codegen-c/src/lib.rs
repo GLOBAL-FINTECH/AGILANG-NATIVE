@@ -24,6 +24,14 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("    bool owns_data;\n");
     out.push_str("} agi_list_list_f64;\n\n");
 
+    for struct_decl in &program.structs {
+        out.push_str("typedef struct {\n");
+        for field in &struct_decl.fields {
+            out.push_str(&format!("    {} {};\n", c_type(&field.ty), field.name));
+        }
+        out.push_str(&format!("}} {};\n\n", struct_decl.name));
+    }
+
     // Declare the runtime print function
     out.push_str("// Linked AGILANG runtime ABI\n");
     out.push_str("extern void agi_print(const char* msg);\n");
@@ -436,25 +444,26 @@ pub fn generate(program: &HirProgram) -> String {
     out
 }
 
-fn c_type(ty: &Type) -> &'static str {
+fn c_type(ty: &Type) -> String {
     match ty {
-        Type::I32 => "int32_t",
-        Type::I64 => "int64_t",
-        Type::U32 => "uint32_t",
-        Type::U64 => "uint64_t",
-        Type::F32 => "float",
-        Type::F64 => "double",
-        Type::Bool => "bool",
-        Type::String => "const char*",
+        Type::I32 => "int32_t".to_string(),
+        Type::I64 => "int64_t".to_string(),
+        Type::U32 => "uint32_t".to_string(),
+        Type::U64 => "uint64_t".to_string(),
+        Type::F32 => "float".to_string(),
+        Type::F64 => "double".to_string(),
+        Type::Bool => "bool".to_string(),
+        Type::String => "const char*".to_string(),
         Type::List(inner) if inner.is_numeric() || inner.as_ref() == &Type::Unknown => {
-            "agi_list_f64"
+            "agi_list_f64".to_string()
         }
         Type::List(inner) if matches!(inner.as_ref(), Type::List(n) if n.is_numeric() || n.as_ref() == &Type::Unknown) => {
-            "agi_list_list_f64"
+            "agi_list_list_f64".to_string()
         }
         Type::Optional(inner) => c_type(inner),
-        Type::Void => "void",
-        _ => "void*",
+        Type::Struct(name) => name.clone(),
+        Type::Void => "void".to_string(),
+        _ => "void*".to_string(),
     }
 }
 
@@ -568,6 +577,15 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
                     generate_expr(value)
                 )
             }
+            HirExpr::MemberAccess { object, member, .. } => {
+                format!(
+                    "{}{}.{} = {};\n",
+                    ind,
+                    generate_expr(object),
+                    member,
+                    generate_expr(value)
+                )
+            }
             _ => format!("{}/* unsupported assignment target */;\n", ind),
         },
         HirStmt::Expr(expr) => {
@@ -647,7 +665,7 @@ fn generate_expr(expr: &HirExpr) -> String {
         }
         HirExpr::ObjectLiteral(items, _, _) => generate_json_object_expr(items),
         HirExpr::MemberAccess { object, member, .. } => {
-            format!("/* member access */ {}.{}", generate_expr(object), member)
+            format!("{}.{}", generate_expr(object), member)
         }
         HirExpr::Index { object, index, .. } => {
             if matches!(object.ty(), Type::List(inner) if inner.is_numeric() || inner.as_ref() == &Type::Unknown)
@@ -976,6 +994,15 @@ fn generate_json_object_expr(items: &[(String, HirExpr)]) -> String {
     )
 }
 
+fn generate_struct_object_expr(items: &[(String, HirExpr)], struct_name: &str) -> String {
+    let fields = items
+        .iter()
+        .map(|(key, value)| format!(".{} = {}", key, generate_expr(value)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("({}){{ {} }}", struct_name, fields)
+}
+
 fn generate_json_array_expr(items: &[HirExpr]) -> String {
     let values = items
         .iter()
@@ -1014,7 +1041,10 @@ fn generate_json_value_expr(key: Option<&str>, expr: &HirExpr) -> String {
         HirExpr::Integer(_, _, _) => format!("agi_json_i64((int64_t)({}))", generate_expr(expr)),
         HirExpr::Float(_, _, _) => format!("agi_json_f64((double)({}))", generate_expr(expr)),
         HirExpr::Bool(_, _, _) => format!("(({}) ? \"true\" : \"false\")", generate_expr(expr)),
-        HirExpr::ObjectLiteral(items, _, _) => generate_json_object_expr(items),
+        HirExpr::ObjectLiteral(items, ty, _) => match ty {
+            Type::Struct(name) => generate_struct_object_expr(items, name),
+            _ => generate_json_object_expr(items),
+        },
         HirExpr::ListLiteral(items, _, _) => generate_json_array_expr(items),
         _ => format!("agi_json_escape_and_quote({})", generate_expr(expr)),
     }
@@ -1464,12 +1494,40 @@ mod tests {
 
     #[test]
     fn generated_runtime_contains_deterministic_list_ownership_helpers() {
-        let program = HirProgram { functions: vec![] };
+        let program = HirProgram {
+            structs: vec![],
+            functions: vec![],
+        };
         let c_code = generate(&program);
         assert!(c_code.contains("static void agi_list_free_f64"));
         assert!(c_code.contains("static bool agi_list_reserve_f64"));
         assert!(c_code.contains("static bool agi_list_insert_f64"));
         assert!(c_code.contains("static bool agi_list_remove_f64"));
         assert!(c_code.contains("static void agi_list_free_list_f64"));
+    }
+
+    #[test]
+    fn test_codegen_struct_typedef_and_member_access() {
+        let source = SourceFile::new(
+            "point.agi",
+            "struct Point:\n    x: i32\n    y: i32\n\nfn main() -> i32:\n    let point: Point = {x: 2, y: 5}\n    point.x = point.x + 3\n    return point.x + point.y\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("typedef struct {\n    int32_t x;\n    int32_t y;\n} Point;"));
+        assert!(c_code.contains("point.x = (point.x + 3);"));
+        assert!(c_code.contains("return (point.x + point.y);"));
+    }
+
+    #[test]
+    fn test_codegen_exec_struct_binary() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "struct_exec.agi",
+            "struct Point:\n    x: i32\n    y: i32\n\nfn main() -> i32:\n    let point: Point = {x: 2, y: 5}\n    point.x = point.x + 3\n    return point.x + point.y\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 10);
     }
 }

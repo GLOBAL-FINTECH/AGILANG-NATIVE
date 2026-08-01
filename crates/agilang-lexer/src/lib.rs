@@ -9,6 +9,7 @@ pub enum TokenKind {
     Module,
     Import,
     Use,
+    Struct,
     Class,
     Extends,
     Let,
@@ -301,6 +302,7 @@ impl<'a> Lexer<'a> {
             "module" => TokenKind::Module,
             "import" => TokenKind::Import,
             "use" => TokenKind::Use,
+            "struct" => TokenKind::Struct,
             "class" => TokenKind::Class,
             "extends" => TokenKind::Extends,
             "let" => TokenKind::Let,
@@ -491,5 +493,15 @@ mod tests {
         let t = lex(&s).unwrap();
         assert!(t.iter().any(|x| x.kind == TokenKind::Continue));
         assert!(t.iter().any(|x| x.kind == TokenKind::Break));
+    }
+
+    #[test]
+    fn lexes_struct_keyword() {
+        let s = SourceFile::new(
+            "x.agi",
+            "struct Point:\n    x: i32\n    y: i32\n",
+        );
+        let t = lex(&s).unwrap();
+        assert!(t.iter().any(|x| x.kind == TokenKind::Struct));
     }
 }

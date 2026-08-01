@@ -5,6 +5,7 @@ use agilang_source::Span;
 pub struct Program {
     pub module_name: Option<ModuleDecl>,
     pub imports: Vec<ImportDecl>,
+    pub structs: Vec<StructDecl>,
     pub functions: Vec<Function>,
 }
 
@@ -17,6 +18,20 @@ pub struct ModuleDecl {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImportDecl {
     pub path: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructDecl {
+    pub name: String,
+    pub fields: Vec<StructField>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructField {
+    pub name: String,
+    pub ty: TypeRef,
     pub span: Span,
 }
 #[derive(Debug, Clone, PartialEq)]

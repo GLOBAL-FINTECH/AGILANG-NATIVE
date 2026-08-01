@@ -257,6 +257,21 @@ fn main() -> Result<()> {
                                             else_body.len()
                                         );
                                     }
+                                    agilang_ir::HirStmt::While { condition, body, .. } => {
+                                        println!(
+                                            "{}{}While {} do {} stmt(s)",
+                                            child_prefix,
+                                            stmt_prefix,
+                                            format_hir_expr(condition),
+                                            body.len()
+                                        );
+                                    }
+                                    agilang_ir::HirStmt::Break { .. } => {
+                                        println!("{}{}Break", child_prefix, stmt_prefix);
+                                    }
+                                    agilang_ir::HirStmt::Continue { .. } => {
+                                        println!("{}{}Continue", child_prefix, stmt_prefix);
+                                    }
                                     agilang_ir::HirStmt::ForIn {
                                         key_name,
                                         value_name,

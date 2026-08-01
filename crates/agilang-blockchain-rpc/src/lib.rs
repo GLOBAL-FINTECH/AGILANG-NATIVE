@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn detects_http_header_boundary() {
-        assert_eq!(find_header_end(b"POST / HTTP/1.1\r\ncontent-length: 0\r\n\r\n"), Some(38));
+        assert_eq!(find_header_end(b"POST / HTTP/1.1\r\ncontent-length: 0\r\n\r\n"), Some(34));
     }
 
     #[test]

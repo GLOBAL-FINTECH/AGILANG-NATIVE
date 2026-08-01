@@ -5,7 +5,22 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HirProgram {
+    pub structs: Vec<HirStruct>,
     pub functions: Vec<HirFunction>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirStruct {
+    pub name: String,
+    pub fields: Vec<HirStructField>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirStructField {
+    pub name: String,
+    pub ty: Type,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
