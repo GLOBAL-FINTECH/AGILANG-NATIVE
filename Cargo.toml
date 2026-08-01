@@ -15,6 +15,7 @@ members = [
   "crates/agilang-runtime-evm",
   "crates/agilang-blockchain-core",
   "crates/agilang-blockchain-storage",
+  "crates/agilang-blockchain-state",
   "crates/agilang-runtime-abi",
   "crates/agilang-runtime-cli",
   "crates/agilang-compat-audit",
