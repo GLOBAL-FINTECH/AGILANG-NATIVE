@@ -24,6 +24,7 @@ members = [
   "crates/agilang-blockchain-service",
   "crates/agilang-blockchain-fee",
   "crates/agilang-blockchain-execution",
+  "crates/agilang-blockchain-runtime",
   "crates/agilang-runtime-abi",
   "crates/agilang-runtime-cli",
   "crates/agilang-compat-audit",
