@@ -27,6 +27,14 @@ pub fn execute_request(
         return build_json_response(status, json);
     }
 
+    match crate::handle_webrtc_request(req, project_root) {
+        Ok(Some(response)) => return response,
+        Ok(None) => {}
+        Err(error) => {
+            return framework_error_response(path, 500, &error);
+        }
+    }
+
     if let Some(json) = crate::builtin_api_response(path) {
         return build_json_response(200, json);
     }

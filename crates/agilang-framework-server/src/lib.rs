@@ -10,6 +10,7 @@ use agilang_framework_http::{HttpMethod, Request, Response};
 use agilang_framework_routing::Router;
 use agilang_framework_view::ViewEngine;
 use agilang_runtime_crypto::sha256;
+use agilang_runtime_webrtc::{SignalEnvelope, SignalKind, SignalingHub};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
@@ -26,6 +27,7 @@ pub enum ControllerResult {
 
 static AUTH_RATE_LIMITER: OnceLock<Mutex<HashMap<String, Vec<u64>>>> = OnceLock::new();
 static ACTIVE_REGISTRATIONS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+static WEBRTC_SIGNALING_HUB: OnceLock<SignalingHub> = OnceLock::new();
 
 const SESSION_COOKIE_NAME: &str = "agilang_session";
 const SESSION_TTL_SECS: u64 = 7200;
@@ -410,16 +412,35 @@ fn hidden_csrf_field(secret: &str) -> String {
     format!(r#"<input type="hidden" name="_csrf" value="{secret}">"#)
 }
 
+fn webrtc_signaling_hub() -> &'static SignalingHub {
+    WEBRTC_SIGNALING_HUB.get_or_init(SignalingHub::default)
+}
+
+fn block_on_runtime<F, T>(future: F) -> Result<T, String>
+where
+    F: std::future::Future<Output = T>,
+{
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        Ok(handle.block_on(future))
+    } else {
+        let runtime = tokio::runtime::Runtime::new().map_err(|error| error.to_string())?;
+        Ok(runtime.block_on(future))
+    }
+}
+
 fn write_framework_response(stream: &mut TcpStream, response: Response) -> std::io::Result<()> {
     let status_line = match response.status {
         200 => "HTTP/1.1 200 OK",
+        202 => "HTTP/1.1 202 Accepted",
         201 => "HTTP/1.1 201 Created",
         302 => "HTTP/1.1 302 Found",
         400 => "HTTP/1.1 400 Bad Request",
         401 => "HTTP/1.1 401 Unauthorized",
         403 => "HTTP/1.1 403 Forbidden",
         404 => "HTTP/1.1 404 Not Found",
+        405 => "HTTP/1.1 405 Method Not Allowed",
         409 => "HTTP/1.1 409 Conflict",
+        422 => "HTTP/1.1 422 Unprocessable Entity",
         429 => "HTTP/1.1 429 Too Many Requests",
         _ => "HTTP/1.1 500 Internal Server Error",
     };
@@ -962,6 +983,210 @@ fn framework_status_json() -> String {
         "connected_users": 1
     })
     .to_string()
+}
+
+pub(crate) fn handle_webrtc_request(
+    req: &Request,
+    project_root: &Path,
+) -> Result<Option<Response>, String> {
+    let path = req.path();
+    let is_webrtc_path = matches!(
+        path,
+        "/api/webrtc/status"
+            | "/api/webrtc/register"
+            | "/api/webrtc/signal"
+            | "/api/webrtc/poll"
+    );
+    if !is_webrtc_path {
+        return Ok(None);
+    }
+
+    let capabilities = agilang_runtime_webrtc::capabilities();
+    if path == "/api/webrtc/status" {
+        let status = serde_json::json!({
+            "signaling": capabilities.signaling,
+            "peer_connection": capabilities.peer_connection,
+            "data_channel": capabilities.data_channel,
+            "stun_server": capabilities.stun_server,
+            "turn_server": capabilities.turn_server,
+            "explanation": capabilities.explanation,
+        });
+        return Ok(Some(build_json_response(200, status.to_string())));
+    }
+
+    let mut conn = open_auth_db(project_root)?;
+    let Some(session) = load_session_by_cookie(&mut conn, req)? else {
+        let mut response = Response::json(r#"{"error":"Unauthorized"}"#);
+        response.status = 401;
+        return Ok(Some(response));
+    };
+    let Some(user) = load_user_by_id(&mut conn, &session.user_id)? else {
+        let mut response = Response::json(r#"{"error":"Unauthorized"}"#);
+        response.status = 401;
+        return Ok(Some(response));
+    };
+
+    match path {
+        "/api/webrtc/register" => {
+            if req.method != HttpMethod::Post {
+                return Ok(Some(build_text_response(
+                    405,
+                    "application/json",
+                    r#"{"error":"Method Not Allowed"}"#.to_string(),
+                )));
+            }
+            verify_webrtc_csrf(req, &session)?;
+            let payload = parse_json_body(req)?;
+            let peer_id = payload
+                .get("peer_id")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            if peer_id.is_empty() {
+                return Ok(Some(build_json_response(
+                    422,
+                    serde_json::json!({ "error": "peer_id is required" }).to_string(),
+                )));
+            }
+            let body = serde_json::json!({
+                "registered": true,
+                "peer_id": peer_id,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "role": user.role,
+                }
+            });
+            Ok(Some(build_json_response(200, body.to_string())))
+        }
+        "/api/webrtc/signal" => {
+            if req.method != HttpMethod::Post {
+                return Ok(Some(build_text_response(
+                    405,
+                    "application/json",
+                    r#"{"error":"Method Not Allowed"}"#.to_string(),
+                )));
+            }
+            verify_webrtc_csrf(req, &session)?;
+            let payload = parse_json_body(req)?;
+            let from = payload
+                .get("from")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            let to = payload
+                .get("to")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            let kind = payload
+                .get("kind")
+                .and_then(|value| value.as_str())
+                .and_then(parse_signal_kind);
+            let signal_payload = payload
+                .get("payload")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+                .to_string();
+
+            if from.is_empty() || to.is_empty() || signal_payload.is_empty() || kind.is_none() {
+                return Ok(Some(build_json_response(
+                    422,
+                    serde_json::json!({ "error": "from, to, kind and payload are required" })
+                        .to_string(),
+                )));
+            }
+
+            let kind = kind.expect("validated above");
+            block_on_runtime(async {
+                webrtc_signaling_hub()
+                    .publish(SignalEnvelope {
+                        session_id: uuid::Uuid::new_v4(),
+                        from,
+                        to,
+                        kind,
+                        payload: signal_payload,
+                    })
+                    .await;
+            })?;
+            Ok(Some(build_json_response(
+                202,
+                serde_json::json!({ "queued": true }).to_string(),
+            )))
+        }
+        "/api/webrtc/poll" => {
+            if req.method != HttpMethod::Get {
+                return Ok(Some(build_text_response(
+                    405,
+                    "application/json",
+                    r#"{"error":"Method Not Allowed"}"#.to_string(),
+                )));
+            }
+            let peer_id = req.query("peer_id").unwrap_or("").trim().to_string();
+            if peer_id.is_empty() {
+                return Ok(Some(build_json_response(
+                    422,
+                    serde_json::json!({ "error": "peer_id is required" }).to_string(),
+                )));
+            }
+            let message = block_on_runtime(async { webrtc_signaling_hub().receive(&peer_id).await })?;
+            let body = if let Some(message) = message {
+                serde_json::json!({
+                    "message": {
+                        "session_id": message.session_id,
+                        "from": message.from,
+                        "to": message.to,
+                        "kind": format_signal_kind(&message.kind),
+                        "payload": message.payload,
+                    }
+                })
+            } else {
+                serde_json::json!({ "message": null })
+            };
+            Ok(Some(build_json_response(200, body.to_string())))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn verify_webrtc_csrf(req: &Request, session: &AuthSessionRecord) -> Result<(), String> {
+    let token = req
+        .headers
+        .get("x-csrf-token")
+        .or_else(|| req.headers.get("X-CSRF-Token"))
+        .cloned()
+        .unwrap_or_default();
+    if token == session.csrf_secret {
+        Ok(())
+    } else {
+        Err("Invalid CSRF token.".to_string())
+    }
+}
+
+fn parse_json_body(req: &Request) -> Result<serde_json::Value, String> {
+    serde_json::from_slice(&req.body).map_err(|error| error.to_string())
+}
+
+fn parse_signal_kind(value: &str) -> Option<SignalKind> {
+    match value {
+        "offer" => Some(SignalKind::Offer),
+        "answer" => Some(SignalKind::Answer),
+        "ice-candidate" => Some(SignalKind::IceCandidate),
+        "hangup" => Some(SignalKind::Hangup),
+        _ => None,
+    }
+}
+
+fn format_signal_kind(kind: &SignalKind) -> &'static str {
+    match kind {
+        SignalKind::Offer => "offer",
+        SignalKind::Answer => "answer",
+        SignalKind::IceCandidate => "ice-candidate",
+        SignalKind::Hangup => "hangup",
+    }
 }
 
 fn cj_http_client() -> Result<agilang_runtime_http::HttpClient, String> {
@@ -2047,6 +2272,21 @@ mod tests {
         }
     }
 
+    fn query_request(
+        method: HttpMethod,
+        path: &str,
+        query: &[(&str, &str)],
+        cookie: Option<&str>,
+        ip_octet: u8,
+    ) -> Request {
+        let mut req = request(method, path, cookie, None, ip_octet);
+        req.query = query
+            .iter()
+            .map(|(key, value)| ((*key).to_string(), vec![(*value).to_string()]))
+            .collect();
+        req
+    }
+
     fn cookie_from(response: &Response) -> String {
         response
             .headers
@@ -2883,6 +3123,192 @@ fn register_api() -> void:
     #[test]
     fn generated_post_resource_executes_end_to_end_on_sqlite() {
         run_generated_post_flow(FrameworkDriver::Sqlite, "generated_post_sqlite");
+    }
+
+    #[test]
+    fn webrtc_signaling_requires_authentication() {
+        let (root, _) = setup_auth_project("webrtc_auth");
+
+        let status = invoke_app(
+            &root,
+            request(HttpMethod::Get, "/api/webrtc/status", None, None, 70),
+        );
+        assert_eq!(status.status, 200);
+        assert!(response_text(&status).contains("\"signaling\":true"));
+        assert!(response_text(&status).contains("\"peer_connection\":false"));
+
+        let unauthorized_register = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/register",
+                None,
+                None,
+                r#"{"peer_id":"alice-peer"}"#,
+                70,
+            ),
+        );
+        assert_eq!(unauthorized_register.status, 401);
+
+        let unauthorized_poll = invoke_app(
+            &root,
+            query_request(
+                HttpMethod::Get,
+                "/api/webrtc/poll",
+                &[("peer_id", "alice-peer")],
+                None,
+                70,
+            ),
+        );
+        assert_eq!(unauthorized_poll.status, 401);
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn webrtc_signaling_enforces_csrf_and_delivers_messages() {
+        let (root, engine) = setup_auth_project("webrtc_signal");
+        let alice_cookie = register_user(
+            &root,
+            &engine,
+            71,
+            "alice-webrtc@example.com",
+            "Password123!",
+            "Alice",
+        );
+        let bob_cookie = register_user(
+            &root,
+            &engine,
+            72,
+            "bob-webrtc@example.com",
+            "Password123!",
+            "Bob",
+        );
+
+        let alice_dashboard = invoke(
+            &root,
+            &engine,
+            request(HttpMethod::Get, "/dashboard", Some(&alice_cookie), None, 71),
+        );
+        let alice_csrf = csrf_from(&alice_dashboard);
+        let bob_dashboard = invoke(
+            &root,
+            &engine,
+            request(HttpMethod::Get, "/dashboard", Some(&bob_cookie), None, 72),
+        );
+        let bob_csrf = csrf_from(&bob_dashboard);
+
+        let csrf_denied = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/signal",
+                Some(&alice_cookie),
+                Some("wrong"),
+                r#"{"from":"alice-peer","to":"bob-peer","kind":"offer","payload":"offer-sdp"}"#,
+                71,
+            ),
+        );
+        assert_eq!(csrf_denied.status, 500);
+        assert!(response_text(&csrf_denied).contains("Invalid CSRF token."));
+
+        let alice_register = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/register",
+                Some(&alice_cookie),
+                Some(&alice_csrf),
+                r#"{"peer_id":"alice-peer"}"#,
+                71,
+            ),
+        );
+        assert_eq!(alice_register.status, 200);
+        assert!(response_text(&alice_register).contains("\"registered\":true"));
+
+        let bob_register = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/register",
+                Some(&bob_cookie),
+                Some(&bob_csrf),
+                r#"{"peer_id":"bob-peer"}"#,
+                72,
+            ),
+        );
+        assert_eq!(bob_register.status, 200);
+
+        let offer = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/signal",
+                Some(&alice_cookie),
+                Some(&alice_csrf),
+                r#"{"from":"alice-peer","to":"bob-peer","kind":"offer","payload":"offer-sdp"}"#,
+                71,
+            ),
+        );
+        assert_eq!(offer.status, 202);
+
+        let candidate = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/signal",
+                Some(&alice_cookie),
+                Some(&alice_csrf),
+                r#"{"from":"alice-peer","to":"bob-peer","kind":"ice-candidate","payload":"candidate-1"}"#,
+                71,
+            ),
+        );
+        assert_eq!(candidate.status, 202);
+
+        let first_poll = invoke_app(
+            &root,
+            query_request(
+                HttpMethod::Get,
+                "/api/webrtc/poll",
+                &[("peer_id", "bob-peer")],
+                Some(&bob_cookie),
+                72,
+            ),
+        );
+        assert_eq!(first_poll.status, 200);
+        let first_body = response_text(&first_poll);
+        assert!(first_body.contains("\"kind\":\"offer\""));
+        assert!(first_body.contains("\"payload\":\"offer-sdp\""));
+
+        let second_poll = invoke_app(
+            &root,
+            query_request(
+                HttpMethod::Get,
+                "/api/webrtc/poll",
+                &[("peer_id", "bob-peer")],
+                Some(&bob_cookie),
+                72,
+            ),
+        );
+        assert_eq!(second_poll.status, 200);
+        let second_body = response_text(&second_poll);
+        assert!(second_body.contains("\"kind\":\"ice-candidate\""));
+        assert!(second_body.contains("\"payload\":\"candidate-1\""));
+
+        let empty_poll = invoke_app(
+            &root,
+            query_request(
+                HttpMethod::Get,
+                "/api/webrtc/poll",
+                &[("peer_id", "bob-peer")],
+                Some(&bob_cookie),
+                72,
+            ),
+        );
+        assert_eq!(empty_poll.status, 200);
+        assert!(response_text(&empty_poll).contains("\"message\":null"));
+
+        fs::remove_dir_all(root).ok();
     }
 }
 
