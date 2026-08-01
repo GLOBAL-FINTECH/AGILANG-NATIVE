@@ -1,0 +1,12 @@
+[package]
+name = "agilang-blockchain-execution"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agilang-runtime-core = { path = "../agilang-runtime-core" }
+agilang-blockchain-core = { path = "../agilang-blockchain-core" }
+agilang-blockchain-state = { path = "../agilang-blockchain-state" }
+agilang-blockchain-fee = { path = "../agilang-blockchain-fee" }
+serde = { workspace = true }
+serde_json = { workspace = true }
