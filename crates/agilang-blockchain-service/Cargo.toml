@@ -8,4 +8,5 @@ agilang-runtime-core = { path = "../agilang-runtime-core" }
 agilang-blockchain-core = { path = "../agilang-blockchain-core" }
 agilang-blockchain-node = { path = "../agilang-blockchain-node" }
 agilang-blockchain-transaction = { path = "../agilang-blockchain-transaction" }
+agilang-blockchain-fee = { path = "../agilang-blockchain-fee" }
 serde_json = { workspace = true }
