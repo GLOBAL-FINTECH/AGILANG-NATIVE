@@ -1,0 +1,26 @@
+{
+  "schema": "AGI-BLOCKCHAIN-COMPAT-1",
+  "canonical_repository": "GLOBAL-FINTECH/agilang",
+  "canonical_commit": "69f22dad372c45767bc5fd0afc9076a142c3ed24",
+  "vectors": {
+    "transfer_alice_bob_25_nonce_0": {
+      "payload": {
+        "from": "alice",
+        "to": "bob",
+        "value": 25,
+        "data": "0x",
+        "nonce": 0,
+        "gas_limit": 21000,
+        "gas_price": 0,
+        "type": "transfer",
+        "signature": "",
+        "metadata": {}
+      },
+      "canonical_json": "{\"data\":\"0x\",\"from\":\"alice\",\"gas_limit\":21000,\"gas_price\":0,\"metadata\":{},\"nonce\":0,\"signature\":\"\",\"to\":\"bob\",\"type\":\"transfer\",\"value\":25}",
+      "hash": "0xbe0840258e1cafa5d4c2f30d5e601effaee66ea017e21469086a595db290931a"
+    },
+    "empty_merkle_root": {
+      "hash": "0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

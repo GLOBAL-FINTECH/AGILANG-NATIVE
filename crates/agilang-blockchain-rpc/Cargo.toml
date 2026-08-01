@@ -1,0 +1,12 @@
+[package]
+name = "agilang-blockchain-rpc"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agilang-blockchain-node = { path = "../agilang-blockchain-node" }
+agilang-runtime-core = { path = "../agilang-runtime-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
