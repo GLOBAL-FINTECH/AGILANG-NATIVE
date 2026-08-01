@@ -137,7 +137,7 @@ ags_syntax_grammar = ".agilang/editor/ags.tmLanguage.json"
 
 [build]
 target = "native"
-output = "build/{name}.exe"
+output = "build/{name}"
 "#,
         ),
         (
@@ -2153,7 +2153,7 @@ ags_syntax_grammar = ".agilang/editor/ags.tmLanguage.json"
 
 [build]
 target = "native"
-output = "build/{name}.exe"
+output = "build/{name}"
 "#,
         ),
         (

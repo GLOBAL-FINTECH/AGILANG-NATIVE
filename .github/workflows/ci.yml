@@ -18,9 +18,24 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo run -p agilang-compat-audit --
       - run: cargo test --workspace --all-features
       - run: cargo build --workspace --release --all-features
       - run: cargo run -p agilang-runtime-cli -- doctor
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          cargo build -p agilang-runtime-abi --release
+          cargo build -p agilang-native-cli --release
+          $ToolchainRoot = Join-Path $env:RUNNER_TEMP 'agilang-toolchain'
+          $env:AGILANG_RUNTIME_LIB = "$PWD\target\release\agilang_runtime_abi.lib"
+          & "$PWD\target\release\agilang.exe" install --root $ToolchainRoot --force
+          $env:Path = "$ToolchainRoot\bin;$env:Path"
+          agilang version --verbose
+          agilang paths
+          agilang doctor
+          agilang check examples/native/hello-native.agi
+          agilang run examples/native/hello-native.agi
       - if: runner.os != 'Windows'
         shell: bash
         run: |

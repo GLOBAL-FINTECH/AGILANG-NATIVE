@@ -1,11 +1,124 @@
 use anyhow::{bail, Context, Result};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "windows")]
-const RUNTIME_LIB_NAME: &str = "agilang_runtime_abi.lib";
-#[cfg(not(target_os = "windows"))]
-const RUNTIME_LIB_NAME: &str = "libagilang_runtime_abi.a";
+pub const RUNTIME_LIB_NAME: &str = "agilang_runtime_abi.lib";
+#[cfg(target_os = "windows")]
+pub const RUNTIME_DLL_NAME: &str = "agilang_runtime_abi.dll";
+#[cfg(target_os = "linux")]
+pub const RUNTIME_LIB_NAME: &str = "libagilang_runtime_abi.a";
+#[cfg(target_os = "linux")]
+pub const RUNTIME_DLL_NAME: &str = "libagilang_runtime_abi.so";
+pub const TOOLCHAIN_MANIFEST_NAME: &str = "toolchain.json";
+pub const RUNTIME_MANIFEST_NAME: &str = "runtime-manifest.json";
+pub const AGILANG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ToolchainManifest {
+    pub toolchain: String,
+    pub version: String,
+    pub abi_version: String,
+    pub target: String,
+    pub runtime_library: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime_dynamic_library: Option<String>,
+    pub compiler: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuntimeManifest {
+    pub toolchain: String,
+    pub version: String,
+    pub abi_version: String,
+    pub target: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ToolchainInstallation {
+    pub root: PathBuf,
+    pub manifest_path: PathBuf,
+    pub manifest: ToolchainManifest,
+}
+
+pub fn compiler_binary_name() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        "agilang.exe"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        "agilang"
+    }
+}
+
+pub fn executable_suffix() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        ".exe"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        ""
+    }
+}
+
+pub fn default_toolchain_manifest(target: &str, abi_version: &str) -> ToolchainManifest {
+    ToolchainManifest {
+        toolchain: "AGILANG Native".to_string(),
+        version: AGILANG_VERSION.to_string(),
+        abi_version: abi_version.to_string(),
+        target: target.to_string(),
+        runtime_library: format!("lib/{RUNTIME_LIB_NAME}"),
+        runtime_dynamic_library: Some(format!("lib/{RUNTIME_DLL_NAME}")),
+        compiler: format!("bin/{}", compiler_binary_name()),
+    }
+}
+
+pub fn default_runtime_manifest(target: &str, abi_version: &str) -> RuntimeManifest {
+    RuntimeManifest {
+        toolchain: "AGILANG Native".to_string(),
+        version: AGILANG_VERSION.to_string(),
+        abi_version: abi_version.to_string(),
+        target: target.to_string(),
+    }
+}
+
+pub fn load_toolchain_manifest(path: &Path) -> Result<ToolchainManifest> {
+    serde_json::from_slice(&fs::read(path)?)
+        .with_context(|| format!("failed to parse toolchain manifest at {}", path.display()))
+}
+
+pub fn write_toolchain_manifest(root: &Path, manifest: &ToolchainManifest) -> Result<PathBuf> {
+    fs::create_dir_all(root)?;
+    let path = root.join(TOOLCHAIN_MANIFEST_NAME);
+    fs::write(&path, serde_json::to_vec_pretty(manifest)?)?;
+    Ok(path)
+}
+
+pub fn write_runtime_manifest(root: &Path, manifest: &RuntimeManifest) -> Result<PathBuf> {
+    let runtime_dir = root.join("runtime");
+    fs::create_dir_all(&runtime_dir)?;
+    let path = runtime_dir.join(RUNTIME_MANIFEST_NAME);
+    fs::write(&path, serde_json::to_vec_pretty(manifest)?)?;
+    Ok(path)
+}
+
+pub fn discover_toolchain_from_exe(exe_path: &Path) -> Option<ToolchainInstallation> {
+    let bin_dir = exe_path.parent()?;
+    let root = bin_dir.parent()?.to_path_buf();
+    let manifest_path = root.join(TOOLCHAIN_MANIFEST_NAME);
+    if !manifest_path.is_file() {
+        return None;
+    }
+    let manifest = load_toolchain_manifest(&manifest_path).ok()?;
+    Some(ToolchainInstallation {
+        root,
+        manifest_path,
+        manifest,
+    })
+}
 
 pub fn build_project(
     entry_file: &Path,
@@ -150,6 +263,13 @@ fn resolve_runtime_lib(
     }
 
     if let Some(exe_path) = current_exe {
+        if let Some(toolchain) = discover_toolchain_from_exe(&exe_path) {
+            let manifest_runtime = toolchain.root.join(&toolchain.manifest.runtime_library);
+            if manifest_runtime.is_file() {
+                return Ok(manifest_runtime);
+            }
+        }
+
         for candidate in installed_runtime_candidates(&exe_path) {
             if candidate.is_file() {
                 return Ok(candidate);
@@ -164,7 +284,7 @@ fn resolve_runtime_lib(
     }
 
     bail!(
-        "AGILANG runtime library `{RUNTIME_LIB_NAME}` not found. Set AGILANG_RUNTIME_LIB or install it beside the AGILANG toolchain under lib/, runtime/, or a workspace target directory."
+        "AGILANG runtime library not found. Set AGILANG_RUNTIME_LIB or install {RUNTIME_LIB_NAME} beside the agilang binary, ../lib, ../runtime, or a workspace target directory."
     )
 }
 
@@ -172,7 +292,7 @@ fn installed_runtime_candidates(exe_path: &Path) -> Vec<PathBuf> {
     let Some(bin_dir) = exe_path.parent() else {
         return Vec::new();
     };
-    let mut candidates = vec![
+    let candidates = vec![
         bin_dir.join(RUNTIME_LIB_NAME),
         bin_dir.join("..").join("lib").join(RUNTIME_LIB_NAME),
         bin_dir.join("..").join("runtime").join(RUNTIME_LIB_NAME),
@@ -181,11 +301,7 @@ fn installed_runtime_candidates(exe_path: &Path) -> Vec<PathBuf> {
             .join("target")
             .join("release")
             .join(RUNTIME_LIB_NAME),
-        bin_dir
-            .join("..")
-            .join("target")
-            .join("debug")
-            .join(RUNTIME_LIB_NAME),
+        bin_dir.join("..").join("target").join("debug").join(RUNTIME_LIB_NAME),
     ];
 
     #[cfg(target_os = "linux")]
@@ -250,7 +366,7 @@ mod tests {
 
         let resolved = resolve_runtime_lib(
             Some(env_lib.clone()),
-            Some(root.join("bin").join(executable_name())),
+            Some(root.join("bin").join(compiler_binary_name())),
             root.clone(),
         )
         .unwrap();
@@ -260,13 +376,37 @@ mod tests {
     }
 
     #[test]
-    fn runtime_resolver_finds_library_in_installed_lib_directory() {
-        let root = unique_temp_dir("exe");
-        let exe_path = root.join("toolchain").join("bin").join(executable_name());
-        let runtime_lib = root
+    fn runtime_resolver_uses_toolchain_manifest_when_present() {
+        let root = unique_temp_dir("manifest");
+        let exe_path = root
             .join("toolchain")
-            .join("lib")
-            .join(RUNTIME_LIB_NAME);
+            .join("bin")
+            .join(compiler_binary_name());
+        let runtime_lib = root.join("toolchain").join("lib").join(RUNTIME_LIB_NAME);
+        touch(&runtime_lib);
+        write_toolchain_manifest(
+            &root.join("toolchain"),
+            &default_toolchain_manifest(native_target_name(), "1.3.0"),
+        )
+        .unwrap();
+
+        let resolved = resolve_runtime_lib(None, Some(exe_path), root.clone()).unwrap();
+
+        assert_eq!(
+            resolved.canonicalize().unwrap(),
+            runtime_lib.canonicalize().unwrap()
+        );
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn runtime_resolver_finds_library_beside_executable_installation() {
+        let root = unique_temp_dir("exe");
+        let exe_path = root
+            .join("toolchain")
+            .join("bin")
+            .join(compiler_binary_name());
+        let runtime_lib = root.join("toolchain").join("lib").join(RUNTIME_LIB_NAME);
         touch(&runtime_lib);
 
         let resolved = resolve_runtime_lib(None, Some(exe_path), root.clone()).unwrap();
@@ -282,10 +422,7 @@ mod tests {
     fn runtime_resolver_finds_workspace_target_parent() {
         let root = unique_temp_dir("workspace");
         let current_dir = root.join("examples").join("computation").join("src");
-        let runtime_lib = root
-            .join("target")
-            .join("release")
-            .join(RUNTIME_LIB_NAME);
+        let runtime_lib = root.join("target").join("release").join(RUNTIME_LIB_NAME);
         touch(&runtime_lib);
         fs::create_dir_all(&current_dir).unwrap();
 
@@ -310,16 +447,5 @@ mod tests {
     #[test]
     fn native_target_matches_host_platform() {
         assert_ne!(native_target_name(), "unsupported-native-target");
-    }
-
-    fn executable_name() -> &'static str {
-        #[cfg(target_os = "windows")]
-        {
-            "agilang.exe"
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            "agilang"
-        }
     }
 }

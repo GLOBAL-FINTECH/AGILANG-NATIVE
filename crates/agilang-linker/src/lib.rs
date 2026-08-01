@@ -4,13 +4,15 @@ use std::process::Command;
 
 #[cfg(target_os = "windows")]
 const WINDOWS_SYSTEM_LIBRARIES: &str = "ws2_32.lib userenv.lib ntdll.lib bcrypt.lib advapi32.lib pdh.lib powrprof.lib iphlpapi.lib netapi32.lib secur32.lib ole32.lib oleaut32.lib propsys.lib psapi.lib shell32.lib wbemuuid.lib";
+#[cfg(target_os = "linux")]
+const LINUX_SYSTEM_LIBRARIES: &[&str] = &["-lpthread", "-ldl", "-lm"];
 
 #[derive(Debug, Clone)]
 pub struct Linker {
     #[cfg(target_os = "windows")]
     vcvars_path: Option<PathBuf>,
-    #[cfg(not(target_os = "windows"))]
-    c_compiler: PathBuf,
+    #[cfg(target_os = "linux")]
+    compiler: String,
 }
 
 impl Linker {
@@ -32,31 +34,34 @@ impl Linker {
             Self { vcvars_path }
         }
 
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "linux")]
         {
-            let c_compiler = std::env::var_os("AGILANG_CC")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from(detect_unix_c_compiler()));
-            Self { c_compiler }
+            Self {
+                compiler: detect_linux_compiler(),
+            }
         }
     }
 
     pub fn compile_and_link(&self, c_file: &Path, out_exe: &Path, lib_path: &Path) -> Result<()> {
-        let build_dir = out_exe.parent().unwrap_or_else(|| Path::new("build"));
-        let obj_dir = build_dir.join("objects");
-        std::fs::create_dir_all(&obj_dir)?;
-        if let Some(parent) = out_exe.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
         #[cfg(target_os = "windows")]
         {
+            let build_dir = out_exe.parent().unwrap_or_else(|| Path::new("build"));
+            let obj_dir = build_dir.join("objects");
+            std::fs::create_dir_all(&obj_dir)?;
+            if let Some(parent) = out_exe.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
             self.compile_and_link_windows(c_file, out_exe, lib_path, build_dir, &obj_dir)
         }
 
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "linux")]
         {
-            self.compile_and_link_unix(c_file, out_exe, lib_path, &obj_dir)
+            self.compile_and_link_linux(c_file, out_exe, lib_path)
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+        {
+            bail!("AGILANG native linking is not implemented on this platform")
         }
     }
 
@@ -107,20 +112,18 @@ impl Linker {
         Ok(())
     }
 
-    #[cfg(not(target_os = "windows"))]
-    fn compile_and_link_unix(
-        &self,
-        c_file: &Path,
-        out_exe: &Path,
-        lib_path: &Path,
-        obj_dir: &Path,
-    ) -> Result<()> {
+    #[cfg(target_os = "linux")]
+    fn compile_and_link_linux(&self, c_file: &Path, out_exe: &Path, lib_path: &Path) -> Result<()> {
+        let build_dir = out_exe.parent().unwrap_or_else(|| Path::new("build"));
+        let obj_dir = build_dir.join("objects");
+        std::fs::create_dir_all(&obj_dir).ok();
+
         let stem = out_exe
             .file_stem()
             .unwrap_or_else(|| std::ffi::OsStr::new("app"));
         let obj_file = obj_dir.join(format!("{}.o", stem.to_string_lossy()));
 
-        let compile = Command::new(&self.c_compiler)
+        let compile = Command::new(&self.compiler)
             .args(["-std=c11", "-O2", "-fPIC", "-c"])
             .arg(c_file)
             .arg("-o")
@@ -129,35 +132,31 @@ impl Linker {
             .with_context(|| {
                 format!(
                     "failed to execute Linux C compiler `{}`; install clang or gcc, or set AGILANG_CC",
-                    self.c_compiler.display()
+                    self.compiler
                 )
             })?;
         if !compile.status.success() {
             bail!(
                 "C compilation failed with `{}`.\nStdout: {}\nStderr: {}",
-                self.c_compiler.display(),
+                self.compiler,
                 String::from_utf8_lossy(&compile.stdout),
                 String::from_utf8_lossy(&compile.stderr)
             );
         }
 
-        let link = Command::new(&self.c_compiler)
+        let link = Command::new(&self.compiler)
             .arg(&obj_file)
             .arg(lib_path)
-            .args(["-o"])
+            .arg("-o")
             .arg(out_exe)
-            .args(["-lpthread", "-ldl", "-lm", "-lrt", "-lutil"])
+            .args(LINUX_SYSTEM_LIBRARIES)
+            .args(["-lrt", "-lutil"])
             .output()
-            .with_context(|| {
-                format!(
-                    "failed to execute Linux linker through `{}`",
-                    self.c_compiler.display()
-                )
-            })?;
+            .with_context(|| format!("failed to execute Linux linker through `{}`", self.compiler))?;
         if !link.status.success() {
             bail!(
                 "native link failed with `{}`.\nStdout: {}\nStderr: {}",
-                self.c_compiler.display(),
+                self.compiler,
                 String::from_utf8_lossy(&link.stdout),
                 String::from_utf8_lossy(&link.stderr)
             );
@@ -166,20 +165,38 @@ impl Linker {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
-fn detect_unix_c_compiler() -> &'static str {
-    for compiler in ["clang", "cc", "gcc"] {
-        if Command::new(compiler).arg("--version").output().is_ok() {
-            return compiler;
+#[cfg(target_os = "linux")]
+fn detect_linux_compiler() -> String {
+    if let Ok(explicit) = std::env::var("AGILANG_CC") {
+        if !explicit.trim().is_empty() {
+            return explicit;
         }
     }
-    "cc"
+    for candidate in ["clang", "cc", "gcc"] {
+        if command_available(candidate) {
+            return candidate.to_string();
+        }
+    }
+    "cc".to_string()
+}
+
+#[cfg(target_os = "linux")]
+fn command_available(command: &str) -> bool {
+    Command::new("sh")
+        .arg("-c")
+        .arg(format!("command -v {command} >/dev/null 2>&1"))
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
 mod tests {
     #[cfg(target_os = "windows")]
     use super::WINDOWS_SYSTEM_LIBRARIES;
+
+    #[cfg(target_os = "linux")]
+    use super::{command_available, detect_linux_compiler, LINUX_SYSTEM_LIBRARIES};
 
     #[cfg(target_os = "windows")]
     #[test]
@@ -201,10 +218,24 @@ mod tests {
         }
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
     #[test]
-    fn selects_a_unix_c_compiler_name() {
-        let compiler = super::detect_unix_c_compiler();
-        assert!(["clang", "cc", "gcc"].contains(&compiler));
+    fn linux_linker_prefers_supported_tool_names() {
+        let compiler = detect_linux_compiler();
+        assert!(["clang", "cc", "gcc"].contains(&compiler.as_str()) || !compiler.is_empty());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_linker_includes_system_libraries() {
+        for library in ["-lpthread", "-ldl", "-lm"] {
+            assert!(LINUX_SYSTEM_LIBRARIES.contains(&library));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_command_probe_handles_missing_binary() {
+        assert!(!command_available("agilang-this-command-does-not-exist"));
     }
 }

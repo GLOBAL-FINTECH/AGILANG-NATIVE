@@ -43,10 +43,21 @@ pub enum HirStmt {
         value: Option<HirExpr>,
         span: Span,
     },
+    Break {
+        span: Span,
+    },
+    Continue {
+        span: Span,
+    },
     If {
         condition: HirExpr,
         then_body: Vec<HirStmt>,
         else_body: Vec<HirStmt>,
+        span: Span,
+    },
+    While {
+        condition: HirExpr,
+        body: Vec<HirStmt>,
         span: Span,
     },
     ForIn {

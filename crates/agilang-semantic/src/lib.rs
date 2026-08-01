@@ -10,6 +10,7 @@ pub struct Analyser {
     errors: Vec<Diagnostic>,
     current_return_type: Option<Type>,
     current_local_symbols: Vec<Symbol>,
+    loop_depth: usize,
 }
 
 impl Analyser {
@@ -122,6 +123,7 @@ impl Analyser {
             errors: vec![],
             current_return_type: None,
             current_local_symbols: vec![],
+            loop_depth: 0,
         }
     }
 
@@ -300,14 +302,7 @@ impl Analyser {
 
         // Return analysis: check that a non-void function returns on all control flows
         if ret_type != Type::Void && ret_type != Type::Error {
-            let mut returns = false;
-            for stmt in &hir_body {
-                if matches!(stmt, HirStmt::Return { .. }) {
-                    returns = true;
-                    break;
-                }
-            }
-            if !returns {
+            if !self.block_returns(&hir_body) {
                 self.errors.push(Diagnostic::error(
                     "E2008",
                     format!(
@@ -331,6 +326,24 @@ impl Analyser {
             local_symbols: local_syms,
             span: func.span,
         })
+    }
+
+    fn block_returns(&self, body: &[HirStmt]) -> bool {
+        body.iter().any(|stmt| self.stmt_returns(stmt))
+    }
+
+    fn stmt_returns(&self, stmt: &HirStmt) -> bool {
+        match stmt {
+            HirStmt::Return { .. } => true,
+            HirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => !else_body.is_empty()
+                && self.block_returns(then_body)
+                && self.block_returns(else_body),
+            _ => false,
+        }
     }
 
     fn analyse_stmt(&mut self, stmt: &Stmt) -> Option<HirStmt> {
@@ -506,6 +519,30 @@ impl Analyser {
                     span: *span,
                 })
             }
+            Stmt::Break { span } => {
+                if self.loop_depth == 0 {
+                    self.errors.push(Diagnostic::error(
+                        "E2011",
+                        "`break` is only valid inside a loop",
+                        *span,
+                    ));
+                    None
+                } else {
+                    Some(HirStmt::Break { span: *span })
+                }
+            }
+            Stmt::Continue { span } => {
+                if self.loop_depth == 0 {
+                    self.errors.push(Diagnostic::error(
+                        "E2012",
+                        "`continue` is only valid inside a loop",
+                        *span,
+                    ));
+                    None
+                } else {
+                    Some(HirStmt::Continue { span: *span })
+                }
+            }
             Stmt::If {
                 condition,
                 then_body,
@@ -538,6 +575,28 @@ impl Analyser {
                     span: *span,
                 })
             }
+            Stmt::While {
+                condition,
+                body,
+                span,
+            } => {
+                let hir_condition = self.analyse_expr(condition, Some(&Type::Bool))?;
+                self.loop_depth += 1;
+                self.enter_scope();
+                let mut hir_body = vec![];
+                for stmt in body {
+                    if let Some(hir_stmt) = self.analyse_stmt(stmt) {
+                        hir_body.push(hir_stmt);
+                    }
+                }
+                self.exit_scope();
+                self.loop_depth -= 1;
+                Some(HirStmt::While {
+                    condition: hir_condition,
+                    body: hir_body,
+                    span: *span,
+                })
+            }
             Stmt::ForIn {
                 key_name,
                 value_name,
@@ -546,6 +605,7 @@ impl Analyser {
                 span,
             } => {
                 let hir_iterable = self.analyse_expr(iterable, None)?;
+                self.loop_depth += 1;
                 self.enter_scope();
                 let key_sym = Symbol {
                     name: key_name.clone(),
@@ -574,6 +634,7 @@ impl Analyser {
                     }
                 }
                 self.exit_scope();
+                self.loop_depth -= 1;
                 Some(HirStmt::ForIn {
                     key_name: key_name.clone(),
                     value_name: value_name.clone(),
@@ -1498,6 +1559,40 @@ mod tests {
     fn test_list_append_and_len() {
         let src = "fn main() -> i32:\n    let values = [1.0, 2.0, 3.0]\n    append(values, 4.0)\n    let n: i64 = len(values)\n    print(n)\n    return 0\n";
         assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_while_loop_is_lowered() {
+        let src = "fn main() -> i32:\n    let value = 0\n    while value < 3:\n        print(value)\n        value = value + 1\n    return 0\n";
+        let hir = check_source(src).unwrap();
+        assert!(matches!(hir.functions[0].body[1], HirStmt::While { .. }));
+    }
+
+    #[test]
+    fn test_break_and_continue_are_lowered_inside_loop() {
+        let src = "fn main() -> i32:\n    while true:\n        continue\n        break\n    return 0\n";
+        let hir = check_source(src).unwrap();
+        match &hir.functions[0].body[0] {
+            HirStmt::While { body, .. } => {
+                assert!(matches!(body[0], HirStmt::Continue { .. }));
+                assert!(matches!(body[1], HirStmt::Break { .. }));
+            }
+            other => panic!("expected while statement, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_break_outside_loop_is_rejected() {
+        let src = "fn main() -> i32:\n    break\n    return 0\n";
+        let errs = check_source(src).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2011"));
+    }
+
+    #[test]
+    fn test_continue_outside_loop_is_rejected() {
+        let src = "fn main() -> i32:\n    continue\n    return 0\n";
+        let errs = check_source(src).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2012"));
     }
 
     #[test]

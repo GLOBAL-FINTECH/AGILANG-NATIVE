@@ -6,6 +6,11 @@ use agilang_database_mysql_gateway::{
 };
 use agilang_database_security_kernel::Capability;
 use agilang_database_tcp::{fetch_status, perform_handshake, start_server, TransportServerConfig};
+use agilang_build::{
+    compiler_binary_name, executable_suffix,
+    default_runtime_manifest, default_toolchain_manifest, discover_toolchain_from_exe,
+    write_runtime_manifest, write_toolchain_manifest, RUNTIME_DLL_NAME, RUNTIME_LIB_NAME,
+};
 use agilang_framework_database::DatabaseConfig;
 use agilang_framework_migrations::{MigrationExecutor, MigrationFile};
 use agilang_framework_seeding::{ProjectSeedConfig, SeederExecutor};
@@ -16,10 +21,16 @@ use std::{
     time::Duration,
 };
 
-const TARGET: &str = if cfg!(target_arch = "x86_64") {
+const TARGET: &str = if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
     "x86_64-pc-windows-msvc"
-} else {
+} else if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
     "aarch64-pc-windows-msvc"
+} else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+    "x86_64-unknown-linux-gnu"
+} else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+    "aarch64-unknown-linux-gnu"
+} else {
+    "unknown-target"
 };
 const AGILANG_VERSION: &str = env!("CARGO_PKG_VERSION");
 const ABI_VERSION: &str = "1.3.0";
@@ -60,7 +71,7 @@ fn find_conflicting_installations() -> Vec<PathBuf> {
     let active_exe = env::current_exe().ok();
     if let Some(path_var) = env::var_os("Path") {
         for dir in env::split_paths(&path_var) {
-            let exe = dir.join("agilang.exe");
+            let exe = dir.join(compiler_binary_name());
             if exe.exists() {
                 if let Some(ref active) = active_exe {
                     if let (Ok(p1), Ok(p2)) = (exe.canonicalize(), active.canonicalize()) {
@@ -300,7 +311,7 @@ fn main() -> Result<()> {
                 None => find_project_entry()?,
             };
 
-            let mut out_exe = PathBuf::from("build/out.exe");
+            let mut out_exe = PathBuf::from(format!("build/out{}", executable_suffix()));
             if let Ok(current_dir) = env::current_dir() {
                 let mut dir = current_dir;
                 loop {
@@ -309,7 +320,9 @@ fn main() -> Result<()> {
                             .file_name()
                             .map(|n| n.to_string_lossy().into_owned())
                             .unwrap_or_else(|| "app".into());
-                        out_exe = dir.join("build").join(format!("{}.exe", name));
+                        out_exe = dir
+                            .join("build")
+                            .join(format!("{}{}", name, executable_suffix()));
                         break;
                     }
                     if !dir.pop() {
@@ -350,7 +363,7 @@ fn main() -> Result<()> {
                 None => find_project_entry()?,
             };
 
-            let mut out_exe = PathBuf::from("build/out.exe");
+            let mut out_exe = PathBuf::from(format!("build/out{}", executable_suffix()));
             let mut found_project = false;
             if let Ok(current_dir) = env::current_dir() {
                 let mut dir = current_dir;
@@ -360,7 +373,9 @@ fn main() -> Result<()> {
                             .file_name()
                             .map(|n| n.to_string_lossy().into_owned())
                             .unwrap_or_else(|| "app".into());
-                        out_exe = dir.join("build").join(format!("{}.exe", name));
+                        out_exe = dir
+                            .join("build")
+                            .join(format!("{}{}", name, executable_suffix()));
                         found_project = true;
                         break;
                     }
@@ -375,7 +390,7 @@ fn main() -> Result<()> {
                     .file_stem()
                     .unwrap_or_else(|| std::ffi::OsStr::new("out"))
                     .to_string_lossy();
-                out_exe = PathBuf::from(format!("build/{}.exe", stem));
+                out_exe = PathBuf::from(format!("build/{}{}", stem, executable_suffix()));
             }
 
             agilang_build::build_project(&entry_path, &out_exe, emit_c, keep_generated, verbose)?;
@@ -623,6 +638,12 @@ fn main() -> Result<()> {
         }
         "fmt" => {
             println!("Formatting is not yet implemented in Phase 2");
+        }
+        "install" => {
+            command_install(args.collect())?;
+        }
+        "paths" => {
+            command_paths()?;
         }
         "doctor" => {
             run_doctor()?;
@@ -1362,6 +1383,163 @@ fn load_optional(path: Option<String>) -> Result<SourceFile> {
         .with_context(|| format!("failed to load {}", entry_path.display()))
 }
 
+fn default_install_root() -> PathBuf {
+    if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+        return PathBuf::from(local_app_data).join("Programs").join("AGILANG");
+    }
+    PathBuf::from(r"C:\AGILANG")
+}
+
+fn parse_install_args(args: &[String]) -> Result<(PathBuf, bool)> {
+    let mut root = default_install_root();
+    let mut force = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--root" => {
+                let Some(value) = args.get(i + 1) else {
+                    bail!("--root requires a path");
+                };
+                root = PathBuf::from(value);
+                i += 2;
+            }
+            "--force" => {
+                force = true;
+                i += 1;
+            }
+            unknown => bail!("unknown install argument `{unknown}`"),
+        }
+    }
+    Ok((root, force))
+}
+
+fn install_toolchain(
+    active_exe: &Path,
+    runtime_lib: &Path,
+    runtime_dll: Option<&Path>,
+    install_root: &Path,
+    force: bool,
+) -> Result<()> {
+    let bin_dir = install_root.join("bin");
+    let lib_dir = install_root.join("lib");
+    let include_dir = install_root.join("include");
+    let runtime_dir = install_root.join("runtime");
+    let stdlib_dir = install_root.join("stdlib");
+    for dir in [&bin_dir, &lib_dir, &include_dir, &runtime_dir, &stdlib_dir] {
+        fs::create_dir_all(dir)?;
+    }
+
+    let target_exe = bin_dir.join(compiler_binary_name());
+    let target_lib = lib_dir.join(RUNTIME_LIB_NAME);
+    if !force && target_exe.exists() && !files_are_identical(active_exe, &target_exe) {
+        bail!(
+            "refusing to overwrite existing compiler at {} without --force",
+            target_exe.display()
+        );
+    }
+    if !force && target_lib.exists() && !files_are_identical(runtime_lib, &target_lib) {
+        bail!(
+            "refusing to overwrite existing runtime library at {} without --force",
+            target_lib.display()
+        );
+    }
+
+    fs::copy(active_exe, &target_exe)
+        .with_context(|| format!("failed to copy compiler to {}", target_exe.display()))?;
+    fs::copy(runtime_lib, &target_lib)
+        .with_context(|| format!("failed to copy runtime library to {}", target_lib.display()))?;
+
+    if let Some(dll) = runtime_dll {
+        let target_dll = lib_dir.join(RUNTIME_DLL_NAME);
+        fs::copy(dll, &target_dll)
+            .with_context(|| format!("failed to copy runtime dll to {}", target_dll.display()))?;
+    }
+
+    let toolchain_manifest = default_toolchain_manifest(TARGET, ABI_VERSION);
+    let runtime_manifest = default_runtime_manifest(TARGET, ABI_VERSION);
+    write_toolchain_manifest(install_root, &toolchain_manifest)?;
+    write_runtime_manifest(install_root, &runtime_manifest)?;
+    Ok(())
+}
+
+fn command_install(args: Vec<String>) -> Result<()> {
+    let (install_root, force) = parse_install_args(&args)?;
+    let active_exe = env::current_exe().context("failed to resolve active executable")?;
+    let runtime_lib = agilang_build::diagnose_runtime_lib()?;
+    let runtime_dll = runtime_lib.with_file_name(RUNTIME_DLL_NAME);
+
+    install_toolchain(
+        &active_exe,
+        &runtime_lib,
+        runtime_dll.is_file().then_some(runtime_dll.as_path()),
+        &install_root,
+        force,
+    )?;
+
+    println!("Installed AGILANG toolchain");
+    println!("  root: {}", install_root.display());
+    println!(
+        "  compiler: {}",
+        install_root.join("bin").join(compiler_binary_name()).display()
+    );
+    println!(
+        "  runtime library: {}",
+        install_root.join("lib").join(RUNTIME_LIB_NAME).display()
+    );
+    println!("  manifest: {}", install_root.join("toolchain.json").display());
+    Ok(())
+}
+
+fn command_paths() -> Result<()> {
+    let active_exe = env::current_exe().context("failed to resolve active executable")?;
+    let install_root = active_exe
+        .parent()
+        .and_then(|parent| parent.parent())
+        .map(Path::to_path_buf)
+        .unwrap_or_else(default_install_root);
+    let runtime_lib = agilang_build::diagnose_runtime_lib().ok();
+    let toolchain = discover_toolchain_from_exe(&active_exe);
+
+    println!("AGILANG Paths");
+    println!("  executable: {}", active_exe.display());
+    println!("  install root: {}", install_root.display());
+    println!("  bin: {}", install_root.join("bin").display());
+    println!("  lib: {}", install_root.join("lib").display());
+    println!("  include: {}", install_root.join("include").display());
+    println!("  runtime: {}", install_root.join("runtime").display());
+    println!("  stdlib: {}", install_root.join("stdlib").display());
+    println!(
+        "  toolchain manifest: {}",
+        install_root.join("toolchain.json").display()
+    );
+    println!(
+        "  runtime library: {}",
+        runtime_lib
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "<unresolved>".to_string())
+    );
+    println!(
+        "  manifest status: {}",
+        if toolchain.is_some() { "present" } else { "missing" }
+    );
+    Ok(())
+}
+
+fn describe_install_layout(active_exe: &Path, toolchain: Option<&agilang_build::ToolchainInstallation>) -> &'static str {
+    if toolchain.is_some() {
+        "manifest-backed"
+    } else if active_exe
+        .parent()
+        .and_then(|parent| parent.parent())
+        .map(|root| root.join("lib").join(RUNTIME_LIB_NAME).exists())
+        .unwrap_or(false)
+    {
+        "bin/lib legacy"
+    } else {
+        "incomplete"
+    }
+}
+
 fn run_doctor() -> Result<()> {
     let active_exe = env::current_exe().unwrap_or_else(|_| PathBuf::from("unknown"));
     let active_exe_display = active_exe.to_string_lossy().into_owned();
@@ -1375,6 +1553,7 @@ fn run_doctor() -> Result<()> {
         .and_then(|parent| parent.parent())
         .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_else(|| "unknown".to_string());
+    let toolchain = discover_toolchain_from_exe(&active_exe);
 
     println!("AGILANG Doctor");
     println!("  date: August 1, 2026");
@@ -1388,11 +1567,30 @@ fn run_doctor() -> Result<()> {
         "  AGILANG_RUNTIME_LIB: {}",
         env::var("AGILANG_RUNTIME_LIB").unwrap_or_else(|_| "<unset>".to_string())
     );
+    if let Some(toolchain) = &toolchain {
+        println!("  toolchain manifest: {}", toolchain.manifest_path.display());
+        println!("  manifest version: {}", toolchain.manifest.version);
+        println!("  manifest target: {}", toolchain.manifest.target);
+    } else {
+        println!("  toolchain manifest: missing");
+    }
 
     println!("\nToolchain");
     print_tool_status("cargo", command_available("cargo"));
-    print_tool_status("cl.exe", command_available("cl.exe"));
-    print_tool_status("link.exe", command_available("link.exe"));
+    #[cfg(target_os = "windows")]
+    {
+        print_tool_status("cl.exe", command_available("cl.exe"));
+        print_tool_status("link.exe", command_available("link.exe"));
+    }
+    #[cfg(target_os = "linux")]
+    {
+        print_tool_status("clang", command_available("clang"));
+        print_tool_status("cc", command_available("cc"));
+        print_tool_status("gcc", command_available("gcc"));
+        print_tool_status("ld", command_available("ld"));
+        print_tool_status("ar", command_available("ar"));
+        print_tool_status("pkg-config", command_available("pkg-config"));
+    }
 
     if let Ok(runtime_path) = &runtime_lib {
         let runtime_version_match = runtime_path.exists();
@@ -1403,6 +1601,10 @@ fn run_doctor() -> Result<()> {
     } else {
         println!("  runtime resolution status: failed");
     }
+    println!(
+        "  installation layout: {}",
+        describe_install_layout(&active_exe, toolchain.as_ref())
+    );
 
     let smoke = run_native_smoke_test(runtime_lib.ok());
     println!("\nNative smoke test");
@@ -1438,11 +1640,27 @@ fn print_tool_status(name: &str, available: bool) {
 }
 
 fn command_available(command: &str) -> bool {
-    std::process::Command::new("where.exe")
-        .arg(command)
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    #[cfg(target_os = "windows")]
+    {
+        return std::process::Command::new("where.exe")
+            .arg(command)
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        return std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!("command -v {command} >/dev/null 2>&1"))
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false);
+    }
+
+    #[allow(unreachable_code)]
+    false
 }
 
 fn run_native_smoke_test(runtime_lib: Option<PathBuf>) -> Result<String> {
@@ -1474,7 +1692,9 @@ entry = "src/main.agi"
     }
 
     let result = (|| -> Result<String> {
-        let out_exe = root.join("build").join("doctor-smoke.exe");
+        let out_exe = root
+            .join("build")
+            .join(format!("doctor-smoke{}", executable_suffix()));
         agilang_build::build_project(&root.join("src/main.agi"), &out_exe, false, false, false)?;
         let output = std::process::Command::new(&out_exe)
             .output()
@@ -1515,6 +1735,8 @@ fn print_help() {
         Commands:\n  \
           agilang new <project> [--template <template>]\n  \
           agilang init\n  \
+          agilang install [--root <path>] [--force]\n  \
+          agilang paths\n  \
           agilang http-client [--force]\n  \
           agilang check [<file>]\n  \
           agilang run [<file>]\n  \
