@@ -17,6 +17,7 @@ members = [
   "crates/agilang-blockchain-storage",
   "crates/agilang-blockchain-state",
   "crates/agilang-blockchain-node",
+  "crates/agilang-blockchain-consensus",
   "crates/agilang-runtime-abi",
   "crates/agilang-runtime-cli",
   "crates/agilang-compat-audit",
@@ -117,6 +118,7 @@ parking_lot = "0.12"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 sha2 = "0.10"
+hmac = "0.12"
 thiserror = "2.0"
 tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "time", "sync", "net", "fs", "io-util", "signal"] }
 tracing = "0.1"
