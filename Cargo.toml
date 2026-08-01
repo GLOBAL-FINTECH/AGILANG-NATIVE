@@ -20,6 +20,9 @@ members = [
   "crates/agilang-blockchain-consensus",
   "crates/agilang-blockchain-rpc",
   "crates/agilang-blockchain-p2p",
+  "crates/agilang-blockchain-transaction",
+  "crates/agilang-blockchain-service",
+  "crates/agilang-blockchain-fee",
   "crates/agilang-runtime-abi",
   "crates/agilang-runtime-cli",
   "crates/agilang-compat-audit",
@@ -121,6 +124,8 @@ serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 sha2 = "0.10"
 hmac = "0.12"
+sha3 = "0.10"
+k256 = { version = "0.13", features = ["ecdsa"] }
 thiserror = "2.0"
 tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "time", "sync", "net", "fs", "io-util", "signal"] }
 tracing = "0.1"
