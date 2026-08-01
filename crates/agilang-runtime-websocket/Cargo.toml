@@ -1,0 +1,10 @@
+[package]
+name = "agilang-runtime-websocket"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+base64.workspace = true
+sha1 = "0.10"
