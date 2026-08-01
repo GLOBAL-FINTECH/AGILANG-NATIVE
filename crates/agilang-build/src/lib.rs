@@ -87,6 +87,10 @@ pub fn build_project(
     Ok(())
 }
 
+pub fn diagnose_runtime_lib() -> Result<PathBuf> {
+    find_runtime_lib()
+}
+
 fn find_project_root(entry_file: &Path) -> Option<PathBuf> {
     let mut dir = entry_file.parent()?.to_path_buf();
     loop {

@@ -625,26 +625,7 @@ fn main() -> Result<()> {
             println!("Formatting is not yet implemented in Phase 2");
         }
         "doctor" => {
-            let active_exe = env::current_exe()
-                .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_else(|_| "unknown".to_string());
-            println!("CLI resolution");
-            println!("  active: {}", active_exe);
-            println!("  version: AGILANG v{AGILANG_VERSION}");
-            println!("  status: native");
-            println!("  AGILANG native runtime status: healthy");
-
-            let conflicts = find_conflicting_installations();
-            if !conflicts.is_empty() {
-                println!("\nConflicting installations");
-                for c in conflicts {
-                    println!("  found: {}", c.display());
-                    println!("  implementation: alternate AGILANG executable");
-                    println!("  recommendation: remove it from PATH or update it to this version");
-                }
-            } else {
-                println!("\nNo conflicting installations found.");
-            }
+            run_doctor()?;
         }
         "--version" | "version" | "-V" => {
             let verbose = args.next().as_deref() == Some("--verbose");
@@ -1379,6 +1360,143 @@ fn load_optional(path: Option<String>) -> Result<SourceFile> {
     };
     SourceFile::load(&entry_path)
         .with_context(|| format!("failed to load {}", entry_path.display()))
+}
+
+fn run_doctor() -> Result<()> {
+    let active_exe = env::current_exe().unwrap_or_else(|_| PathBuf::from("unknown"));
+    let active_exe_display = active_exe.to_string_lossy().into_owned();
+    let runtime_lib = agilang_build::diagnose_runtime_lib();
+    let runtime_lib_path = runtime_lib
+        .as_ref()
+        .map(|path| path.to_string_lossy().into_owned())
+        .unwrap_or_else(|error| format!("unresolved ({error})"));
+    let install_root = active_exe
+        .parent()
+        .and_then(|parent| parent.parent())
+        .map(|path| path.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    println!("AGILANG Doctor");
+    println!("  date: August 1, 2026");
+    println!("  active executable: {}", active_exe_display);
+    println!("  CLI version: {}", AGILANG_VERSION);
+    println!("  ABI version: {}", ABI_VERSION);
+    println!("  target triple: {}", TARGET);
+    println!("  installation root: {}", install_root);
+    println!("  runtime library: {}", runtime_lib_path);
+    println!(
+        "  AGILANG_RUNTIME_LIB: {}",
+        env::var("AGILANG_RUNTIME_LIB").unwrap_or_else(|_| "<unset>".to_string())
+    );
+
+    println!("\nToolchain");
+    print_tool_status("cargo", command_available("cargo"));
+    print_tool_status("cl.exe", command_available("cl.exe"));
+    print_tool_status("link.exe", command_available("link.exe"));
+
+    if let Ok(runtime_path) = &runtime_lib {
+        let runtime_version_match = runtime_path.exists();
+        println!(
+            "  runtime resolution status: {}",
+            if runtime_version_match { "ok" } else { "missing" }
+        );
+    } else {
+        println!("  runtime resolution status: failed");
+    }
+
+    let smoke = run_native_smoke_test(runtime_lib.ok());
+    println!("\nNative smoke test");
+    match smoke {
+        Ok(output) => {
+            println!("  compile: ok");
+            println!("  execute: ok");
+            println!("  output: {}", output.trim());
+        }
+        Err(error) => {
+            println!("  compile: failed");
+            println!("  execute: skipped");
+            println!("  error: {}", error);
+        }
+    }
+
+    let conflicts = find_conflicting_installations();
+    if !conflicts.is_empty() {
+        println!("\nConflicting installations");
+        for c in conflicts {
+            println!("  found: {}", c.display());
+            println!("  recommendation: remove it from PATH or update it to this version");
+        }
+    } else {
+        println!("\nConflicting installations: none");
+    }
+
+    Ok(())
+}
+
+fn print_tool_status(name: &str, available: bool) {
+    println!("  {}: {}", name, if available { "found" } else { "missing" });
+}
+
+fn command_available(command: &str) -> bool {
+    std::process::Command::new("where.exe")
+        .arg(command)
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+fn run_native_smoke_test(runtime_lib: Option<PathBuf>) -> Result<String> {
+    let root = env::temp_dir().join(format!(
+        "agilang-doctor-{}",
+        chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    ));
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("agilang.toml"),
+        r#"[project]
+name = "doctor-smoke"
+version = "0.1.0"
+
+[application]
+entry = "src/main.agi"
+"#,
+    )?;
+    fs::write(
+        root.join("src/main.agi"),
+        "fn main() -> void:\n    print(\"AGILANG doctor smoke test passed\")\n",
+    )?;
+
+    let previous_dir = env::current_dir()?;
+    let previous_runtime = env::var_os("AGILANG_RUNTIME_LIB");
+    env::set_current_dir(&root)?;
+    if let Some(runtime_lib) = runtime_lib {
+        env::set_var("AGILANG_RUNTIME_LIB", runtime_lib);
+    }
+
+    let result = (|| -> Result<String> {
+        let out_exe = root.join("build").join("doctor-smoke.exe");
+        agilang_build::build_project(&root.join("src/main.agi"), &out_exe, false, false, false)?;
+        let output = std::process::Command::new(&out_exe)
+            .output()
+            .context("failed to execute smoke-test binary")?;
+        if !output.status.success() {
+            bail!(
+                "smoke-test binary exited non-zero: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    })();
+
+    env::set_current_dir(previous_dir)?;
+    if let Some(value) = previous_runtime {
+        env::set_var("AGILANG_RUNTIME_LIB", value);
+    } else {
+        env::remove_var("AGILANG_RUNTIME_LIB");
+    }
+    fs::remove_dir_all(&root).ok();
+
+    result
 }
 
 fn report(source: &SourceFile, errors: Vec<agilang_compiler::Diagnostic>) -> Result<()> {
