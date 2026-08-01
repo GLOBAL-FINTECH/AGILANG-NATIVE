@@ -19,6 +19,7 @@ pub enum TokenKind {
     If,
     Elif,
     Else,
+    Match,
     While,
     For,
     In,
@@ -313,6 +314,7 @@ impl<'a> Lexer<'a> {
             "if" => TokenKind::If,
             "elif" => TokenKind::Elif,
             "else" => TokenKind::Else,
+            "match" => TokenKind::Match,
             "while" => TokenKind::While,
             "for" => TokenKind::For,
             "in" => TokenKind::In,
@@ -515,5 +517,15 @@ mod tests {
         );
         let t = lex(&s).unwrap();
         assert!(t.iter().any(|x| x.kind == TokenKind::Enum));
+    }
+
+    #[test]
+    fn lexes_match_keyword() {
+        let s = SourceFile::new(
+            "x.agi",
+            "match status:\n    Status.Active:\n        return 1\n    _:\n        return 0\n",
+        );
+        let t = lex(&s).unwrap();
+        assert!(t.iter().any(|x| x.kind == TokenKind::Match));
     }
 }

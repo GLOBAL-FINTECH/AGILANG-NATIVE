@@ -273,6 +273,9 @@ impl<'a> Parser<'a> {
         if self.at(&TokenKind::If) {
             return self.if_statement();
         }
+        if self.at(&TokenKind::Match) {
+            return self.match_statement();
+        }
         if self.at(&TokenKind::While) {
             return self.while_statement();
         }
@@ -399,6 +402,55 @@ impl<'a> Parser<'a> {
             then_body,
             else_body,
             span: Span::new(start, end),
+        })
+    }
+    fn match_statement(&mut self) -> Option<Stmt> {
+        let start = self.expect(&TokenKind::Match, "E170", "expected `match`")?.span.start;
+        let subject = self.expression()?;
+        self.expect(&TokenKind::Colon, "E171", "expected `:`")?;
+        self.expect(&TokenKind::Newline, "E172", "expected newline")?;
+        self.expect(&TokenKind::Indent, "E173", "expected indented match body")?;
+        let mut arms = vec![];
+        while !self.at(&TokenKind::Dedent) && !self.at(&TokenKind::Eof) {
+            if self.eat(&TokenKind::Newline).is_some() {
+                continue;
+            }
+            let pattern = self.match_pattern()?;
+            let pattern_span = match &pattern {
+                MatchPattern::EnumVariant { span, .. } | MatchPattern::Wildcard { span } => *span,
+            };
+            self.expect(&TokenKind::Colon, "E174", "expected `:` after match pattern")?;
+            self.expect(&TokenKind::Newline, "E175", "expected newline")?;
+            self.expect(&TokenKind::Indent, "E176", "expected indented match arm body")?;
+            let body = self.block_statements()?;
+            let end = body.last().map(stmt_span_end).unwrap_or(pattern_span.end);
+            arms.push(MatchArm {
+                pattern,
+                body,
+                span: Span::new(pattern_span.start, end),
+            });
+        }
+        let end = self
+            .expect(&TokenKind::Dedent, "E177", "expected end of match body")
+            .map(|t| t.span.end)
+            .unwrap_or(subject.span().end);
+        Some(Stmt::Match {
+            subject,
+            arms,
+            span: Span::new(start, end),
+        })
+    }
+    fn match_pattern(&mut self) -> Option<MatchPattern> {
+        let (name, first_span) = self.identifier("expected match pattern")?;
+        if name == "_" {
+            return Some(MatchPattern::Wildcard { span: first_span });
+        }
+        self.expect(&TokenKind::Dot, "E178", "expected `.` in enum match pattern")?;
+        let (variant, variant_span) = self.identifier("expected enum variant")?;
+        Some(MatchPattern::EnumVariant {
+            enum_name: name,
+            variant,
+            span: Span::new(first_span.start, variant_span.end),
         })
     }
     fn for_in_statement(&mut self) -> Option<Stmt> {
@@ -856,6 +908,7 @@ fn stmt_span_end(stmt: &Stmt) -> usize {
         | Stmt::Break { span, .. }
         | Stmt::Continue { span, .. }
         | Stmt::If { span, .. }
+        | Stmt::Match { span, .. }
         | Stmt::While { span, .. }
         | Stmt::ForIn { span, .. } => span.end,
         Stmt::Expr(expr) => expr.span().end,
@@ -927,6 +980,16 @@ mod tests {
         assert_eq!(p.enums[0].name, "Status");
         assert_eq!(p.enums[0].variants.len(), 3);
         assert_eq!(p.enums[0].variants[1].name, "Active");
+    }
+
+    #[test]
+    fn parses_match_statement() {
+        let s = SourceFile::new(
+            "x.agi",
+            "enum Status:\n    Pending\n    Active\n\nfn main() -> i32:\n    let status: Status = Status.Active\n    match status:\n        Status.Active:\n            return 1\n        _:\n            return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        assert!(matches!(p.functions[0].body[1], Stmt::Match { .. }));
     }
 
     #[test]

@@ -257,6 +257,21 @@ fn main() -> Result<()> {
                                             else_body.len()
                                         );
                                     }
+                                    agilang_ir::HirStmt::Match {
+                                        subject,
+                                        arms,
+                                        exhaustive,
+                                        ..
+                                    } => {
+                                        println!(
+                                            "{}{}Match {} with {} arm(s){}",
+                                            child_prefix,
+                                            stmt_prefix,
+                                            format_hir_expr(subject),
+                                            arms.len(),
+                                            if *exhaustive { " exhaustive" } else { "" }
+                                        );
+                                    }
                                     agilang_ir::HirStmt::While { condition, body, .. } => {
                                         println!(
                                             "{}{}While {} do {} stmt(s)",

@@ -48,6 +48,25 @@ pub struct EnumVariant {
     pub name: String,
     pub span: Span,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchArm {
+    pub pattern: MatchPattern,
+    pub body: Vec<Stmt>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MatchPattern {
+    EnumVariant {
+        enum_name: String,
+        variant: String,
+        span: Span,
+    },
+    Wildcard {
+        span: Span,
+    },
+}
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
@@ -95,6 +114,11 @@ pub enum Stmt {
         condition: Expr,
         then_body: Vec<Stmt>,
         else_body: Vec<Stmt>,
+        span: Span,
+    },
+    Match {
+        subject: Expr,
+        arms: Vec<MatchArm>,
         span: Span,
     },
     While {

@@ -1,8 +1,10 @@
-use agilang_ast::{BinaryOp, EnumDecl, Expr, Function, Program, Stmt, StructDecl, TypeRef};
+use agilang_ast::{
+    BinaryOp, EnumDecl, Expr, Function, MatchPattern, Program, Stmt, StructDecl, TypeRef,
+};
 use agilang_diagnostics::Diagnostic;
 use agilang_ir::{
-    HirBinaryOp, HirEnum, HirEnumVariant, HirExpr, HirFunction, HirParameter, HirProgram,
-    HirStmt, HirStruct, HirStructField,
+    HirBinaryOp, HirEnum, HirEnumVariant, HirExpr, HirFunction, HirMatchArm, HirMatchPattern,
+    HirParameter, HirProgram, HirStmt, HirStruct, HirStructField,
 };
 use agilang_source::Span;
 use agilang_symbols::{Symbol, SymbolKind, SymbolTable};
@@ -464,6 +466,9 @@ impl Analyser {
             } => !else_body.is_empty()
                 && self.block_returns(then_body)
                 && self.block_returns(else_body),
+            HirStmt::Match {
+                arms, exhaustive, ..
+            } => *exhaustive && arms.iter().all(|arm| self.block_returns(&arm.body)),
             _ => false,
         }
     }
@@ -715,6 +720,164 @@ impl Analyser {
                     condition: hir_condition,
                     then_body: hir_then,
                     else_body: hir_else,
+                    span: *span,
+                })
+            }
+            Stmt::Match { subject, arms, span } => {
+                let hir_subject = self.analyse_expr(subject, None)?;
+                let Type::Enum(subject_enum_name) = hir_subject.ty().clone() else {
+                    self.errors.push(Diagnostic::error(
+                        "E2201",
+                        "match subject must be an enum",
+                        subject.span(),
+                    ));
+                    return Some(HirStmt::Match {
+                        subject: hir_subject,
+                        arms: vec![],
+                        exhaustive: false,
+                        span: *span,
+                    });
+                };
+
+                let mut seen_variants = HashMap::<String, Span>::new();
+                let mut wildcard_seen = None::<Span>;
+                let mut matched_variants = std::collections::HashSet::<String>::new();
+                let mut hir_arms = vec![];
+
+                for arm in arms {
+                    let hir_pattern = match &arm.pattern {
+                        MatchPattern::EnumVariant {
+                            enum_name,
+                            variant,
+                            span: pattern_span,
+                        } => {
+                            if wildcard_seen.is_some() {
+                                self.errors.push(Diagnostic::error(
+                                    "E2206",
+                                    "unreachable match arm",
+                                    *pattern_span,
+                                ));
+                            }
+                            if enum_name != &subject_enum_name {
+                                self.errors.push(Diagnostic::error(
+                                    "E2203",
+                                    format!(
+                                        "pattern belongs to enum `{}`, expected `{}`",
+                                        enum_name, subject_enum_name
+                                    ),
+                                    *pattern_span,
+                                ));
+                            } else if let Some(enum_decl) = self.enum_defs.get(&subject_enum_name) {
+                                if !enum_decl.variants.iter().any(|v| v.name == *variant) {
+                                    self.errors.push(Diagnostic::error(
+                                        "E2202",
+                                        format!(
+                                            "unknown enum variant `{}` for `{}`",
+                                            variant, subject_enum_name
+                                        ),
+                                        *pattern_span,
+                                    ));
+                                }
+                            }
+                            let key = format!("{enum_name}.{variant}");
+                            if let Some(existing_span) = seen_variants.insert(key, *pattern_span) {
+                                self.errors.push(
+                                    Diagnostic::error(
+                                        "E2204",
+                                        "duplicate match arm",
+                                        *pattern_span,
+                                    )
+                                    .with_hint(format!(
+                                        "first declared at span {}..{}",
+                                        existing_span.start, existing_span.end
+                                    )),
+                                );
+                            }
+                            matched_variants.insert(variant.clone());
+                            HirMatchPattern::EnumVariant {
+                                enum_name: enum_name.clone(),
+                                variant: variant.clone(),
+                                span: *pattern_span,
+                            }
+                        }
+                        MatchPattern::Wildcard { span: pattern_span } => {
+                            if let Some(existing_span) = wildcard_seen {
+                                self.errors.push(
+                                    Diagnostic::error(
+                                        "E2204",
+                                        "duplicate match arm",
+                                        *pattern_span,
+                                    )
+                                    .with_hint(format!(
+                                        "first wildcard declared at span {}..{}",
+                                        existing_span.start, existing_span.end
+                                    )),
+                                );
+                            }
+                            wildcard_seen = Some(*pattern_span);
+                            HirMatchPattern::Wildcard { span: *pattern_span }
+                        }
+                    };
+
+                    self.enter_scope();
+                    let mut hir_body = vec![];
+                    for stmt in &arm.body {
+                        if let Some(hir_stmt) = self.analyse_stmt(stmt) {
+                            hir_body.push(hir_stmt);
+                        }
+                    }
+                    self.exit_scope();
+
+                    hir_arms.push(HirMatchArm {
+                        pattern: hir_pattern,
+                        body: hir_body,
+                        span: arm.span,
+                    });
+                }
+
+                let exhaustive = if wildcard_seen.is_some() {
+                    true
+                } else if let Some(enum_decl) = self.enum_defs.get(&subject_enum_name) {
+                    let missing: Vec<String> = enum_decl
+                        .variants
+                        .iter()
+                        .filter(|variant| !matched_variants.contains(&variant.name))
+                        .map(|variant| variant.name.clone())
+                        .collect();
+                    if !missing.is_empty() {
+                        self.errors.push(Diagnostic::error(
+                            "E2205",
+                            format!(
+                                "non-exhaustive match for `{}`; missing {}",
+                                subject_enum_name,
+                                missing.join(", ")
+                            ),
+                            *span,
+                        ));
+                        false
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                };
+
+                if let Some(wildcard_span) = wildcard_seen {
+                    if let Some(last_arm) = hir_arms.last() {
+                        if !matches!(last_arm.pattern, HirMatchPattern::Wildcard { .. }) {
+                            self.errors.push(Diagnostic::error(
+                                "E2207",
+                                "wildcard arm must be last",
+                                wildcard_span,
+                            ));
+                        }
+                    }
+                }
+
+                Some(HirStmt::Match {
+                    subject: hir_subject,
+                    arms: hir_arms,
+                    exhaustive,
                     span: *span,
                 })
             }
@@ -1897,6 +2060,26 @@ mod tests {
         let src = "enum Status:\n    Pending\n    Active\n\nfn main() -> bool:\n    return Status.Unknown == Status.Active\n";
         let errs = check_source(src).unwrap_err();
         assert!(errs.iter().any(|e| e.code == "E2106"));
+    }
+
+    #[test]
+    fn test_exhaustive_match_counts_as_return() {
+        let src = "enum Status:\n    Pending\n    Active\n    Suspended\n\nfn status_code(status: Status) -> i32:\n    match status:\n        Status.Pending:\n            return 1\n        Status.Active:\n            return 2\n        Status.Suspended:\n            return 3\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_non_exhaustive_match_is_rejected() {
+        let src = "enum Status:\n    Pending\n    Active\n    Suspended\n\nfn status_code(status: Status) -> i32:\n    match status:\n        Status.Pending:\n            return 1\n        Status.Active:\n            return 2\n";
+        let errs = check_source(src).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2205"));
+    }
+
+    #[test]
+    fn test_match_subject_must_be_enum() {
+        let src = "fn main() -> i32:\n    match 42:\n        _:\n            return 0\n";
+        let errs = check_source(src).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2201"));
     }
 }
 

@@ -38,6 +38,25 @@ pub struct HirEnumVariant {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirMatchArm {
+    pub pattern: HirMatchPattern,
+    pub body: Vec<HirStmt>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HirMatchPattern {
+    EnumVariant {
+        enum_name: String,
+        variant: String,
+        span: Span,
+    },
+    Wildcard {
+        span: Span,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HirFunction {
     pub name: String,
     pub params: Vec<HirParameter>,
@@ -82,6 +101,12 @@ pub enum HirStmt {
         condition: HirExpr,
         then_body: Vec<HirStmt>,
         else_body: Vec<HirStmt>,
+        span: Span,
+    },
+    Match {
+        subject: HirExpr,
+        arms: Vec<HirMatchArm>,
+        exhaustive: bool,
         span: Span,
     },
     While {

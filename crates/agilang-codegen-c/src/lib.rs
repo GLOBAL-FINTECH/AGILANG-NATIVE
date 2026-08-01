@@ -629,6 +629,32 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
             out.push('\n');
             out
         }
+        HirStmt::Match { subject, arms, .. } => {
+            let mut out = format!("{}switch ({}) {{\n", ind, generate_expr(subject));
+            for arm in arms {
+                match &arm.pattern {
+                    agilang_ir::HirMatchPattern::EnumVariant {
+                        enum_name,
+                        variant,
+                        ..
+                    } => {
+                        out.push_str(&format!(
+                            "{}    case {}_{}:\n",
+                            ind, enum_name, variant
+                        ));
+                    }
+                    agilang_ir::HirMatchPattern::Wildcard { .. } => {
+                        out.push_str(&format!("{}    default:\n", ind));
+                    }
+                }
+                for stmt in &arm.body {
+                    out.push_str(&generate_stmt(stmt, indent + 8));
+                }
+                out.push_str(&format!("{}        break;\n", ind));
+            }
+            out.push_str(&format!("{}}}\n", ind));
+            out
+        }
         HirStmt::While {
             condition, body, ..
         } => {
@@ -1576,6 +1602,32 @@ mod tests {
         let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
             "enum_exec.agi",
             "enum Status:\n    Pending\n    Active\n    Suspended\n\nfn main() -> i32:\n    let status: Status = Status.Active\n    if status == Status.Active:\n        return 7\n    return 2\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 7);
+    }
+
+    #[test]
+    fn test_codegen_match_lowers_to_switch() {
+        let source = SourceFile::new(
+            "match.agi",
+            "enum Status:\n    Pending\n    Active\n    Suspended\n\nfn status_code(status: Status) -> i32:\n    match status:\n        Status.Pending:\n            return 1\n        Status.Active:\n            return 2\n        _:\n            return 0\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("switch (status) {"));
+        assert!(c_code.contains("case Status_Pending:"));
+        assert!(c_code.contains("case Status_Active:"));
+        assert!(c_code.contains("default:"));
+    }
+
+    #[test]
+    fn test_codegen_exec_match_binary() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "match_exec.agi",
+            "enum Status:\n    Pending\n    Active\n    Suspended\n\nfn main() -> i32:\n    let status: Status = Status.Active\n    match status:\n        Status.Pending:\n            return 1\n        Status.Active:\n            return 7\n        Status.Suspended:\n            return 3\n",
         ) else {
             return;
         };
