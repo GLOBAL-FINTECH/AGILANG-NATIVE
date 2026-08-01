@@ -453,6 +453,10 @@ class ApplicationService:
         return "0.5.0"
 "#,
         ),
+        ("app/Policies/.gitkeep", ""),
+        ("app/Requests/.gitkeep", ""),
+        ("database/factories/.gitkeep", ""),
+        ("tests/Unit/.gitkeep", ""),
         (
             "app/Console/Commands/HelloCommand.agi",
             r#"module App.Console.Commands
@@ -510,19 +514,40 @@ return AuthConfig {
         (
             "config/database.agi",
             r#"return {
-    "primary": {
-        "driver": "agidb",
-        "database": "storage/database/main.agidb",
-        "credential_source": "vault:database/roles/{name}-runtime",
-        "tls": "verify-full",
-        "pool_min": 2,
-        "pool_max": 20,
-        "connection_timeout_ms": 5000,
-        "statement_timeout_ms": 15000,
-        "prepared_statements_only": true,
-        "raw_sql_requires_unsafe": true,
-        "audit_queries": true
-    }
+    "default": "agidb",
+    "connections": {
+        "agidb": {
+            "driver": "agidb",
+            "database": "storage/database/main.agidb",
+            "credential_source": "vault:database/roles/{name}-runtime",
+            "pool_min": 2,
+            "pool_max": 20,
+            "connection_timeout_ms": 5000,
+            "statement_timeout_ms": 15000
+        },
+        "sqlite": {
+            "driver": "sqlite",
+            "database": "storage/database/main.sqlite",
+            "pool_min": 1,
+            "pool_max": 10,
+            "connection_timeout_ms": 5000,
+            "statement_timeout_ms": 15000
+        },
+        "mysql": {
+            "driver": "mysql",
+            "host": env("DB_HOST", "127.0.0.1"),
+            "port": env_i32("DB_PORT", 3306),
+            "database": env("DB_DATABASE", "{name}"),
+            "username": env("DB_USERNAME", ""),
+            "password_secret": env("DB_PASSWORD_SECRET", "vault:database/mysql/{name}"),
+            "tls": env("DB_TLS_MODE", "verify-full"),
+            "pool_min": 2,
+            "pool_max": 20,
+            "connection_timeout_ms": 5000,
+            "statement_timeout_ms": 15000
+        }
+    },
+    "strict_driver_selection": true
 }
 "#,
         ),
@@ -1307,6 +1332,60 @@ fn to_pascal_case(s: &str) -> String {
         .collect()
 }
 
+fn to_snake_case(s: &str) -> String {
+    let mut out = String::new();
+    for (index, ch) in s.chars().enumerate() {
+        if ch.is_uppercase() && index > 0 {
+            out.push('_');
+        }
+        if ch.is_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else if !out.ends_with('_') {
+            out.push('_');
+        }
+    }
+    out.trim_matches('_').to_string()
+}
+
+fn ensure_parent_dir(path: &PathBuf) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    Ok(())
+}
+
+fn write_generated_file(path: &PathBuf, content: &str, force: bool, label: &str) -> Result<()> {
+    if path.exists() && !force {
+        bail!(
+            "{} `{}` already exists. Re-run with --force to overwrite it.",
+            label,
+            path.display()
+        );
+    }
+    ensure_parent_dir(path)?;
+    fs::write(path, content)?;
+    Ok(())
+}
+
+fn nested_namespace(root: &str, file_name: &str) -> String {
+    let ns_parts = file_name.split('/').collect::<Vec<_>>();
+    if ns_parts.len() > 1 {
+        format!("{root}.{}", ns_parts[..ns_parts.len() - 1].join("."))
+    } else {
+        root.to_string()
+    }
+}
+
+fn pluralize(word: &str) -> String {
+    if word.ends_with('s') {
+        format!("{word}es")
+    } else if word.ends_with('y') && word.len() > 1 {
+        format!("{}ies", &word[..word.len() - 1])
+    } else {
+        format!("{word}s")
+    }
+}
+
 fn find_project_root() -> Result<PathBuf> {
     let mut dir = std::env::current_dir()?;
     loop {
@@ -1356,13 +1435,15 @@ pub fn install_http_client(force: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn make_component(component: &str, name: &str) -> Result<()> {
-    // Determine project root by looking for agilang.toml in current or parents
+pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
     let project_root = find_project_root()?;
-
     let normalized_name = normalize_path_name(name);
     let parts: Vec<&str> = normalized_name.split('/').collect();
     let class_name = parts.last().cloned().unwrap_or("");
+    let resource_name = class_name.trim_end_matches("Controller").trim_end_matches("Request");
+    let resource_pascal = to_pascal_case(resource_name);
+    let resource_snake = to_snake_case(&resource_pascal);
+    let resource_table = pluralize(&resource_snake);
 
     match component {
         "controller" => {
@@ -1376,88 +1457,22 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
             } else {
                 format!("{}Controller", class_name)
             };
-            let path = project_root
-                .join("app/Controllers")
-                .join(format!("{}.agi", file_name));
-            if path.exists() {
-                bail!("controller `{}` already exists", file_name);
-            }
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-
-            let ns_parts = file_name.split('/').collect::<Vec<_>>();
-            let ns = if ns_parts.len() > 1 {
-                format!(
-                    "App.Controllers.{}",
-                    ns_parts[..ns_parts.len() - 1].join(".")
-                )
-            } else {
-                "App.Controllers".to_string()
-            };
-
+            let path = project_root.join("app/Controllers").join(format!("{}.agi", file_name));
+            let ns = nested_namespace("App.Controllers", &file_name);
             let content = format!(
-                "module {}\n\nuse Framework.Http.Request\nuse Framework.Http.Response\n\nclass {}:\n    fn index(request: Request) -> Response:\n        return Response.html(\"<h1>{}</h1>\")\n",
-                ns, actual_class_name, actual_class_name
+                "module {ns}\n\nuse App.Models.{resource_pascal}\nuse App.Requests.Store{resource_pascal}Request\nuse App.Requests.Update{resource_pascal}Request\nuse Framework.Http.Request\nuse Framework.Http.Response\n\nclass {actual_class_name}:\n    fn index(request: Request) -> Response:\n        return Response.json({{\"resource\": \"{resource_table}\", \"action\": \"index\"}})\n\n    fn show(request: Request, id: i64) -> Response:\n        return Response.json({{\"resource\": \"{resource_table}\", \"action\": \"show\", \"id\": id}})\n\n    fn store(request: Store{resource_pascal}Request) -> Response:\n        return Response.status(201).json({{\"resource\": \"{resource_table}\", \"action\": \"store\"}})\n\n    fn update(request: Update{resource_pascal}Request, id: i64) -> Response:\n        return Response.json({{\"resource\": \"{resource_table}\", \"action\": \"update\", \"id\": id}})\n\n    fn destroy(request: Request, id: i64) -> Response:\n        return Response.json({{\"resource\": \"{resource_table}\", \"action\": \"destroy\", \"id\": id}})\n"
             );
-            fs::write(&path, content)?;
+            write_generated_file(&path, &content, force, "controller")?;
             println!("Created controller app/Controllers/{}.agi", file_name);
         }
         "model" => {
-            let path = project_root
-                .join("app/Models")
-                .join(format!("{}.agi", normalized_name));
-            if path.exists() {
-                bail!("model `{}` already exists", normalized_name);
-            }
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-
-            let ns = if parts.len() > 1 {
-                format!("App.Models.{}", parts[..parts.len() - 1].join("."))
-            } else {
-                "App.Models".to_string()
-            };
-
-            let content = format!("module {}\n\nclass {}:\n    let id: i64\n", ns, class_name);
-            fs::write(&path, content)?;
-            println!("Created model app/Models/{}.agi", normalized_name);
-        }
-        "service" => {
-            let file_name = if class_name.ends_with("Service") {
-                normalized_name.clone()
-            } else {
-                format!("{}Service", normalized_name)
-            };
-            let actual_class_name = if class_name.ends_with("Service") {
-                class_name.to_string()
-            } else {
-                format!("{}Service", class_name)
-            };
-            let path = project_root
-                .join("app/Services")
-                .join(format!("{}.agi", file_name));
-            if path.exists() {
-                bail!("service `{}` already exists", file_name);
-            }
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-
-            let ns_parts = file_name.split('/').collect::<Vec<_>>();
-            let ns = if ns_parts.len() > 1 {
-                format!("App.Services.{}", ns_parts[..ns_parts.len() - 1].join("."))
-            } else {
-                "App.Services".to_string()
-            };
-
+            let path = project_root.join("app/Models").join(format!("{}.agi", normalized_name));
+            let ns = nested_namespace("App.Models", &normalized_name);
             let content = format!(
-                "module {}\n\nclass {}:\n    fn handle() -> void:\n        pass\n",
-                ns, actual_class_name
+                "module {ns}\n\nuse Framework.Database.Model\n\nclass {resource_pascal} extends Model:\n    table = \"{resource_table}\"\n    primary_key = \"id\"\n    fillable = [\"name\"]\n    hidden = []\n    casts = {{}}\n"
             );
-            fs::write(&path, content)?;
-            println!("Created service app/Services/{}.agi", file_name);
+            write_generated_file(&path, &content, force, "model")?;
+            println!("Created model app/Models/{}.agi", normalized_name);
         }
         "middleware" => {
             let file_name = if class_name.ends_with("Middleware") {
@@ -1470,32 +1485,70 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
             } else {
                 format!("{}Middleware", class_name)
             };
-            let path = project_root
-                .join("app/Middleware")
-                .join(format!("{}.agi", file_name));
-            if path.exists() {
-                bail!("middleware `{}` already exists", file_name);
-            }
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-
-            let ns_parts = file_name.split('/').collect::<Vec<_>>();
-            let ns = if ns_parts.len() > 1 {
-                format!(
-                    "App.Middleware.{}",
-                    ns_parts[..ns_parts.len() - 1].join(".")
-                )
-            } else {
-                "App.Middleware".to_string()
-            };
-
+            let path = project_root.join("app/Middleware").join(format!("{}.agi", file_name));
+            let ns = nested_namespace("App.Middleware", &file_name);
             let content = format!(
-                "module {}\n\nuse Framework.Http.Request\nuse Framework.Http.Response\nuse Framework.Middleware.Next\n\nclass {}:\n    fn handle(request: Request, next: Next) -> Response:\n        return next(request)\n",
-                ns, actual_class_name
+                "module {ns}\n\nuse Framework.Http.Request\nuse Framework.Http.Response\nuse Framework.Middleware.Next\n\nclass {actual_class_name}:\n    fn handle(request: Request, next: Next) -> Response:\n        return next(request)\n"
             );
-            fs::write(&path, content)?;
+            write_generated_file(&path, &content, force, "middleware")?;
             println!("Created middleware app/Middleware/{}.agi", file_name);
+        }
+        "request" => {
+            let file_name = if class_name.ends_with("Request") {
+                normalized_name.clone()
+            } else {
+                format!("{}Request", normalized_name)
+            };
+            let actual_class_name = if class_name.ends_with("Request") {
+                class_name.to_string()
+            } else {
+                format!("{}Request", class_name)
+            };
+            let path = project_root.join("app/Requests").join(format!("{}.agi", file_name));
+            let ns = nested_namespace("App.Requests", &file_name);
+            let content = format!(
+                "module {ns}\n\nuse Framework.Validation.FormRequest\n\nclass {actual_class_name} extends FormRequest:\n    fn authorize() -> bool:\n        return true\n\n    fn rules() -> map:\n        return {{\n            \"name\": [\"required\", \"string\", \"max:255\"]\n        }}\n"
+            );
+            write_generated_file(&path, &content, force, "request")?;
+            println!("Created request app/Requests/{}.agi", file_name);
+        }
+        "policy" => {
+            let file_name = if class_name.ends_with("Policy") {
+                normalized_name.clone()
+            } else {
+                format!("{}Policy", normalized_name)
+            };
+            let actual_class_name = if class_name.ends_with("Policy") {
+                class_name.to_string()
+            } else {
+                format!("{}Policy", class_name)
+            };
+            let path = project_root.join("app/Policies").join(format!("{}.agi", file_name));
+            let ns = nested_namespace("App.Policies", &file_name);
+            let content = format!(
+                "module {ns}\n\nclass {actual_class_name}:\n    fn view_any(user: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n\n    fn view(user: map, model: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n\n    fn create(user: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n\n    fn update(user: map, model: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n\n    fn delete(user: map, model: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n"
+            );
+            write_generated_file(&path, &content, force, "policy")?;
+            println!("Created policy app/Policies/{}.agi", file_name);
+        }
+        "service" => {
+            let file_name = if class_name.ends_with("Service") {
+                normalized_name.clone()
+            } else {
+                format!("{}Service", normalized_name)
+            };
+            let actual_class_name = if class_name.ends_with("Service") {
+                class_name.to_string()
+            } else {
+                format!("{}Service", class_name)
+            };
+            let path = project_root.join("app/Services").join(format!("{}.agi", file_name));
+            let ns = nested_namespace("App.Services", &file_name);
+            let content = format!(
+                "module {ns}\n\nclass {actual_class_name}:\n    fn handle() -> void:\n        pass\n"
+            );
+            write_generated_file(&path, &content, force, "service")?;
+            println!("Created service app/Services/{}.agi", file_name);
         }
         "provider" => {
             let file_name = if class_name.ends_with("ServiceProvider") {
@@ -1508,98 +1561,80 @@ pub fn make_component(component: &str, name: &str) -> Result<()> {
             } else {
                 format!("{}ServiceProvider", class_name)
             };
-            let path = project_root
-                .join("app/Providers")
-                .join(format!("{}.agi", file_name));
-            if path.exists() {
-                bail!("provider `{}` already exists", file_name);
-            }
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-
-            let ns_parts = file_name.split('/').collect::<Vec<_>>();
-            let ns = if ns_parts.len() > 1 {
-                format!("App.Providers.{}", ns_parts[..ns_parts.len() - 1].join("."))
-            } else {
-                "App.Providers".to_string()
-            };
-
+            let path = project_root.join("app/Providers").join(format!("{}.agi", file_name));
+            let ns = nested_namespace("App.Providers", &file_name);
             let content = format!(
-                "module {}\n\nuse Framework.Container.Container\nuse Framework.Providers.ServiceProvider\n\nclass {} extends ServiceProvider:\n    fn register(container: Container) -> void:\n        pass\n\n    fn boot() -> void:\n        pass\n",
-                ns, actual_class_name
+                "module {ns}\n\nuse Framework.Container.Container\nuse Framework.Providers.ServiceProvider\n\nclass {actual_class_name} extends ServiceProvider:\n    fn register(container: Container) -> void:\n        pass\n\n    fn boot() -> void:\n        pass\n"
             );
-            fs::write(&path, content)?;
+            write_generated_file(&path, &content, force, "provider")?;
             println!("Created provider app/Providers/{}.agi", file_name);
         }
         "view" => {
-            let path = project_root
-                .join("resources/views")
-                .join(format!("{}.ags", normalized_name));
-            if path.exists() {
-                bail!("view `{}` already exists", normalized_name);
-            }
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(
-                &path,
-                format!("<!-- View template {} -->\n", normalized_name),
-            )?;
+            let path = project_root.join("resources/views").join(format!("{}.ags", normalized_name));
+            let content = format!("<!-- View template {} -->\n", normalized_name);
+            write_generated_file(&path, &content, force, "view")?;
             println!("Created view resources/views/{}.ags", normalized_name);
         }
         "route" => {
-            let path = project_root
-                .join("routes")
-                .join(format!("{}.agi", normalized_name));
-            if path.exists() {
-                bail!("route file `{}` already exists", normalized_name);
-            }
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
+            let path = project_root.join("routes").join(format!("{}.agi", normalized_name));
             let content = format!(
                 "use Framework.Routing.Route\n\nfn register_{}() -> void:\n    pass\n",
                 class_name.to_lowercase()
             );
-            fs::write(&path, content)?;
+            write_generated_file(&path, &content, force, "route file")?;
             println!("Created routes/{}.agi", normalized_name);
         }
         "migration" => {
-            let timestamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)?
-                .as_secs();
+            let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
             let migration_class = to_pascal_case(class_name);
             let file_name = format!("{}_{}", timestamp, migration_class);
-            let path = project_root
-                .join("database/migrations")
-                .join(format!("{}.agi", file_name));
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
+            let path = project_root.join("database/migrations").join(format!("{}.agi", file_name));
             let content = format!(
-                "use Framework.Database.Migration\nuse Framework.Database.Schema\n\nclass {} extends Migration:\n    fn up() -> void:\n        pass\n\n    fn down() -> void:\n        pass\n",
-                migration_class
+                "use Framework.Database.Migration\nuse Framework.Database.Schema\n\nclass {migration_class} extends Migration:\n    fn up() -> void:\n        Schema.create(\"{resource_table}\", fn table:\n            table.id()\n            table.string(\"name\")\n            table.timestamps()\n        )\n\n    fn down() -> void:\n        Schema.drop_if_exists(\"{resource_table}\")\n"
             );
-            fs::write(&path, content)?;
+            write_generated_file(&path, &content, force, "migration")?;
             println!("Created migration database/migrations/{}.agi", file_name);
         }
+        "seeder" => {
+            let file_name = if class_name.ends_with("Seeder") { normalized_name.clone() } else { format!("{}Seeder", normalized_name) };
+            let actual_class_name = if class_name.ends_with("Seeder") { class_name.to_string() } else { format!("{}Seeder", class_name) };
+            let path = project_root.join("database/seeders").join(format!("{}.agi", file_name));
+            let content = format!(
+                "use Framework.Database.Seeder\n\nclass {actual_class_name} extends Seeder:\n    fn run() -> void:\n        print(\"Seeding {resource_table}\")\n"
+            );
+            write_generated_file(&path, &content, force, "seeder")?;
+            println!("Created seeder database/seeders/{}.agi", file_name);
+        }
+        "factory" => {
+            let file_name = if class_name.ends_with("Factory") { normalized_name.clone() } else { format!("{}Factory", normalized_name) };
+            let actual_class_name = if class_name.ends_with("Factory") { class_name.to_string() } else { format!("{}Factory", class_name) };
+            let path = project_root.join("database/factories").join(format!("{}.agi", file_name));
+            let content = format!(
+                "class {actual_class_name}:\n    fn definition() -> map:\n        return {{\n            \"name\": \"Example {resource_pascal}\"\n        }}\n"
+            );
+            write_generated_file(&path, &content, force, "factory")?;
+            println!("Created factory database/factories/{}.agi", file_name);
+        }
         "test" => {
-            let path = project_root
-                .join("tests/Feature")
-                .join(format!("{}Test.agi", normalized_name));
-            if path.exists() {
-                bail!("test `{}` already exists", normalized_name);
-            }
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
+            let path = project_root.join("tests/Feature").join(format!("{}Test.agi", normalized_name));
             let content = format!(
                 "fn test_{}() -> i32:\n    return 0\n",
                 class_name.to_lowercase()
             );
-            fs::write(&path, content)?;
+            write_generated_file(&path, &content, force, "test")?;
             println!("Created test tests/Feature/{}Test.agi", normalized_name);
+        }
+        "resource" => {
+            make_component("model", &resource_pascal, force)?;
+            make_component("controller", &format!("{resource_pascal}Controller"), force)?;
+            make_component("request", &format!("Store{resource_pascal}"), force)?;
+            make_component("request", &format!("Update{resource_pascal}"), force)?;
+            make_component("policy", &resource_pascal, force)?;
+            make_component("migration", &format!("create_{}_table", resource_table), force)?;
+            make_component("factory", &resource_pascal, force)?;
+            make_component("seeder", &resource_pascal, force)?;
+            make_component("test", &format!("{resource_pascal}Resource"), force)?;
+            println!("Created resource bundle for {}", resource_pascal);
         }
         _ => bail!("unknown framework component `{}`", component),
     }

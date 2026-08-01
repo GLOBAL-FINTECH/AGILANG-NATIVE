@@ -588,12 +588,14 @@ fn main() -> Result<()> {
                 .next()
                 .context("framework component type is required (e.g. controller, model, etc.)")?;
             let name = args.next().context("component name is required")?;
-            agilang_project_generator::make_component(&component, &name)?;
+            let force = args.any(|arg| arg == "--force");
+            agilang_project_generator::make_component(&component, &name, force)?;
         }
         cmd if cmd.starts_with("make:") => {
             let component = &cmd[5..];
             let name = args.next().context("component name is required")?;
-            agilang_project_generator::make_component(component, &name)?;
+            let force = args.any(|arg| arg == "--force");
+            agilang_project_generator::make_component(component, &name, force)?;
         }
         "test" => {
             println!("AGILANG check passed. (Testing is not yet implemented in Phase 2)");
@@ -751,18 +753,6 @@ fn main() -> Result<()> {
         "ai:refresh" => {
             bail!("ai:refresh is not implemented as a live refresh operation");
         }
-        "make:migration" => {
-            let name = args
-                .next()
-                .unwrap_or_else(|| "CreateUsersTable".to_string());
-            let timestamp = "20260720_210000";
-            let filename = format!(
-                "database/migrations/{}_{}.agi",
-                timestamp,
-                name.to_lowercase()
-            );
-            println!("Created migration: {}", filename);
-        }
         "migrate" => {
             let pretend = args.any(|arg| arg == "--pretend");
             let file = agilang_framework_migrations::MigrationFile {
@@ -800,10 +790,6 @@ fn main() -> Result<()> {
             println!("Resetting database migrations...");
             agilang_framework_migrations::MigrationRepository::clear();
             println!("Database migrations reset successfully.");
-        }
-        "make:seeder" => {
-            let name = args.next().unwrap_or_else(|| "UserSeeder".to_string());
-            println!("Created seeder: database/seeders/{}.agi", name);
         }
         "seed" | "db:seed" => {
             println!("Seeding database records...");
