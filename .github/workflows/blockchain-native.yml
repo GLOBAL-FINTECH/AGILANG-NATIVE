@@ -36,8 +36,8 @@ jobs:
       - name: Format
         run: cargo fmt --all --check
       - name: Check blockchain crates
-        run: cargo check -p agilang-blockchain-core -p agilang-blockchain-storage -p agilang-blockchain-state -p agilang-blockchain-node -p agilang-blockchain-consensus -p agilang-blockchain-rpc -p agilang-blockchain-p2p -p agilang-blockchain-transaction -p agilang-blockchain-service -p agilang-blockchain-fee
+        run: cargo check -p agilang-blockchain-core -p agilang-blockchain-storage -p agilang-blockchain-state -p agilang-blockchain-node -p agilang-blockchain-consensus -p agilang-blockchain-rpc -p agilang-blockchain-p2p -p agilang-blockchain-transaction -p agilang-blockchain-service -p agilang-blockchain-fee -p agilang-blockchain-execution
       - name: Clippy blockchain crates
-        run: cargo clippy -p agilang-blockchain-core -p agilang-blockchain-storage -p agilang-blockchain-state -p agilang-blockchain-node -p agilang-blockchain-consensus -p agilang-blockchain-rpc -p agilang-blockchain-p2p -p agilang-blockchain-transaction -p agilang-blockchain-service -p agilang-blockchain-fee --all-targets -- -D warnings
+        run: cargo clippy -p agilang-blockchain-core -p agilang-blockchain-storage -p agilang-blockchain-state -p agilang-blockchain-node -p agilang-blockchain-consensus -p agilang-blockchain-rpc -p agilang-blockchain-p2p -p agilang-blockchain-transaction -p agilang-blockchain-service -p agilang-blockchain-fee -p agilang-blockchain-execution --all-targets -- -D warnings
       - name: Test blockchain crates
-        run: cargo test -p agilang-blockchain-core -p agilang-blockchain-storage -p agilang-blockchain-state -p agilang-blockchain-node -p agilang-blockchain-consensus -p agilang-blockchain-rpc -p agilang-blockchain-p2p -p agilang-blockchain-transaction -p agilang-blockchain-service -p agilang-blockchain-fee
+        run: cargo test -p agilang-blockchain-core -p agilang-blockchain-storage -p agilang-blockchain-state -p agilang-blockchain-node -p agilang-blockchain-consensus -p agilang-blockchain-rpc -p agilang-blockchain-p2p -p agilang-blockchain-transaction -p agilang-blockchain-service -p agilang-blockchain-fee -p agilang-blockchain-execution
