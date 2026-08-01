@@ -1,10 +1,14 @@
 //! Bounded network-facing JSON-RPC server for the Native AGILANG blockchain.
 
-use agilang_blockchain_node::BlockchainNode;
+use agilang_blockchain_service::BlockchainService;
 use agilang_runtime_core::{AgilangError, ErrorCode, RuntimeResult};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -61,15 +65,18 @@ struct RpcError {
 
 pub struct RpcServer {
     config: RpcServerConfig,
-    node: Arc<Mutex<BlockchainNode>>,
+    service: Arc<Mutex<BlockchainService>>,
 }
 
 impl RpcServer {
-    pub fn new(config: RpcServerConfig, node: Arc<Mutex<BlockchainNode>>) -> RuntimeResult<Self> {
+    pub fn new(
+        config: RpcServerConfig,
+        service: Arc<Mutex<BlockchainService>>,
+    ) -> RuntimeResult<Self> {
         if config.max_connections == 0 || config.max_request_bytes == 0 {
             return invalid("RPC connection and request limits must be greater than zero");
         }
-        Ok(Self { config, node })
+        Ok(Self { config, service })
     }
 
     pub async fn serve(self) -> RuntimeResult<()> {
@@ -82,11 +89,11 @@ impl RpcServer {
                 .acquire_owned()
                 .await
                 .map_err(|_| invalid_error("RPC connection limiter closed"))?;
-            let node = self.node.clone();
+            let service = self.service.clone();
             let config = self.config.clone();
             tokio::spawn(async move {
                 let _permit = permit;
-                if let Err(error) = handle_connection(stream, node, config).await {
+                if let Err(error) = handle_connection(stream, service, config).await {
                     tracing::warn!(%peer, error = %error, "blockchain RPC connection failed");
                 }
             });
@@ -96,7 +103,7 @@ impl RpcServer {
 
 async fn handle_connection(
     mut stream: TcpStream,
-    node: Arc<Mutex<BlockchainNode>>,
+    service: Arc<Mutex<BlockchainService>>,
     config: RpcServerConfig,
 ) -> RuntimeResult<()> {
     let request = timeout(
@@ -107,7 +114,7 @@ async fn handle_connection(
     .map_err(|_| invalid_error("RPC request read timed out"))??;
 
     let response = match request.method.as_str() {
-        "POST" => dispatch_body(&request.body, node).await,
+        "POST" => dispatch_body(&request.body, service).await,
         "GET" if request.path == "/health" => json!({"status":"ok"}),
         _ => json!({"error":"method not allowed"}),
     };
@@ -131,7 +138,7 @@ async fn handle_connection(
     .map_err(io_error)
 }
 
-async fn dispatch_body(body: &[u8], node: Arc<Mutex<BlockchainNode>>) -> Value {
+async fn dispatch_body(body: &[u8], service: Arc<Mutex<BlockchainService>>) -> Value {
     let value: Value = match serde_json::from_slice(body) {
         Ok(value) => value,
         Err(error) => return response_error(Value::Null, -32700, format!("parse error: {error}")),
@@ -142,17 +149,17 @@ async fn dispatch_body(body: &[u8], node: Arc<Mutex<BlockchainNode>>) -> Value {
         }
         let mut responses = Vec::with_capacity(batch.len());
         for item in batch {
-            if let Some(response) = dispatch_one(item.clone(), node.clone()).await {
+            if let Some(response) = dispatch_one(item.clone(), service.clone()).await {
                 responses.push(response);
             }
         }
         Value::Array(responses)
     } else {
-        dispatch_one(value, node).await.unwrap_or(Value::Null)
+        dispatch_one(value, service).await.unwrap_or(Value::Null)
     }
 }
 
-async fn dispatch_one(value: Value, node: Arc<Mutex<BlockchainNode>>) -> Option<Value> {
+async fn dispatch_one(value: Value, service: Arc<Mutex<BlockchainService>>) -> Option<Value> {
     let request: RpcRequest = match serde_json::from_value(value) {
         Ok(request) => request,
         Err(error) => return Some(response_error(Value::Null, -32600, error.to_string())),
@@ -160,9 +167,20 @@ async fn dispatch_one(value: Value, node: Arc<Mutex<BlockchainNode>>) -> Option<
     let notification = request.id.is_none();
     let id = request.id.unwrap_or(Value::Null);
     if request.jsonrpc != "2.0" || request.method.trim().is_empty() {
-        return Some(response_error(id, -32600, "invalid JSON-RPC request".to_string()));
+        return Some(response_error(
+            id,
+            -32600,
+            "invalid JSON-RPC request".to_string(),
+        ));
     }
-    let result = node.lock().await.rpc(&request.method, request.params);
+    let now_ms = match unix_time_ms() {
+        Ok(value) => value,
+        Err(error) => return Some(response_error(id, -32603, error.to_string())),
+    };
+    let result = service
+        .lock()
+        .await
+        .rpc(&request.method, request.params, now_ms);
     if notification {
         return None;
     }
@@ -174,8 +192,23 @@ async fn dispatch_one(value: Value, node: Arc<Mutex<BlockchainNode>>) -> Option<
             error: None,
         })
         .unwrap_or_else(|error| response_error(Value::Null, -32603, error.to_string())),
-        Err(error) => response_error(id, -32601, error.to_string()),
+        Err(error) => response_error(id, rpc_error_code(&error), error.to_string()),
     })
+}
+
+fn rpc_error_code(error: &AgilangError) -> i64 {
+    match error.code {
+        ErrorCode::InvalidArgument => -32602,
+        _ => -32603,
+    }
+}
+
+fn unix_time_ms() -> RuntimeResult<u64> {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| invalid_error(format!("system clock is before UNIX epoch: {error}")))?;
+    u64::try_from(duration.as_millis())
+        .map_err(|_| invalid_error("system timestamp exceeds u64 milliseconds"))
 }
 
 fn response_error(id: Value, code: i64, message: String) -> Value {
@@ -185,7 +218,9 @@ fn response_error(id: Value, code: i64, message: String) -> Value {
         result: None,
         error: Some(RpcError { code, message }),
     })
-    .unwrap_or_else(|_| json!({"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"internal error"}}))
+    .unwrap_or_else(|_| {
+        json!({"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"internal error"}})
+    })
 }
 
 struct HttpRequest {
@@ -212,9 +247,12 @@ async fn read_http_request(stream: &mut TcpStream, max_bytes: usize) -> RuntimeR
             break;
         }
     }
-    let header = std::str::from_utf8(&buffer[..header_end]).map_err(|_| invalid_error("invalid HTTP header encoding"))?;
+    let header = std::str::from_utf8(&buffer[..header_end])
+        .map_err(|_| invalid_error("invalid HTTP header encoding"))?;
     let mut lines = header.split("\r\n");
-    let request_line = lines.next().ok_or_else(|| invalid_error("missing HTTP request line"))?;
+    let request_line = lines
+        .next()
+        .ok_or_else(|| invalid_error("missing HTTP request line"))?;
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or_default().to_string();
     let path = parts.next().unwrap_or_default().to_string();
@@ -222,7 +260,10 @@ async fn read_http_request(stream: &mut TcpStream, max_bytes: usize) -> RuntimeR
     for line in lines {
         if let Some((name, value)) = line.split_once(':') {
             if name.eq_ignore_ascii_case("content-length") {
-                content_length = value.trim().parse().map_err(|_| invalid_error("invalid content-length"))?;
+                content_length = value
+                    .trim()
+                    .parse()
+                    .map_err(|_| invalid_error("invalid content-length"))?;
             }
         }
     }
@@ -271,7 +312,10 @@ mod tests {
 
     #[test]
     fn detects_http_header_boundary() {
-        assert_eq!(find_header_end(b"POST / HTTP/1.1\r\ncontent-length: 0\r\n\r\n"), Some(38));
+        assert_eq!(
+            find_header_end(b"POST / HTTP/1.1\r\ncontent-length: 0\r\n\r\n"),
+            Some(38)
+        );
     }
 
     #[test]
@@ -279,5 +323,10 @@ mod tests {
         let config = RpcServerConfig::default();
         assert!(config.max_connections > 0);
         assert!(config.max_request_bytes <= 2 * 1024 * 1024);
+    }
+
+    #[test]
+    fn timestamp_is_available() {
+        assert!(unix_time_ms().unwrap() > 0);
     }
 }
