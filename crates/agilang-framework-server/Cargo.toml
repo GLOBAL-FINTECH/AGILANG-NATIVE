@@ -18,6 +18,7 @@ agilang-runtime-crypto = { path = "../agilang-runtime-crypto" }
 agilang-runtime-http = { path = "../agilang-runtime-http" }
 agilang-runtime-async = { path = "../agilang-runtime-async" }
 chrono = "0.4"
+serde.workspace = true
 serde_json = "1"
 anyhow.workspace = true
 

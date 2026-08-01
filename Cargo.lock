@@ -121,6 +121,7 @@ version = "0.7.0"
 dependencies = [
  "agilang-codegen-c",
  "agilang-compiler",
+ "agilang-framework-server",
  "agilang-ir",
  "agilang-linker",
  "agilang-source",
@@ -667,6 +668,7 @@ dependencies = [
  "agilang-runtime-http",
  "anyhow",
  "chrono",
+ "serde",
  "serde_json",
 ]
 

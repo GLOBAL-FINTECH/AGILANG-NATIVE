@@ -1,4 +1,6 @@
 mod controller_runtime;
+mod framework_manifest;
+pub use framework_manifest::write_framework_manifest;
 
 use agilang_database_agidb::AgiDbConnection;
 use agilang_database_driver::{DatabaseConnection, DatabaseRow, DatabaseValue};
@@ -2339,6 +2341,11 @@ fn register_api() -> void:
             )
             .unwrap();
         }
+
+        write_framework_manifest(&root).unwrap();
+        fs::remove_file(root.join("app/Models/Post.agi")).unwrap();
+        fs::remove_file(root.join("app/Requests/StorePostRequest.agi")).unwrap();
+        fs::remove_file(root.join("app/Requests/UpdatePostRequest.agi")).unwrap();
 
         root
     }

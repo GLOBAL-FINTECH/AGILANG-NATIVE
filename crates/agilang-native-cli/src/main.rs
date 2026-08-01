@@ -463,6 +463,8 @@ fn main() -> Result<()> {
             println!("Loading application configuration...");
             println!("Compiling routes...");
 
+            agilang_framework_server::write_framework_manifest(&project_root)?;
+
             let mut router = agilang_framework_routing::Router::new();
             let web_routes_file = project_root.join("routes/web.agi");
             let api_routes_file = project_root.join("routes/api.agi");

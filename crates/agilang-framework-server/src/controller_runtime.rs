@@ -1,5 +1,6 @@
 use crate::{
     build_json_response, build_text_response, handle_auth_request, load_session_by_cookie,
+    framework_manifest::{load_framework_manifest, ModelManifest, RequestManifest},
     load_user_by_id, parse_form_body, redirect_response, AuthSessionRecord, AuthUserRecord,
 };
 use agilang_database_driver::{DatabaseConnection, DatabaseDriverKind, DatabaseValue};
@@ -86,20 +87,8 @@ impl DispatchError {
     }
 }
 
-struct ResourceDescriptor {
-    table: String,
-    primary_key: String,
-    fillable: Vec<String>,
-    hidden: Vec<String>,
-    casts: HashMap<String, String>,
-    timestamps: bool,
-    soft_deletes: bool,
-}
-
-struct RequestDescriptor {
-    rules: HashMap<String, Vec<String>>,
-    validated_fields: Vec<String>,
-}
+type ResourceDescriptor = ModelManifest;
+type RequestDescriptor = RequestManifest;
 
 fn dispatch_controller(
     project_root: &Path,
@@ -154,16 +143,27 @@ fn dispatch_generated_resource(
         ));
     };
 
-    let model_path = project_root.join("app/Models").join(format!("{resource_name}.agi"));
-    if !model_path.exists() {
-        return Err(DispatchError::new(
-            500,
-            format!("Controller `{}` is not registered", route.controller),
-        ));
-    }
-
-    let descriptor =
-        parse_model_descriptor(&model_path).map_err(|error| DispatchError::new(500, error.to_string()))?;
+    let manifest = load_framework_manifest(project_root)
+        .map_err(|error| DispatchError::new(500, error.to_string()))?;
+    let descriptor = if let Some(manifest) = manifest.as_ref() {
+        manifest
+            .models
+            .get(resource_name)
+            .cloned()
+            .ok_or_else(|| {
+                DispatchError::new(500, format!("Model manifest for `{resource_name}` not found"))
+            })?
+    } else {
+        let model_path = project_root.join("app/Models").join(format!("{resource_name}.agi"));
+        if !model_path.exists() {
+            return Err(DispatchError::new(
+                500,
+                format!("Controller `{}` is not registered", route.controller),
+            ));
+        }
+        parse_model_descriptor(&model_path)
+            .map_err(|error| DispatchError::new(500, error.to_string()))?
+    };
     let request_name = match route.action.as_str() {
         "store" => Some(format!("Store{resource_name}Request")),
         "update" => Some(format!("Update{resource_name}Request")),
@@ -171,8 +171,18 @@ fn dispatch_generated_resource(
     };
     let request_descriptor = request_name
         .as_ref()
-        .map(|name| project_root.join("app/Requests").join(format!("{name}.agi")))
-        .map(|path| parse_request_descriptor(&path))
+        .map(|name| {
+            if let Some(manifest) = manifest.as_ref() {
+                manifest
+                    .requests
+                    .get(name)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("Request manifest for `{name}` not found"))
+            } else {
+                let path = project_root.join("app/Requests").join(format!("{name}.agi"));
+                parse_request_descriptor(&path)
+            }
+        })
         .transpose()
         .map_err(|error| DispatchError::new(500, error.to_string()))?;
 

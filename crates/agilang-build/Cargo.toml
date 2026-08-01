@@ -13,4 +13,5 @@ agilang-ir = { path = "../agilang-ir" }
 agilang-compiler = { path = "../agilang-compiler" }
 agilang-codegen-c = { path = "../agilang-codegen-c" }
 agilang-linker = { path = "../agilang-linker" }
+agilang-framework-server = { path = "../agilang-framework-server" }
 anyhow.workspace = true

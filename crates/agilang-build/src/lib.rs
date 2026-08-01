@@ -75,10 +75,26 @@ pub fn build_project(
     );
     fs::write(manifest_path, manifest_json)?;
 
+    if let Some(project_root) = find_project_root(entry_file) {
+        agilang_framework_server::write_framework_manifest(&project_root)?;
+    }
+
     println!("Finished release build");
     println!("Output: {}", out_exe.display());
 
     Ok(())
+}
+
+fn find_project_root(entry_file: &Path) -> Option<PathBuf> {
+    let mut dir = entry_file.parent()?.to_path_buf();
+    loop {
+        if dir.join("agilang.toml").exists() {
+            return Some(dir);
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
 }
 
 fn find_runtime_lib() -> Result<PathBuf> {
