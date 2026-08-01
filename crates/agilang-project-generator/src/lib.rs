@@ -1180,7 +1180,7 @@ class CreateUsersTable extends Migration:
 
 class DatabaseSeeder extends Seeder:
     fn run() -> void:
-        print("Database seeding complete")
+        print("Database seeding complete via configured driver")
 "#,
         ),
         (
@@ -2764,7 +2764,7 @@ class CreateUsersTable extends Migration:
 
 class DatabaseSeeder extends Seeder:
     fn run() -> void:
-        print("Database seeding complete")
+        print("Database seeding complete via configured driver")
 "#,
         ),
         (

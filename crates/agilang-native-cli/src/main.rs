@@ -8,6 +8,7 @@ use agilang_database_security_kernel::Capability;
 use agilang_database_tcp::{fetch_status, perform_handshake, start_server, TransportServerConfig};
 use agilang_framework_database::DatabaseConfig;
 use agilang_framework_migrations::{MigrationExecutor, MigrationFile};
+use agilang_framework_seeding::{ProjectSeedConfig, SeederExecutor};
 use anyhow::{bail, Context, Result};
 use std::{
     env, fs,
@@ -821,8 +822,14 @@ fn main() -> Result<()> {
             println!("Fresh migrated {} migrations.", applied.len());
         }
         "seed" | "db:seed" => {
-            println!("Seeding database records...");
-            println!("Database seeding completed successfully.");
+            let project_root = std::env::current_dir()?;
+            let seed_config = ProjectSeedConfig::from_project_root(&project_root)?;
+            let created = SeederExecutor::seed_default_users(&seed_config.database, 2, true)?;
+            println!(
+                "Database seeding completed successfully. Seeded {} user records via {:?}.",
+                created.len(),
+                seed_config.database.driver
+            );
         }
         "db:connections" => {
             println!("AGILANG Database Connections\n");

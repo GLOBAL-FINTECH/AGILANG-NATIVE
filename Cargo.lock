@@ -639,6 +639,7 @@ dependencies = [
 name = "agilang-framework-seeding"
 version = "0.7.0"
 dependencies = [
+ "agilang-database-driver",
  "agilang-framework-database",
  "anyhow",
  "serde",
@@ -749,6 +750,7 @@ dependencies = [
  "agilang-framework-http",
  "agilang-framework-migrations",
  "agilang-framework-routing",
+ "agilang-framework-seeding",
  "agilang-framework-server",
  "agilang-framework-view",
  "agilang-ir",

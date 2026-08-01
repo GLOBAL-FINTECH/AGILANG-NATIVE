@@ -94,6 +94,10 @@ impl<M: OrmModel> ModelRepository<M> {
         Ok(self.conn.health_check()?.healthy)
     }
 
+    pub fn connection_mut(&mut self) -> &mut FrameworkConnection {
+        &mut self.conn
+    }
+
     pub fn create(&mut self, attributes: HashMap<String, Value>) -> Result<M> {
         let mut safe = validate_mass_assignment(&attributes, M::fillable(), M::guarded())?;
         apply_insert_defaults::<M>(&mut safe);

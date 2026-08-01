@@ -24,6 +24,7 @@ agilang-framework-http = { path = "../agilang-framework-http" }
 agilang-framework-database = { path = "../agilang-framework-database" }
 agilang-lsp = { path = "../agilang-lsp" }
 agilang-framework-migrations = { path = "../agilang-framework-migrations" }
+agilang-framework-seeding = { path = "../agilang-framework-seeding" }
 agilang-database-benchmark = { path = "../agilang-database-benchmark" }
 chrono = "0.4"
 agilang-ags-compiler = { path = "../agilang-ags-compiler" }
