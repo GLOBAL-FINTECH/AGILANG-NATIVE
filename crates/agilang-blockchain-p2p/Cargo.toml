@@ -1,0 +1,12 @@
+[package]
+name = "agilang-blockchain-p2p"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agilang-blockchain-core = { path = "../agilang-blockchain-core" }
+agilang-runtime-core = { path = "../agilang-runtime-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
