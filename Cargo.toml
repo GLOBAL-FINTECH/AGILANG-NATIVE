@@ -120,6 +120,7 @@ parking_lot = "0.12"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 sha2 = "0.10"
+hmac = "0.12"
 thiserror = "2.0"
 tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "time", "sync", "net", "fs", "io-util", "signal"] }
 tracing = "0.1"
