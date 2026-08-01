@@ -1,0 +1,93 @@
+name: Linux Native Toolchain
+
+on:
+  push:
+    branches:
+      - feat/linux-native-toolchain
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  linux-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install native C toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang pkg-config
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.81.0
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Test Linux linker and build resolver
+        run: |
+          cargo test -p agilang-linker
+          cargo test -p agilang-build
+
+      - name: Build Linux runtime and CLI
+        run: |
+          cargo build -p agilang-runtime-abi --release
+          cargo build -p agilang-native-cli --release
+          test -x target/release/agilang
+          test -f target/release/libagilang_runtime_abi.a
+
+      - name: Verify Linux CLI identity
+        run: |
+          target/release/agilang --version
+          target/release/agilang version --verbose
+
+      - name: Create computation application
+        run: |
+          mkdir -p /tmp/agilang-linux-computation/src
+          cat > /tmp/agilang-linux-computation/agilang.toml <<'EOF'
+          [project]
+          name = "agilang-linux-computation"
+          version = "0.1.0"
+          edition = "2026"
+          type = "console"
+
+          [application]
+          entry = "src/main.agi"
+
+          [build]
+          target = "native"
+          output = "build/agilang-linux-computation"
+          EOF
+          cat > /tmp/agilang-linux-computation/src/main.agi <<'EOF'
+          fn multiply(a: i32, b: i32) -> i32:
+              return a * b
+
+          fn main() -> i32:
+              print("AGILANG Linux native application")
+              if multiply(6, 7) != 42:
+                  return 1
+              print("Linux computation passed")
+              return 0
+          EOF
+
+      - name: Check, build, and run AGILANG application
+        env:
+          AGILANG_RUNTIME_LIB: ${{ github.workspace }}/target/release/libagilang_runtime_abi.a
+          AGILANG_CC: clang
+        working-directory: /tmp/agilang-linux-computation
+        run: |
+          $GITHUB_WORKSPACE/target/release/agilang check src/main.agi
+          $GITHUB_WORKSPACE/target/release/agilang build src/main.agi --verbose
+          $GITHUB_WORKSPACE/target/release/agilang run src/main.agi | tee run-output.txt
+          grep -q "AGILANG Linux native application" run-output.txt
+          grep -q "Linux computation passed" run-output.txt
+          file build/*
+
+      - name: Workspace tests
+        run: cargo test --workspace

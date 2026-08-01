@@ -2,7 +2,7 @@
   "schema": "AGI-COMPAT-1",
   "repository": "GLOBAL-FINTECH/agilang",
   "branch": "main",
-  "commit": "REPLACE_WITH_40_CHARACTER_SHA",
+  "commit": "69f22dad372c45767bc5fd0afc9076a142c3ed24",
   "native_workspace_version": "0.7.0",
-  "captured_at_utc": "REPLACE_WITH_ISO_8601_TIMESTAMP"
+  "captured_at_utc": "2026-08-01T00:00:00Z"
 }

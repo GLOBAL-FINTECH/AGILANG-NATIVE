@@ -3,7 +3,36 @@ use agilang_source::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
+    pub module_name: Option<ModuleDecl>,
+    pub imports: Vec<ImportDecl>,
+    pub structs: Vec<StructDecl>,
     pub functions: Vec<Function>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModuleDecl {
+    pub path: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportDecl {
+    pub path: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructDecl {
+    pub name: String,
+    pub fields: Vec<StructField>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructField {
+    pub name: String,
+    pub ty: TypeRef,
+    pub span: Span,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
@@ -42,10 +71,21 @@ pub enum Stmt {
         value: Option<Expr>,
         span: Span,
     },
+    Break {
+        span: Span,
+    },
+    Continue {
+        span: Span,
+    },
     If {
         condition: Expr,
         then_body: Vec<Stmt>,
         else_body: Vec<Stmt>,
+        span: Span,
+    },
+    While {
+        condition: Expr,
+        body: Vec<Stmt>,
         span: Span,
     },
     ForIn {

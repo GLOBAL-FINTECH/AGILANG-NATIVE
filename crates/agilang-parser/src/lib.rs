@@ -19,36 +19,105 @@ struct Parser<'a> {
 }
 impl<'a> Parser<'a> {
     fn program(mut self) -> Result<Program, Vec<Diagnostic>> {
+        let mut module_name = None;
+        let mut imports = vec![];
+        let mut structs = vec![];
         let mut functions = vec![];
         self.skip_newlines();
         while !self.at(&TokenKind::Eof) {
             match self.item() {
-                Some(mut parsed) => functions.append(&mut parsed),
+                Some(Item::Module(module_decl)) => {
+                    if module_name.is_some() {
+                        self.errors.push(Diagnostic::error(
+                            "E157",
+                            "duplicate module declaration",
+                            module_decl.span,
+                        ));
+                    } else {
+                        module_name = Some(module_decl);
+                    }
+                }
+                Some(Item::Import(import_decl)) => imports.push(import_decl),
+                Some(Item::Struct(struct_decl)) => structs.push(struct_decl),
+                Some(Item::Functions(mut parsed)) => functions.append(&mut parsed),
                 None => self.synchronize(),
             }
             self.skip_newlines();
         }
         if self.errors.is_empty() {
-            Ok(Program { functions })
+            Ok(Program {
+                module_name,
+                imports,
+                structs,
+                functions,
+            })
         } else {
             Err(self.errors)
         }
     }
-    fn item(&mut self) -> Option<Vec<Function>> {
+    fn item(&mut self) -> Option<Item> {
         if self.at(&TokenKind::Module) {
-            self.skip_until_newline();
-            self.eat(&TokenKind::Newline);
-            return Some(vec![]);
+            return self.module_item();
         }
-        if self.at(&TokenKind::Use) {
-            self.skip_until_newline();
-            self.eat(&TokenKind::Newline);
-            return Some(vec![]);
+        if self.at(&TokenKind::Import) || self.at(&TokenKind::Use) {
+            return self.import_item();
+        }
+        if self.at(&TokenKind::Struct) {
+            return self.struct_item();
         }
         if self.at(&TokenKind::Class) {
-            return self.class_item();
+            return self.class_item().map(Item::Functions);
         }
-        self.function().map(|f| vec![f])
+        self.function().map(|f| Item::Functions(vec![f]))
+    }
+    fn module_item(&mut self) -> Option<Item> {
+        let start = self.expect(&TokenKind::Module, "E158", "expected `module`")?.span.start;
+        let (path, end) = self.module_path("expected module path")?;
+        self.line_end();
+        Some(Item::Module(ModuleDecl {
+            path,
+            span: Span::new(start, end),
+        }))
+    }
+    fn import_item(&mut self) -> Option<Item> {
+        let start = self.advance().span.start;
+        let (path, end) = self.module_path("expected import path")?;
+        self.line_end();
+        Some(Item::Import(ImportDecl {
+            path,
+            span: Span::new(start, end),
+        }))
+    }
+    fn struct_item(&mut self) -> Option<Item> {
+        let start = self.expect(&TokenKind::Struct, "E159", "expected `struct`")?.span.start;
+        let (name, _) = self.identifier("expected struct name")?;
+        self.expect(&TokenKind::Colon, "E160", "expected `:`")?;
+        self.expect(&TokenKind::Newline, "E161", "expected newline")?;
+        self.expect(&TokenKind::Indent, "E162", "expected indented struct body")?;
+        let mut fields = vec![];
+        while !self.at(&TokenKind::Dedent) && !self.at(&TokenKind::Eof) {
+            if self.eat(&TokenKind::Newline).is_some() {
+                continue;
+            }
+            let (field_name, field_span) = self.identifier("expected field name")?;
+            self.expect(&TokenKind::Colon, "E163", "expected `:` after field name")?;
+            let ty = self.type_ref()?;
+            self.line_end();
+            fields.push(StructField {
+                name: field_name,
+                ty,
+                span: field_span,
+            });
+        }
+        let end = self
+            .expect(&TokenKind::Dedent, "E164", "expected end of struct body")
+            .map(|t| t.span.end)
+            .unwrap_or(start);
+        Some(Item::Struct(StructDecl {
+            name,
+            fields,
+            span: Span::new(start, end),
+        }))
     }
     fn class_item(&mut self) -> Option<Vec<Function>> {
         self.expect(&TokenKind::Class, "E128", "expected `class`")?;
@@ -170,6 +239,9 @@ impl<'a> Parser<'a> {
         if self.at(&TokenKind::If) {
             return self.if_statement();
         }
+        if self.at(&TokenKind::While) {
+            return self.while_statement();
+        }
         if self.at(&TokenKind::For) {
             return self.for_in_statement();
         }
@@ -223,6 +295,16 @@ impl<'a> Parser<'a> {
                 span: Span::new(start, end),
             });
         }
+        if self.at(&TokenKind::Break) {
+            let token = self.advance().clone();
+            self.line_end();
+            return Some(Stmt::Break { span: token.span });
+        }
+        if self.at(&TokenKind::Continue) {
+            let token = self.advance().clone();
+            self.line_end();
+            return Some(Stmt::Continue { span: token.span });
+        }
         let expr = self.expression()?;
         if self.eat(&TokenKind::Equal).is_some() {
             let value = self.expression()?;
@@ -231,6 +313,21 @@ impl<'a> Parser<'a> {
             return Some(Stmt::Assign {
                 target: expr,
                 value,
+                span,
+            });
+        }
+        if let Some(op) = self.compound_assignment_op() {
+            let value = self.expression()?;
+            let span = expr.span().join(value.span());
+            self.line_end();
+            return Some(Stmt::Assign {
+                target: expr.clone(),
+                value: Expr::Binary {
+                    left: Box::new(expr),
+                    op,
+                    right: Box::new(value),
+                    span,
+                },
                 span,
             });
         }
@@ -246,7 +343,11 @@ impl<'a> Parser<'a> {
         let then_body = self.block_statements()?;
         let mut else_body = vec![];
         let mut end = condition.span().end;
-        if self.at(&TokenKind::Else) {
+        if self.at(&TokenKind::Elif) {
+            let elif_stmt = self.elif_clause()?;
+            end = stmt_span_end(&elif_stmt);
+            else_body.push(elif_stmt);
+        } else if self.at(&TokenKind::Else) {
             self.advance();
             self.expect(&TokenKind::Colon, "E137", "expected `:`")?;
             self.expect(&TokenKind::Newline, "E138", "expected newline")?;
@@ -285,6 +386,51 @@ impl<'a> Parser<'a> {
             key_name: first_name,
             value_name: second_name,
             iterable,
+            body,
+            span: Span::new(start, end),
+        })
+    }
+    fn elif_clause(&mut self) -> Option<Stmt> {
+        let start = self.expect(&TokenKind::Elif, "E150", "expected `elif`")?.span.start;
+        let condition = self.expression()?;
+        self.expect(&TokenKind::Colon, "E151", "expected `:`")?;
+        self.expect(&TokenKind::Newline, "E152", "expected newline")?;
+        self.expect(&TokenKind::Indent, "E153", "expected indented elif body")?;
+        let then_body = self.block_statements()?;
+        let mut else_body = vec![];
+        let mut end = then_body.last().map(stmt_span_end).unwrap_or(condition.span().end);
+        if self.at(&TokenKind::Elif) {
+            let nested = self.elif_clause()?;
+            end = stmt_span_end(&nested);
+            else_body.push(nested);
+        } else if self.at(&TokenKind::Else) {
+            self.advance();
+            self.expect(&TokenKind::Colon, "E154", "expected `:`")?;
+            self.expect(&TokenKind::Newline, "E155", "expected newline")?;
+            self.expect(&TokenKind::Indent, "E156", "expected indented else body")?;
+            else_body = self.block_statements()?;
+            end = else_body.last().map(stmt_span_end).unwrap_or(end);
+        }
+        Some(Stmt::If {
+            condition,
+            then_body,
+            else_body,
+            span: Span::new(start, end),
+        })
+    }
+    fn while_statement(&mut self) -> Option<Stmt> {
+        let start = self
+            .expect(&TokenKind::While, "E146", "expected `while`")?
+            .span
+            .start;
+        let condition = self.expression()?;
+        self.expect(&TokenKind::Colon, "E147", "expected `:`")?;
+        self.expect(&TokenKind::Newline, "E148", "expected newline")?;
+        self.expect(&TokenKind::Indent, "E149", "expected indented loop body")?;
+        let body = self.block_statements()?;
+        let end = body.last().map(stmt_span_end).unwrap_or(condition.span().end);
+        Some(Stmt::While {
+            condition,
             body,
             span: Span::new(start, end),
         })
@@ -571,6 +717,17 @@ impl<'a> Parser<'a> {
             None
         }
     }
+    fn module_path(&mut self, msg: &str) -> Option<(String, usize)> {
+        let (mut path, first_span) = self.identifier(msg)?;
+        let mut end = first_span.end;
+        while self.eat(&TokenKind::Dot).is_some() {
+            let (segment, span) = self.identifier("expected module path segment")?;
+            path.push('.');
+            path.push_str(&segment);
+            end = span.end;
+        }
+        Some((path, end))
+    }
     fn line_end(&mut self) {
         if self.eat(&TokenKind::Newline).is_none()
             && !self.at(&TokenKind::Dedent)
@@ -603,6 +760,19 @@ impl<'a> Parser<'a> {
     fn skip_until_newline(&mut self) {
         while !self.at(&TokenKind::Eof) && !self.at(&TokenKind::Newline) {
             self.advance();
+        }
+    }
+    fn compound_assignment_op(&mut self) -> Option<BinaryOp> {
+        if self.eat(&TokenKind::PlusEqual).is_some() {
+            Some(BinaryOp::Add)
+        } else if self.eat(&TokenKind::MinusEqual).is_some() {
+            Some(BinaryOp::Subtract)
+        } else if self.eat(&TokenKind::StarEqual).is_some() {
+            Some(BinaryOp::Multiply)
+        } else if self.eat(&TokenKind::SlashEqual).is_some() {
+            Some(BinaryOp::Divide)
+        } else {
+            None
         }
     }
     fn skip_container_layout(&mut self) {
@@ -649,10 +819,20 @@ fn stmt_span_end(stmt: &Stmt) -> usize {
         Stmt::Let { span, .. }
         | Stmt::Assign { span, .. }
         | Stmt::Return { span, .. }
+        | Stmt::Break { span, .. }
+        | Stmt::Continue { span, .. }
         | Stmt::If { span, .. }
+        | Stmt::While { span, .. }
         | Stmt::ForIn { span, .. } => span.end,
         Stmt::Expr(expr) => expr.span().end,
     }
+}
+
+enum Item {
+    Module(ModuleDecl),
+    Import(ImportDecl),
+    Struct(StructDecl),
+    Functions(Vec<Function>),
 }
 #[cfg(test)]
 mod tests {
@@ -666,8 +846,38 @@ mod tests {
             "fn main() -> i32:\n    let chain_id: i64 = 1990\n    return 0\n",
         );
         let p = parse(&lex(&s).unwrap()).unwrap();
+        assert!(p.module_name.is_none());
+        assert!(p.imports.is_empty());
+        assert!(p.structs.is_empty());
         assert_eq!(p.functions[0].name, "main");
         assert_eq!(p.functions[0].body.len(), 2);
+    }
+
+    #[test]
+    fn parses_module_and_imports() {
+        let s = SourceFile::new(
+            "x.agi",
+            "module App.Controllers.InvoiceController\nimport App.Services.TaxService\nimport App.Models.Invoice\n\nfn main() -> i32:\n    return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        assert_eq!(p.module_name.as_ref().unwrap().path, "App.Controllers.InvoiceController");
+        assert_eq!(p.imports.len(), 2);
+        assert_eq!(p.imports[0].path, "App.Services.TaxService");
+        assert_eq!(p.imports[1].path, "App.Models.Invoice");
+    }
+
+    #[test]
+    fn parses_struct_declaration() {
+        let s = SourceFile::new(
+            "x.agi",
+            "struct Point:\n    x: i32\n    y: i32\n\nfn main() -> i32:\n    return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        assert_eq!(p.structs.len(), 1);
+        assert_eq!(p.structs[0].name, "Point");
+        assert_eq!(p.structs[0].fields.len(), 2);
+        assert_eq!(p.structs[0].fields[0].name, "x");
+        assert_eq!(p.structs[0].fields[1].name, "y");
     }
 
     #[test]
@@ -699,6 +909,60 @@ mod tests {
         let p = parse(&lex(&s).unwrap()).unwrap();
         assert_eq!(p.functions[0].body.len(), 3);
         assert!(matches!(p.functions[0].body[1], Stmt::Assign { .. }));
+    }
+
+    #[test]
+    fn parses_while_statement() {
+        let s = SourceFile::new(
+            "x.agi",
+            "fn main() -> i32:\n    let value = 0\n    while value < 3:\n        print(value)\n        value = value + 1\n    return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        assert_eq!(p.functions[0].body.len(), 3);
+        assert!(matches!(p.functions[0].body[1], Stmt::While { .. }));
+    }
+
+    #[test]
+    fn parses_elif_statement() {
+        let s = SourceFile::new(
+            "x.agi",
+            "fn main() -> i32:\n    let value = 1\n    if value == 0:\n        return 0\n    elif value == 1:\n        return 1\n    else:\n        return 2\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        assert_eq!(p.functions[0].body.len(), 2);
+        match &p.functions[0].body[1] {
+            Stmt::If { else_body, .. } => {
+                assert!(matches!(else_body.first(), Some(Stmt::If { .. })));
+            }
+            other => panic!("expected if statement, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_compound_assignment_statement() {
+        let s = SourceFile::new(
+            "x.agi",
+            "fn main() -> i32:\n    let value = 1\n    value += 2\n    return value\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        assert_eq!(p.functions[0].body.len(), 3);
+        assert!(matches!(p.functions[0].body[1], Stmt::Assign { .. }));
+    }
+
+    #[test]
+    fn parses_break_and_continue_statements() {
+        let s = SourceFile::new(
+            "x.agi",
+            "fn main() -> i32:\n    while true:\n        continue\n        break\n    return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        match &p.functions[0].body[0] {
+            Stmt::While { body, .. } => {
+                assert!(matches!(body[0], Stmt::Continue { .. }));
+                assert!(matches!(body[1], Stmt::Break { .. }));
+            }
+            other => panic!("expected while statement, got {other:?}"),
+        }
     }
 
     #[test]

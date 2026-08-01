@@ -24,6 +24,14 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("    bool owns_data;\n");
     out.push_str("} agi_list_list_f64;\n\n");
 
+    for struct_decl in &program.structs {
+        out.push_str("typedef struct {\n");
+        for field in &struct_decl.fields {
+            out.push_str(&format!("    {} {};\n", c_type(&field.ty), field.name));
+        }
+        out.push_str(&format!("}} {};\n\n", struct_decl.name));
+    }
+
     // Declare the runtime print function
     out.push_str("// Linked AGILANG runtime ABI\n");
     out.push_str("extern void agi_print(const char* msg);\n");
@@ -410,10 +418,24 @@ pub fn generate(program: &HirProgram) -> String {
         out.push_str("}\n\n");
     }
 
+    let main_return_type = program
+        .functions
+        .iter()
+        .find(|func| func.name == "main")
+        .map(|func| &func.return_type);
+
     // Generate C main standard entry point
     out.push_str("// Standard C Main Entry Point\n");
     out.push_str("int32_t agilang_main(void) {\n");
-    out.push_str("    return (int32_t)main_agi();\n");
+    match main_return_type {
+        Some(Type::Void) | None => {
+            out.push_str("    main_agi();\n");
+            out.push_str("    return 0;\n");
+        }
+        _ => {
+            out.push_str("    return (int32_t)main_agi();\n");
+        }
+    }
     out.push_str("}\n\n");
     out.push_str("int main(void) {\n");
     out.push_str("    return (int)agilang_main();\n");
@@ -422,25 +444,26 @@ pub fn generate(program: &HirProgram) -> String {
     out
 }
 
-fn c_type(ty: &Type) -> &'static str {
+fn c_type(ty: &Type) -> String {
     match ty {
-        Type::I32 => "int32_t",
-        Type::I64 => "int64_t",
-        Type::U32 => "uint32_t",
-        Type::U64 => "uint64_t",
-        Type::F32 => "float",
-        Type::F64 => "double",
-        Type::Bool => "bool",
-        Type::String => "const char*",
+        Type::I32 => "int32_t".to_string(),
+        Type::I64 => "int64_t".to_string(),
+        Type::U32 => "uint32_t".to_string(),
+        Type::U64 => "uint64_t".to_string(),
+        Type::F32 => "float".to_string(),
+        Type::F64 => "double".to_string(),
+        Type::Bool => "bool".to_string(),
+        Type::String => "const char*".to_string(),
         Type::List(inner) if inner.is_numeric() || inner.as_ref() == &Type::Unknown => {
-            "agi_list_f64"
+            "agi_list_f64".to_string()
         }
         Type::List(inner) if matches!(inner.as_ref(), Type::List(n) if n.is_numeric() || n.as_ref() == &Type::Unknown) => {
-            "agi_list_list_f64"
+            "agi_list_list_f64".to_string()
         }
         Type::Optional(inner) => c_type(inner),
-        Type::Void => "void",
-        _ => "void*",
+        Type::Struct(name) => name.clone(),
+        Type::Void => "void".to_string(),
+        _ => "void*".to_string(),
     }
 }
 
@@ -538,6 +561,8 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
                 format!("{}return;\n", ind)
             }
         }
+        HirStmt::Break { .. } => format!("{}break;\n", ind),
+        HirStmt::Continue { .. } => format!("{}continue;\n", ind),
         HirStmt::Assign { target, value, .. } => match target {
             HirExpr::Identifier(name, _, _) => {
                 format!("{}{} = {};\n", ind, name, generate_expr(value))
@@ -549,6 +574,15 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
                     ind,
                     generate_expr(object),
                     generate_expr(index),
+                    generate_expr(value)
+                )
+            }
+            HirExpr::MemberAccess { object, member, .. } => {
+                format!(
+                    "{}{}.{} = {};\n",
+                    ind,
+                    generate_expr(object),
+                    member,
                     generate_expr(value)
                 )
             }
@@ -576,6 +610,16 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
                 out.push_str(&format!("{}}}", ind));
             }
             out.push('\n');
+            out
+        }
+        HirStmt::While {
+            condition, body, ..
+        } => {
+            let mut out = format!("{}while ({}) {{\n", ind, generate_expr(condition));
+            for stmt in body {
+                out.push_str(&generate_stmt(stmt, indent + 4));
+            }
+            out.push_str(&format!("{}}}\n", ind));
             out
         }
         HirStmt::ForIn { .. } => format!("{}/* unsupported for-in loop */;\n", ind),
@@ -621,7 +665,7 @@ fn generate_expr(expr: &HirExpr) -> String {
         }
         HirExpr::ObjectLiteral(items, _, _) => generate_json_object_expr(items),
         HirExpr::MemberAccess { object, member, .. } => {
-            format!("/* member access */ {}.{}", generate_expr(object), member)
+            format!("{}.{}", generate_expr(object), member)
         }
         HirExpr::Index { object, index, .. } => {
             if matches!(object.ty(), Type::List(inner) if inner.is_numeric() || inner.as_ref() == &Type::Unknown)
@@ -950,6 +994,15 @@ fn generate_json_object_expr(items: &[(String, HirExpr)]) -> String {
     )
 }
 
+fn generate_struct_object_expr(items: &[(String, HirExpr)], struct_name: &str) -> String {
+    let fields = items
+        .iter()
+        .map(|(key, value)| format!(".{} = {}", key, generate_expr(value)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("({}){{ {} }}", struct_name, fields)
+}
+
 fn generate_json_array_expr(items: &[HirExpr]) -> String {
     let values = items
         .iter()
@@ -988,7 +1041,10 @@ fn generate_json_value_expr(key: Option<&str>, expr: &HirExpr) -> String {
         HirExpr::Integer(_, _, _) => format!("agi_json_i64((int64_t)({}))", generate_expr(expr)),
         HirExpr::Float(_, _, _) => format!("agi_json_f64((double)({}))", generate_expr(expr)),
         HirExpr::Bool(_, _, _) => format!("(({}) ? \"true\" : \"false\")", generate_expr(expr)),
-        HirExpr::ObjectLiteral(items, _, _) => generate_json_object_expr(items),
+        HirExpr::ObjectLiteral(items, ty, _) => match ty {
+            Type::Struct(name) => generate_struct_object_expr(items, name),
+            _ => generate_json_object_expr(items),
+        },
         HirExpr::ListLiteral(items, _, _) => generate_json_array_expr(items),
         _ => format!("agi_json_escape_and_quote({})", generate_expr(expr)),
     }
@@ -1067,6 +1123,31 @@ mod tests {
     }
 
     #[test]
+    fn test_codegen_void_main_bridge_returns_zero() {
+        let source = SourceFile::new(
+            "void_main.agi",
+            "fn main() -> void:\n    print(\"hello\")\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("void main_agi("));
+        assert!(c_code.contains("    main_agi();\n    return 0;"));
+        assert!(!c_code.contains("return (int32_t)main_agi();"));
+    }
+
+    #[test]
+    fn test_codegen_inferred_void_main_bridge_returns_zero() {
+        let source = SourceFile::new("inferred_void_main.agi", "fn main():\n    print(\"hello\")\n");
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("void main_agi("));
+        assert!(c_code.contains("    main_agi();\n    return 0;"));
+        assert!(!c_code.contains("return (int32_t)main_agi();"));
+    }
+
+    #[test]
     fn test_codegen_stats_list_overload_hir() {
         let source = SourceFile::new(
             "stats.agi",
@@ -1139,6 +1220,58 @@ mod tests {
     }
 
     #[test]
+    fn test_codegen_while_loop_lowering() {
+        let source = SourceFile::new(
+            "while_loop.agi",
+            "fn main() -> i32:\n    let value = 0\n    while value < 3:\n        value = value + 1\n    return value\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("while ((value < 3)) {"));
+        assert!(c_code.contains("value = (value + 1);"));
+    }
+
+    #[test]
+    fn test_codegen_compound_assignment_lowering() {
+        let source = SourceFile::new(
+            "compound.agi",
+            "fn main() -> i32:\n    let value = 1\n    value += 2\n    value *= 3\n    return value\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("value = (value + 2);"));
+        assert!(c_code.contains("value = (value * 3);"));
+    }
+
+    #[test]
+    fn test_codegen_elif_lowering() {
+        let source = SourceFile::new(
+            "elif.agi",
+            "fn main() -> i32:\n    let value = 1\n    if value == 0:\n        return 0\n    elif value == 1:\n        return 1\n    else:\n        return 2\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("if ((value == 0)) {"));
+        assert!(c_code.contains("else {\n        if ((value == 1)) {"));
+    }
+
+    #[test]
+    fn test_codegen_break_and_continue_lowering() {
+        let source = SourceFile::new(
+            "loop_control.agi",
+            "fn main() -> i32:\n    let value = 0\n    while value < 5:\n        value += 1\n        if value == 2:\n            continue\n        if value == 4:\n            break\n    return value\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("continue;"));
+        assert!(c_code.contains("break;"));
+    }
+
+    #[test]
     fn test_codegen_exec_native_stats_binary() {
         if !cfg!(windows) {
             return;
@@ -1200,14 +1333,201 @@ mod tests {
         fs::remove_dir_all(&dir).ok();
     }
 
+    fn compile_and_run_with_runtime_stub(source_name: &str, source_text: &str) -> Option<(i32, String)> {
+        if !cfg!(windows) {
+            return None;
+        }
+
+        let where_out = Command::new("cmd")
+            .args(["/C", "where cl.exe"])
+            .output()
+            .ok()?;
+        if !where_out.status.success() {
+            return None;
+        }
+
+        let source = SourceFile::new(source_name, source_text);
+        let hir = agilang_compiler::hir(&source).ok()?;
+        let c_code = generate(&hir);
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "agilang_codegen_entry_{}_{}",
+            std::process::id(),
+            unique
+        ));
+        fs::create_dir_all(&dir).unwrap();
+
+        let c_path = dir.join("app.c");
+        let runtime_stub_path = dir.join("runtime_stub.c");
+        let exe_path = dir.join("app.exe");
+        fs::write(&c_path, c_code).unwrap();
+        fs::write(
+            &runtime_stub_path,
+            "void agi_print(const char* msg) { (void)msg; }\n\
+             const char* agi_http_get(const char* url) { (void)url; return \"\"; }\n\
+             const char* agi_http_post(const char* url, const char* body) { (void)url; (void)body; return \"\"; }\n\
+             const char* agi_http_get_json(const char* url) { (void)url; return \"{}\"; }\n\
+             const char* agi_http_post_json(const char* url, const char* body) { (void)url; (void)body; return \"{}\"; }\n\
+             const char* agi_http_request_json(const char* request_json) { (void)request_json; return \"{}\"; }\n",
+        )
+        .unwrap();
+
+        let compile = Command::new("cmd")
+            .args([
+                "/C",
+                &format!(
+                    "cl.exe /nologo /O2 /Fe:\"{}\" \"{}\" \"{}\"",
+                    exe_path.display(),
+                    c_path.display(),
+                    runtime_stub_path.display()
+                ),
+            ])
+            .output()
+            .unwrap();
+
+        if !compile.status.success() {
+            panic!(
+                "failed to compile generated C. stdout: {} stderr: {}",
+                String::from_utf8_lossy(&compile.stdout),
+                String::from_utf8_lossy(&compile.stderr)
+            );
+        }
+
+        let run = Command::new(&exe_path).output().unwrap();
+        let result = (
+            run.status.code().unwrap_or_default(),
+            String::from_utf8_lossy(&run.stdout).to_string(),
+        );
+        fs::remove_dir_all(&dir).ok();
+        Some(result)
+    }
+
+    #[test]
+    fn test_codegen_exec_void_main_binary() {
+        let Some((code, _stdout)) =
+            compile_and_run_with_runtime_stub("void_exec.agi", "fn main() -> void:\n    print(\"hello\")\n")
+        else {
+            return;
+        };
+        assert_eq!(code, 0);
+    }
+
+    #[test]
+    fn test_codegen_exec_inferred_void_main_binary() {
+        let Some((code, _stdout)) =
+            compile_and_run_with_runtime_stub("inferred_void_exec.agi", "fn main():\n    print(\"hello\")\n")
+        else {
+            return;
+        };
+        assert_eq!(code, 0);
+    }
+
+    #[test]
+    fn test_codegen_exec_void_helper_main_binary() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "void_helper_exec.agi",
+            "fn helper() -> void:\n    print(\"helper\")\n\nfn main() -> void:\n    helper()\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 0);
+    }
+
+    #[test]
+    fn test_codegen_exec_i32_main_binary_preserves_exit_code() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "i32_exec.agi",
+            "fn main() -> i32:\n    return 7\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 7);
+    }
+
+    #[test]
+    fn test_codegen_exec_while_loop_binary() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "while_exec.agi",
+            "fn main() -> i32:\n    let value = 0\n    while value < 4:\n        value = value + 1\n    return value\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 4);
+    }
+
+    #[test]
+    fn test_codegen_exec_compound_assignment_binary() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "compound_exec.agi",
+            "fn main() -> i32:\n    let value = 1\n    value += 2\n    value *= 3\n    return value\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 9);
+    }
+
+    #[test]
+    fn test_codegen_exec_elif_binary() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "elif_exec.agi",
+            "fn main() -> i32:\n    let value = 1\n    if value == 0:\n        return 0\n    elif value == 1:\n        return 7\n    else:\n        return 2\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 7);
+    }
+
+    #[test]
+    fn test_codegen_exec_break_and_continue_binary() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "loop_control_exec.agi",
+            "fn main() -> i32:\n    let value = 0\n    while value < 5:\n        value += 1\n        if value == 2:\n            continue\n        if value == 4:\n            break\n    return value\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 4);
+    }
+
     #[test]
     fn generated_runtime_contains_deterministic_list_ownership_helpers() {
-        let program = HirProgram { functions: vec![] };
+        let program = HirProgram {
+            structs: vec![],
+            functions: vec![],
+        };
         let c_code = generate(&program);
         assert!(c_code.contains("static void agi_list_free_f64"));
         assert!(c_code.contains("static bool agi_list_reserve_f64"));
         assert!(c_code.contains("static bool agi_list_insert_f64"));
         assert!(c_code.contains("static bool agi_list_remove_f64"));
         assert!(c_code.contains("static void agi_list_free_list_f64"));
+    }
+
+    #[test]
+    fn test_codegen_struct_typedef_and_member_access() {
+        let source = SourceFile::new(
+            "point.agi",
+            "struct Point:\n    x: i32\n    y: i32\n\nfn main() -> i32:\n    let point: Point = {x: 2, y: 5}\n    point.x = point.x + 3\n    return point.x + point.y\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("typedef struct {\n    int32_t x;\n    int32_t y;\n} Point;"));
+        assert!(c_code.contains("point.x = (point.x + 3);"));
+        assert!(c_code.contains("return (point.x + point.y);"));
+    }
+
+    #[test]
+    fn test_codegen_exec_struct_binary() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "struct_exec.agi",
+            "struct Point:\n    x: i32\n    y: i32\n\nfn main() -> i32:\n    let point: Point = {x: 2, y: 5}\n    point.x = point.x + 3\n    return point.x + point.y\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 10);
     }
 }

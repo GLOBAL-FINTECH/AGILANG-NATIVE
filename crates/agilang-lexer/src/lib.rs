@@ -7,17 +7,22 @@ use agilang_source::{SourceFile, Span};
 pub enum TokenKind {
     Fn,
     Module,
+    Import,
     Use,
+    Struct,
     Class,
     Extends,
     Let,
     Const,
     Return,
     If,
+    Elif,
     Else,
     While,
     For,
     In,
+    Break,
+    Continue,
     Throw,
     True,
     False,
@@ -39,6 +44,10 @@ pub enum TokenKind {
     RParen,
     Arrow,
     Equal,
+    PlusEqual,
+    MinusEqual,
+    StarEqual,
+    SlashEqual,
     EqualEqual,
     BangEqual,
     Less,
@@ -119,6 +128,13 @@ impl<'a> Lexer<'a> {
                     });
                 }
                 b'=' => self.single(TokenKind::Equal),
+                b'+' if self.peek(1) == Some(b'=') => {
+                    self.cursor += 2;
+                    self.tokens.push(Token {
+                        kind: TokenKind::PlusEqual,
+                        span: Span::new(start, self.cursor),
+                    });
+                }
                 b'!' if self.peek(1) == Some(b'=') => {
                     self.cursor += 2;
                     self.tokens.push(Token {
@@ -143,12 +159,33 @@ impl<'a> Lexer<'a> {
                 b'<' => self.single(TokenKind::Less),
                 b'>' => self.single(TokenKind::Greater),
                 b'+' => self.single(TokenKind::Plus),
+                b'*' if self.peek(1) == Some(b'=') => {
+                    self.cursor += 2;
+                    self.tokens.push(Token {
+                        kind: TokenKind::StarEqual,
+                        span: Span::new(start, self.cursor),
+                    });
+                }
                 b'*' => self.single(TokenKind::Star),
+                b'/' if self.peek(1) == Some(b'=') => {
+                    self.cursor += 2;
+                    self.tokens.push(Token {
+                        kind: TokenKind::SlashEqual,
+                        span: Span::new(start, self.cursor),
+                    });
+                }
                 b'/' => self.single(TokenKind::Slash),
                 b'-' if self.peek(1) == Some(b'>') => {
                     self.cursor += 2;
                     self.tokens.push(Token {
                         kind: TokenKind::Arrow,
+                        span: Span::new(start, self.cursor),
+                    });
+                }
+                b'-' if self.peek(1) == Some(b'=') => {
+                    self.cursor += 2;
+                    self.tokens.push(Token {
+                        kind: TokenKind::MinusEqual,
                         span: Span::new(start, self.cursor),
                     });
                 }
@@ -263,17 +300,22 @@ impl<'a> Lexer<'a> {
         let kind = match text {
             "fn" => TokenKind::Fn,
             "module" => TokenKind::Module,
+            "import" => TokenKind::Import,
             "use" => TokenKind::Use,
+            "struct" => TokenKind::Struct,
             "class" => TokenKind::Class,
             "extends" => TokenKind::Extends,
             "let" => TokenKind::Let,
             "const" => TokenKind::Const,
             "return" => TokenKind::Return,
             "if" => TokenKind::If,
+            "elif" => TokenKind::Elif,
             "else" => TokenKind::Else,
             "while" => TokenKind::While,
             "for" => TokenKind::For,
             "in" => TokenKind::In,
+            "break" => TokenKind::Break,
+            "continue" => TokenKind::Continue,
             "throw" => TokenKind::Throw,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
@@ -426,5 +468,40 @@ mod tests {
         assert!(t.iter().any(|x| x.kind == TokenKind::GreaterEqual));
         assert!(t.iter().any(|x| x.kind == TokenKind::BangEqual));
         assert!(t.iter().any(|x| x.kind == TokenKind::And));
+    }
+
+    #[test]
+    fn lexes_elif_and_compound_assignments() {
+        let s = SourceFile::new(
+            "x.agi",
+            "fn main() -> i32:\n    let value = 1\n    if value == 1:\n        value += 1\n    elif value == 2:\n        value -= 1\n    else:\n        value *= 2\n    value /= 2\n    return value\n",
+        );
+        let t = lex(&s).unwrap();
+        assert!(t.iter().any(|x| x.kind == TokenKind::Elif));
+        assert!(t.iter().any(|x| x.kind == TokenKind::PlusEqual));
+        assert!(t.iter().any(|x| x.kind == TokenKind::MinusEqual));
+        assert!(t.iter().any(|x| x.kind == TokenKind::StarEqual));
+        assert!(t.iter().any(|x| x.kind == TokenKind::SlashEqual));
+    }
+
+    #[test]
+    fn lexes_break_and_continue() {
+        let s = SourceFile::new(
+            "x.agi",
+            "fn main() -> i32:\n    while true:\n        continue\n        break\n    return 0\n",
+        );
+        let t = lex(&s).unwrap();
+        assert!(t.iter().any(|x| x.kind == TokenKind::Continue));
+        assert!(t.iter().any(|x| x.kind == TokenKind::Break));
+    }
+
+    #[test]
+    fn lexes_struct_keyword() {
+        let s = SourceFile::new(
+            "x.agi",
+            "struct Point:\n    x: i32\n    y: i32\n",
+        );
+        let t = lex(&s).unwrap();
+        assert!(t.iter().any(|x| x.kind == TokenKind::Struct));
     }
 }

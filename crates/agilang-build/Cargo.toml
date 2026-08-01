@@ -15,3 +15,5 @@ agilang-codegen-c = { path = "../agilang-codegen-c" }
 agilang-linker = { path = "../agilang-linker" }
 agilang-framework-server = { path = "../agilang-framework-server" }
 anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true

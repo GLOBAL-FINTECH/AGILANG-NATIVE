@@ -5,7 +5,22 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HirProgram {
+    pub structs: Vec<HirStruct>,
     pub functions: Vec<HirFunction>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirStruct {
+    pub name: String,
+    pub fields: Vec<HirStructField>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirStructField {
+    pub name: String,
+    pub ty: Type,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,10 +58,21 @@ pub enum HirStmt {
         value: Option<HirExpr>,
         span: Span,
     },
+    Break {
+        span: Span,
+    },
+    Continue {
+        span: Span,
+    },
     If {
         condition: HirExpr,
         then_body: Vec<HirStmt>,
         else_body: Vec<HirStmt>,
+        span: Span,
+    },
+    While {
+        condition: HirExpr,
+        body: Vec<HirStmt>,
         span: Span,
     },
     ForIn {
