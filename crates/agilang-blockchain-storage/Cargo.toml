@@ -1,0 +1,11 @@
+[package]
+name = "agilang-blockchain-storage"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agilang-runtime-core = { path = "../agilang-runtime-core" }
+agilang-blockchain-core = { path = "../agilang-blockchain-core" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
