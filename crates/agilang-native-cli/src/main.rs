@@ -1,8 +1,13 @@
 use agilang_compiler::{check, hir, parse, tokenize, SourceFile};
 use agilang_database_identity::{ApplicationIdentity, DatabaseIdentity};
-use agilang_database_mysql_gateway::{read_status as read_mysql_gateway_status, start_server as start_mysql_gateway, GatewayConfig, GatewayUser};
+use agilang_database_mysql_gateway::{
+    read_status as read_mysql_gateway_status, start_server as start_mysql_gateway, GatewayConfig,
+    GatewayUser,
+};
 use agilang_database_security_kernel::Capability;
 use agilang_database_tcp::{fetch_status, perform_handshake, start_server, TransportServerConfig};
+use agilang_framework_database::DatabaseConfig;
+use agilang_framework_migrations::{MigrationExecutor, MigrationFile};
 use anyhow::{bail, Context, Result};
 use std::{
     env, fs,
@@ -21,6 +26,19 @@ const LANGUAGE_SPEC_VERSION: &str = "Draft 0.7";
 
 fn print_version() {
     println!("AGILANG v{AGILANG_VERSION}");
+}
+
+fn default_database_config() -> DatabaseConfig {
+    DatabaseConfig::agidb("storage/database/main.agidb")
+}
+
+fn sample_cli_migrations() -> Vec<MigrationFile> {
+    vec![MigrationFile::new(
+        "20260801_create_users_table",
+        vec!["CREATE TABLE users (id INTEGER, name TEXT)".to_string()],
+        vec!["DROP TABLE IF EXISTS users".to_string()],
+        "create users migration",
+    )]
 }
 
 fn files_are_identical(left: &Path, right: &Path) -> bool {
@@ -755,41 +773,52 @@ fn main() -> Result<()> {
         }
         "migrate" => {
             let pretend = args.any(|arg| arg == "--pretend");
-            let file = agilang_framework_migrations::MigrationFile {
-                name: "20260720_210001_create_users_table".to_string(),
-                sql_statements: vec!["CREATE TABLE \"users\" (id INTEGER PRIMARY KEY);".to_string()],
-                checksum: "a1b2c3d4".to_string(),
-            };
-            let logs =
-                agilang_framework_migrations::MigrationExecutor::run_migrations(&[file], pretend)?;
+            let mut executor = MigrationExecutor::connect(&default_database_config())?;
+            let logs = executor.run_migrations(&sample_cli_migrations(), pretend)?;
             if !pretend {
                 println!("Executed {} migrations.", logs.len());
             }
         }
         "migrate:status" => {
+            let mut executor = MigrationExecutor::connect(&default_database_config())?;
+            let records = executor.status()?;
             println!("AGILANG Migration Status\n");
             println!("{:<50} {:<7} Status", "Migration", "Batch");
+            for record in &records {
+                println!("{:<50} {:<7} Applied", record.migration, record.batch);
+            }
             println!(
-                "{:<50} {:<7} Applied",
-                "20260720_210001_create_users_table", "1"
+                "\nApplied: {}\nPending: 0\nDatabase: agidb\nChecksum integrity: PASS\nStatus: healthy",
+                records.len()
             );
-            println!(
-                "{:<50} {:<7} Applied",
-                "20260720_210002_create_sessions_table", "1"
-            );
-            println!("\nApplied: 2\nPending: 0\nDatabase: sqlite\nChecksum integrity: PASS\nStatus: healthy");
         }
         "migrate:rollback" => {
             let pretend = args.any(|arg| arg == "--pretend");
-            let rolled = agilang_framework_migrations::MigrationExecutor::rollback_latest(pretend)?;
+            let mut executor = MigrationExecutor::connect(&default_database_config())?;
+            let rolled = executor.rollback_latest(&sample_cli_migrations(), pretend)?;
             if !pretend {
                 println!("Rolled back {} migrations.", rolled.len());
             }
         }
-        "migrate:reset" | "migrate:refresh" | "migrate:fresh" => {
-            println!("Resetting database migrations...");
-            agilang_framework_migrations::MigrationRepository::clear();
-            println!("Database migrations reset successfully.");
+        "migrate:reset" => {
+            let pretend = args.any(|arg| arg == "--pretend");
+            let mut executor = MigrationExecutor::connect(&default_database_config())?;
+            let rolled = executor.reset(&sample_cli_migrations(), pretend)?;
+            println!("Rolled back {} migrations.", rolled.len());
+        }
+        "migrate:refresh" => {
+            let pretend = args.any(|arg| arg == "--pretend");
+            let mut executor = MigrationExecutor::connect(&default_database_config())?;
+            let applied = executor.refresh(&sample_cli_migrations(), pretend)?;
+            println!("Refreshed {} migrations.", applied.len());
+        }
+        "migrate:fresh" => {
+            let remaining = args.collect::<Vec<_>>();
+            let pretend = remaining.iter().any(|arg| arg == "--pretend");
+            let allow = remaining.iter().any(|arg| arg == "--force");
+            let mut executor = MigrationExecutor::connect(&default_database_config())?;
+            let applied = executor.fresh(&sample_cli_migrations(), pretend, "local", allow)?;
+            println!("Fresh migrated {} migrations.", applied.len());
         }
         "seed" | "db:seed" => {
             println!("Seeding database records...");
@@ -1039,10 +1068,7 @@ fn main() -> Result<()> {
         "mysql-gateway:start" | "mysql-gateway:serve" => {
             let config = parse_mysql_gateway_args(args.collect())?;
             let server = start_mysql_gateway(config.clone())?;
-            println!(
-                "AGIDB MySQL gateway listening on {}",
-                server.local_addr()
-            );
+            println!("AGIDB MySQL gateway listening on {}", server.local_addr());
             println!("Status file: {}", config.status_path);
             println!("Press Ctrl+C to stop.");
             loop {
@@ -1063,7 +1089,14 @@ fn main() -> Result<()> {
             }
             println!("Max connections: {}", status.max_connections);
             println!("Max packet size: {}", status.max_packet_size);
-            println!("Status: {}", if status.online { "operational" } else { "offline" });
+            println!(
+                "Status: {}",
+                if status.online {
+                    "operational"
+                } else {
+                    "offline"
+                }
+            );
         }
         "agidb:benchmark" => {
             let profile = args.next().unwrap_or_else(|| "connectivity".to_string());
@@ -1431,7 +1464,9 @@ fn parse_mysql_gateway_args(args: Vec<String>) -> Result<GatewayConfig> {
         } else if let Some(value) = arg.strip_prefix("--max-packet-size=") {
             max_packet_size = value.parse().context("invalid --max-packet-size value")?;
         } else if let Some(value) = arg.strip_prefix("--connect-timeout-ms=") {
-            connect_timeout_ms = value.parse().context("invalid --connect-timeout-ms value")?;
+            connect_timeout_ms = value
+                .parse()
+                .context("invalid --connect-timeout-ms value")?;
         } else if let Some(value) = arg.strip_prefix("--query-timeout-ms=") {
             query_timeout_ms = value.parse().context("invalid --query-timeout-ms value")?;
         } else if let Some(value) = arg.strip_prefix("--status-file=") {

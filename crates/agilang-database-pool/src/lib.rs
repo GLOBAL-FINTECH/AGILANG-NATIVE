@@ -49,7 +49,7 @@ impl ConnectionPool {
             );
         }
         *guard += 1;
-        Ok(Box::new(SqliteConnection::new(":memory:")))
+        Ok(Box::new(SqliteConnection::new(":memory:")?))
     }
 
     pub fn release(&self) {

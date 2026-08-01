@@ -1,4 +1,7 @@
-use agilang_database_driver::{DatabaseConnection, DatabaseRow, DatabaseValue, ExecutionResult};
+use agilang_database_driver::{
+    DatabaseCapability, DatabaseConnection, DatabaseDriverKind, DatabaseHealth, DatabaseRow,
+    DatabaseValue, ExecutionResult,
+};
 use agilang_database_storage::{PageManager, MAGIC_BYTES};
 use agilang_database_wal::WriteAheadLog;
 use anyhow::{bail, Context, Result};
@@ -154,6 +157,8 @@ impl DatabaseConnection for AgiDbConnection {
 
         let result = if upper.starts_with("CREATE TABLE") {
             execute_create_table(&mut store, statement)?
+        } else if upper.starts_with("DROP TABLE") {
+            execute_drop_table(&mut store, statement)?
         } else if upper.starts_with("INSERT INTO") {
             execute_insert(&mut store, statement, params)?
         } else if upper.starts_with("UPDATE") {
@@ -194,6 +199,62 @@ impl DatabaseConnection for AgiDbConnection {
         }
         self.in_transaction = false;
         Ok(())
+    }
+
+    fn health_check(&mut self) -> Result<DatabaseHealth> {
+        let _ = self.read_store()?;
+        Ok(DatabaseHealth {
+            healthy: true,
+            message: "ok".to_string(),
+        })
+    }
+
+    fn inspect_tables(&mut self) -> Result<Vec<String>> {
+        let store = self.read_store()?;
+        Ok(store.tables.keys().cloned().collect())
+    }
+
+    fn acquire_migration_lock(&mut self, lock_name: &str) -> Result<()> {
+        let _ = self.execute(
+            "CREATE TABLE agilang_migration_locks (id INTEGER, name TEXT, acquired_at TEXT)",
+            &[],
+        );
+        let existing = self.query(
+            "SELECT * FROM agilang_migration_locks WHERE name = ? LIMIT 1",
+            &[DatabaseValue::Text(lock_name.to_string())],
+        )?;
+        if !existing.is_empty() {
+            bail!("E6110 Another migration process is currently active");
+        }
+        self.execute(
+            "INSERT INTO agilang_migration_locks (name, acquired_at) VALUES (?, ?)",
+            &[
+                DatabaseValue::Text(lock_name.to_string()),
+                DatabaseValue::Text(format!("{:?}", std::time::SystemTime::now())),
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn release_migration_lock(&mut self, lock_name: &str) -> Result<()> {
+        let _ = self.execute(
+            "DELETE FROM agilang_migration_locks WHERE name = ?",
+            &[DatabaseValue::Text(lock_name.to_string())],
+        )?;
+        Ok(())
+    }
+
+    fn capabilities(&self) -> Vec<DatabaseCapability> {
+        vec![
+            DatabaseCapability::Transactions,
+            DatabaseCapability::PreparedStatements,
+            DatabaseCapability::SchemaInspection,
+            DatabaseCapability::MigrationLocking,
+        ]
+    }
+
+    fn driver_kind(&self) -> DatabaseDriverKind {
+        DatabaseDriverKind::AgiDb
     }
 }
 
@@ -294,6 +355,33 @@ fn execute_insert(
     Ok(ExecutionResult {
         rows_affected: 1,
         last_insert_id,
+    })
+}
+
+fn execute_drop_table(store: &mut AgiDbStore, sql: &str) -> Result<ExecutionResult> {
+    let parts = sql.split_whitespace().collect::<Vec<_>>();
+    let table_name = match parts.as_slice() {
+        [_, _, name] => *name,
+        [_, _, if_kw, not_kw, exists_kw, name]
+            if if_kw.eq_ignore_ascii_case("IF")
+                && not_kw.eq_ignore_ascii_case("NOT")
+                && exists_kw.eq_ignore_ascii_case("EXISTS") =>
+        {
+            *name
+        }
+        [_, _, if_kw, exists_kw, name]
+            if if_kw.eq_ignore_ascii_case("IF") && exists_kw.eq_ignore_ascii_case("EXISTS") =>
+        {
+            *name
+        }
+        _ => bail!("E6315 DROP TABLE requires a table name"),
+    }
+    .trim_matches('"');
+
+    let removed = store.tables.remove(table_name).is_some();
+    Ok(ExecutionResult {
+        rows_affected: u64::from(removed),
+        last_insert_id: None,
     })
 }
 

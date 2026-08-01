@@ -7,3 +7,4 @@ edition.workspace = true
 anyhow = { workspace = true }
 serde = { workspace = true }
 agilang-database-driver = { path = "../agilang-database-driver" }
+rusqlite = { version = "0.32", features = ["bundled"] }

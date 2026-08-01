@@ -1,5 +1,13 @@
+mod orm;
+
+pub use orm::*;
+
 use agilang_database_agidb::AgiDbConnection;
-use agilang_database_driver::{DatabaseConnection, DatabaseValue};
+use agilang_database_driver::{
+    DatabaseCapability, DatabaseConnection, DatabaseDriverKind, DatabaseHealth, DatabaseValue,
+};
+use agilang_database_mysql::MySqlConnection;
+use agilang_database_sqlite::SqliteConnection;
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use serde_json::Value;
@@ -9,6 +17,164 @@ use std::sync::Mutex;
 
 pub type DatabaseRow = HashMap<String, Value>;
 pub type TableRows = Vec<DatabaseRow>;
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum FrameworkDriver {
+    Agidb,
+    Sqlite,
+    Mysql,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DatabaseConfig {
+    pub driver: FrameworkDriver,
+    pub database: String,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub strict_driver_selection: bool,
+}
+
+impl DatabaseConfig {
+    pub fn agidb(database: impl Into<String>) -> Self {
+        Self {
+            driver: FrameworkDriver::Agidb,
+            database: database.into(),
+            host: None,
+            port: None,
+            username: None,
+            password: None,
+            strict_driver_selection: true,
+        }
+    }
+
+    pub fn sqlite(database: impl Into<String>) -> Self {
+        Self {
+            driver: FrameworkDriver::Sqlite,
+            database: database.into(),
+            host: None,
+            port: None,
+            username: None,
+            password: None,
+            strict_driver_selection: true,
+        }
+    }
+
+    pub fn mysql(
+        host: impl Into<String>,
+        port: u16,
+        database: impl Into<String>,
+        username: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Self {
+        Self {
+            driver: FrameworkDriver::Mysql,
+            database: database.into(),
+            host: Some(host.into()),
+            port: Some(port),
+            username: Some(username.into()),
+            password: Some(password.into()),
+            strict_driver_selection: true,
+        }
+    }
+}
+
+pub struct FrameworkConnection {
+    inner: Box<dyn DatabaseConnection>,
+}
+
+impl FrameworkConnection {
+    pub fn connect(config: &DatabaseConfig) -> Result<Self> {
+        let inner: Box<dyn DatabaseConnection> = match config.driver {
+            FrameworkDriver::Agidb => Box::new(AgiDbConnection::new(config.database.clone())),
+            FrameworkDriver::Sqlite => Box::new(SqliteConnection::new(config.database.clone())?),
+            FrameworkDriver::Mysql => Box::new(MySqlConnection::new(
+                config
+                    .host
+                    .clone()
+                    .ok_or_else(|| anyhow::anyhow!("E6201 mysql host is required"))?,
+                config.port.unwrap_or(3306),
+                config.database.clone(),
+                config
+                    .username
+                    .clone()
+                    .ok_or_else(|| anyhow::anyhow!("E6202 mysql username is required"))?,
+                config
+                    .password
+                    .clone()
+                    .ok_or_else(|| anyhow::anyhow!("E6203 mysql password is required"))?,
+            )?),
+        };
+        Ok(Self { inner })
+    }
+
+    pub fn driver_kind(&self) -> DatabaseDriverKind {
+        self.inner.driver_kind()
+    }
+
+    pub fn capabilities(&self) -> Vec<DatabaseCapability> {
+        self.inner.capabilities()
+    }
+
+    pub fn health_check(&mut self) -> Result<DatabaseHealth> {
+        self.inner.health_check()
+    }
+}
+
+impl DatabaseConnection for FrameworkConnection {
+    fn execute(
+        &mut self,
+        sql: &str,
+        params: &[agilang_database_driver::DatabaseValue],
+    ) -> Result<agilang_database_driver::ExecutionResult> {
+        self.inner.execute(sql, params)
+    }
+
+    fn query(
+        &mut self,
+        sql: &str,
+        params: &[agilang_database_driver::DatabaseValue],
+    ) -> Result<Vec<agilang_database_driver::DatabaseRow>> {
+        self.inner.query(sql, params)
+    }
+
+    fn begin_transaction(&mut self) -> Result<()> {
+        self.inner.begin_transaction()
+    }
+
+    fn commit(&mut self) -> Result<()> {
+        self.inner.commit()
+    }
+
+    fn rollback(&mut self) -> Result<()> {
+        self.inner.rollback()
+    }
+
+    fn health_check(&mut self) -> Result<DatabaseHealth> {
+        self.inner.health_check()
+    }
+
+    fn inspect_tables(&mut self) -> Result<Vec<String>> {
+        self.inner.inspect_tables()
+    }
+
+    fn acquire_migration_lock(&mut self, lock_name: &str) -> Result<()> {
+        self.inner.acquire_migration_lock(lock_name)
+    }
+
+    fn release_migration_lock(&mut self, lock_name: &str) -> Result<()> {
+        self.inner.release_migration_lock(lock_name)
+    }
+
+    fn capabilities(&self) -> Vec<DatabaseCapability> {
+        self.inner.capabilities()
+    }
+
+    fn driver_kind(&self) -> DatabaseDriverKind {
+        self.inner.driver_kind()
+    }
+}
 
 static DATABASE_STORE: Lazy<Mutex<HashMap<String, TableRows>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));

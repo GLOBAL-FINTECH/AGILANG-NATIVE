@@ -10,3 +10,5 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 agilang-database-agidb = { path = "../agilang-database-agidb" }
 agilang-database-driver = { path = "../agilang-database-driver" }
+agilang-database-sqlite = { path = "../agilang-database-sqlite" }
+agilang-database-mysql = { path = "../agilang-database-mysql" }
