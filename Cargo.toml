@@ -10,6 +10,7 @@ members = [
   "crates/agilang-runtime-resource",
   "crates/agilang-runtime-realtime",
   "crates/agilang-runtime-webrtc",
+  "crates/agilang-runtime-websocket",
   "crates/agilang-runtime-http",
   "crates/agilang-runtime-llm",
   "crates/agilang-runtime-evm",
