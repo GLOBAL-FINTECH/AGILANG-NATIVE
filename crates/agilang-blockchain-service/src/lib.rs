@@ -7,6 +7,9 @@ use agilang_runtime_core::{AgilangError, ErrorCode, RuntimeResult};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
+const RAW_TO_NATIVE_KEY: &str = "ethereum_raw_to_native_hashes";
+const NATIVE_TO_RAW_KEY: &str = "ethereum_native_to_raw_hashes";
+
 /// Stateful RPC facade around `BlockchainNode`.
 ///
 /// The node's read-only dispatcher remains available, while mutating methods are
@@ -18,12 +21,25 @@ pub struct BlockchainService {
 }
 
 impl BlockchainService {
-    pub fn new(node: BlockchainNode) -> Self {
-        Self {
+    pub fn new(node: BlockchainNode) -> RuntimeResult<Self> {
+        let raw_to_native_hash = node
+            .database
+            .metadata::<BTreeMap<String, String>>(RAW_TO_NATIVE_KEY)?
+            .unwrap_or_default();
+        let native_to_raw_hash = node
+            .database
+            .metadata::<BTreeMap<String, String>>(NATIVE_TO_RAW_KEY)?
+            .unwrap_or_else(|| {
+                raw_to_native_hash
+                    .iter()
+                    .map(|(raw, native)| (native.clone(), raw.clone()))
+                    .collect()
+            });
+        Ok(Self {
             node,
-            raw_to_native_hash: BTreeMap::new(),
-            native_to_raw_hash: BTreeMap::new(),
-        }
+            raw_to_native_hash,
+            native_to_raw_hash,
+        })
     }
 
     pub fn rpc(&mut self, method: &str, params: Value, now_ms: u64) -> RuntimeResult<Value> {
@@ -38,7 +54,13 @@ impl BlockchainService {
                 self.raw_to_native_hash
                     .insert(ethereum_hash.clone(), native_hash.clone());
                 self.native_to_raw_hash
-                    .insert(native_hash, ethereum_hash.clone());
+                    .insert(native_hash.clone(), ethereum_hash.clone());
+                if let Err(error) = self.persist_aliases() {
+                    self.node.mempool.remove(&native_hash);
+                    self.raw_to_native_hash.remove(&ethereum_hash);
+                    self.native_to_raw_hash.remove(&native_hash);
+                    return Err(error);
+                }
                 Ok(json!(ethereum_hash))
             }
             "eth_getTransactionByHash" | "eth_getTransactionReceipt" => {
@@ -58,6 +80,15 @@ impl BlockchainService {
 
     pub fn native_hash_for_raw(&self, ethereum_hash: &str) -> Option<&str> {
         self.raw_to_native_hash.get(ethereum_hash).map(String::as_str)
+    }
+
+    fn persist_aliases(&self) -> RuntimeResult<()> {
+        self.node
+            .database
+            .put_metadata(RAW_TO_NATIVE_KEY, &self.raw_to_native_hash)?;
+        self.node
+            .database
+            .put_metadata(NATIVE_TO_RAW_KEY, &self.native_to_raw_hash)
     }
 
     fn convert_raw(
