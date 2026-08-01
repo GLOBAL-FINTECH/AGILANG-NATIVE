@@ -4,7 +4,7 @@ use agilang_blockchain_core::Transaction;
 use agilang_blockchain_node::BlockchainNode;
 use agilang_blockchain_transaction::{decode_raw_transaction, hex_address, RawTransaction};
 use agilang_runtime_core::{AgilangError, ErrorCode, RuntimeResult};
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 /// Stateful RPC facade around `BlockchainNode`.
@@ -104,9 +104,6 @@ impl BlockchainService {
                 let sender = hex_address(&tx.sender);
                 let to = tx.to.map(|value| hex_address(&value)).unwrap_or_default();
                 let ethereum_hash = hex_bytes(&tx.hash);
-                // Until the execution layer exposes a canonical base fee, admission
-                // reserves the sender's declared maximum fee. Block execution will
-                // later settle the actual base-fee burn and validator priority tip.
                 let gas_price = tx.max_fee_per_gas;
                 let metadata = transaction_metadata(
                     &ethereum_hash,
