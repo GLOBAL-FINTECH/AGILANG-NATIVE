@@ -28,6 +28,7 @@ pub enum ControllerResult {
 static AUTH_RATE_LIMITER: OnceLock<Mutex<HashMap<String, Vec<u64>>>> = OnceLock::new();
 static ACTIVE_REGISTRATIONS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 static WEBRTC_SIGNALING_HUB: OnceLock<SignalingHub> = OnceLock::new();
+static WEBRTC_PEER_REGISTRY: OnceLock<Mutex<HashMap<String, WebRtcPeerRegistration>>> = OnceLock::new();
 
 const SESSION_COOKIE_NAME: &str = "agilang_session";
 const SESSION_TTL_SECS: u64 = 7200;
@@ -51,6 +52,13 @@ struct AuthUserRecord {
     email: String,
     password_hash: String,
     role: String,
+}
+
+#[derive(Debug, Clone)]
+struct WebRtcPeerRegistration {
+    session_token_hash: String,
+    user_id: String,
+    email: String,
 }
 
 struct RegistrationGuard {
@@ -383,6 +391,7 @@ fn delete_session(conn: &mut AgiDbConnection, token_hash: &str) {
         "DELETE FROM sessions WHERE token = ?",
         &[DatabaseValue::Text(token_hash.to_string())],
     );
+    unregister_webrtc_session_peers(token_hash);
 }
 
 fn consume_rate_limit(bucket: &str, limit: usize) -> bool {
@@ -406,6 +415,9 @@ fn clear_auth_runtime_state() {
     if let Some(registrations) = ACTIVE_REGISTRATIONS.get() {
         registrations.lock().unwrap().clear();
     }
+    if let Some(peers) = WEBRTC_PEER_REGISTRY.get() {
+        peers.lock().unwrap().clear();
+    }
 }
 
 fn hidden_csrf_field(secret: &str) -> String {
@@ -414,6 +426,48 @@ fn hidden_csrf_field(secret: &str) -> String {
 
 fn webrtc_signaling_hub() -> &'static SignalingHub {
     WEBRTC_SIGNALING_HUB.get_or_init(SignalingHub::default)
+}
+
+fn webrtc_peer_registry() -> &'static Mutex<HashMap<String, WebRtcPeerRegistration>> {
+    WEBRTC_PEER_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn register_webrtc_peer(
+    peer_id: &str,
+    session: &AuthSessionRecord,
+    user: &AuthUserRecord,
+) -> Result<(), Response> {
+    let mut registry = webrtc_peer_registry().lock().unwrap();
+    match registry.get(peer_id) {
+        Some(existing)
+            if existing.session_token_hash != session.token_hash || existing.user_id != user.id =>
+        {
+            Err(build_json_response(
+                409,
+                serde_json::json!({ "error": "peer_id is already registered" }).to_string(),
+            ))
+        }
+        _ => {
+            registry.insert(
+                peer_id.to_string(),
+                WebRtcPeerRegistration {
+                    session_token_hash: session.token_hash.clone(),
+                    user_id: user.id.clone(),
+                    email: user.email.clone(),
+                },
+            );
+            Ok(())
+        }
+    }
+}
+
+fn registered_webrtc_peer(peer_id: &str) -> Option<WebRtcPeerRegistration> {
+    webrtc_peer_registry().lock().unwrap().get(peer_id).cloned()
+}
+
+fn unregister_webrtc_session_peers(token_hash: &str) {
+    let mut registry = webrtc_peer_registry().lock().unwrap();
+    registry.retain(|_, registration| registration.session_token_hash != token_hash);
 }
 
 fn block_on_runtime<F, T>(future: F) -> Result<T, String>
@@ -1003,12 +1057,14 @@ pub(crate) fn handle_webrtc_request(
 
     let capabilities = agilang_runtime_webrtc::capabilities();
     if path == "/api/webrtc/status" {
+        let active_peer_count = webrtc_peer_registry().lock().unwrap().len();
         let status = serde_json::json!({
             "signaling": capabilities.signaling,
             "peer_connection": capabilities.peer_connection,
             "data_channel": capabilities.data_channel,
             "stun_server": capabilities.stun_server,
             "turn_server": capabilities.turn_server,
+            "active_peers": active_peer_count,
             "explanation": capabilities.explanation,
         });
         return Ok(Some(build_json_response(200, status.to_string())));
@@ -1035,8 +1091,18 @@ pub(crate) fn handle_webrtc_request(
                     r#"{"error":"Method Not Allowed"}"#.to_string(),
                 )));
             }
-            verify_webrtc_csrf(req, &session)?;
-            let payload = parse_json_body(req)?;
+            if let Some(response) = verify_webrtc_csrf(req, &session) {
+                return Ok(Some(response));
+            }
+            let payload = match parse_json_body(req) {
+                Ok(payload) => payload,
+                Err(error) => {
+                    return Ok(Some(build_json_response(
+                        422,
+                        serde_json::json!({ "error": error }).to_string(),
+                    )))
+                }
+            };
             let peer_id = payload
                 .get("peer_id")
                 .and_then(|value| value.as_str())
@@ -1049,6 +1115,9 @@ pub(crate) fn handle_webrtc_request(
                     serde_json::json!({ "error": "peer_id is required" }).to_string(),
                 )));
             }
+            if let Err(response) = register_webrtc_peer(&peer_id, &session, &user) {
+                return Ok(Some(response));
+            }
             let body = serde_json::json!({
                 "registered": true,
                 "peer_id": peer_id,
@@ -1056,7 +1125,8 @@ pub(crate) fn handle_webrtc_request(
                     "id": user.id,
                     "email": user.email,
                     "role": user.role,
-                }
+                },
+                "active_peers": webrtc_peer_registry().lock().unwrap().len(),
             });
             Ok(Some(build_json_response(200, body.to_string())))
         }
@@ -1068,8 +1138,18 @@ pub(crate) fn handle_webrtc_request(
                     r#"{"error":"Method Not Allowed"}"#.to_string(),
                 )));
             }
-            verify_webrtc_csrf(req, &session)?;
-            let payload = parse_json_body(req)?;
+            if let Some(response) = verify_webrtc_csrf(req, &session) {
+                return Ok(Some(response));
+            }
+            let payload = match parse_json_body(req) {
+                Ok(payload) => payload,
+                Err(error) => {
+                    return Ok(Some(build_json_response(
+                        422,
+                        serde_json::json!({ "error": error }).to_string(),
+                    )))
+                }
+            };
             let from = payload
                 .get("from")
                 .and_then(|value| value.as_str())
@@ -1101,6 +1181,27 @@ pub(crate) fn handle_webrtc_request(
             }
 
             let kind = kind.expect("validated above");
+            let Some(from_registration) = registered_webrtc_peer(&from) else {
+                return Ok(Some(build_json_response(
+                    409,
+                    serde_json::json!({ "error": "source peer is not registered" }).to_string(),
+                )));
+            };
+            if from_registration.session_token_hash != session.token_hash
+                || from_registration.user_id != user.id
+            {
+                return Ok(Some(build_json_response(
+                    403,
+                    serde_json::json!({ "error": "peer ownership mismatch" }).to_string(),
+                )));
+            }
+            let Some(destination_registration) = registered_webrtc_peer(&to) else {
+                return Ok(Some(build_json_response(
+                    404,
+                    serde_json::json!({ "error": "destination peer is not registered" })
+                        .to_string(),
+                )));
+            };
             block_on_runtime(async {
                 webrtc_signaling_hub()
                     .publish(SignalEnvelope {
@@ -1114,7 +1215,14 @@ pub(crate) fn handle_webrtc_request(
             })?;
             Ok(Some(build_json_response(
                 202,
-                serde_json::json!({ "queued": true }).to_string(),
+                serde_json::json!({
+                    "queued": true,
+                    "to_user": {
+                        "id": destination_registration.user_id,
+                        "email": destination_registration.email,
+                    }
+                })
+                .to_string(),
             )))
         }
         "/api/webrtc/poll" => {
@@ -1130,6 +1238,18 @@ pub(crate) fn handle_webrtc_request(
                 return Ok(Some(build_json_response(
                     422,
                     serde_json::json!({ "error": "peer_id is required" }).to_string(),
+                )));
+            }
+            let Some(registration) = registered_webrtc_peer(&peer_id) else {
+                return Ok(Some(build_json_response(
+                    404,
+                    serde_json::json!({ "error": "peer_id is not registered" }).to_string(),
+                )));
+            };
+            if registration.session_token_hash != session.token_hash || registration.user_id != user.id {
+                return Ok(Some(build_json_response(
+                    403,
+                    serde_json::json!({ "error": "peer ownership mismatch" }).to_string(),
                 )));
             }
             let message = block_on_runtime(async { webrtc_signaling_hub().receive(&peer_id).await })?;
@@ -1152,7 +1272,7 @@ pub(crate) fn handle_webrtc_request(
     }
 }
 
-fn verify_webrtc_csrf(req: &Request, session: &AuthSessionRecord) -> Result<(), String> {
+fn verify_webrtc_csrf(req: &Request, session: &AuthSessionRecord) -> Option<Response> {
     let token = req
         .headers
         .get("x-csrf-token")
@@ -1160,9 +1280,12 @@ fn verify_webrtc_csrf(req: &Request, session: &AuthSessionRecord) -> Result<(), 
         .cloned()
         .unwrap_or_default();
     if token == session.csrf_secret {
-        Ok(())
+        None
     } else {
-        Err("Invalid CSRF token.".to_string())
+        Some(build_json_response(
+            403,
+            serde_json::json!({ "error": "Invalid CSRF token." }).to_string(),
+        ))
     }
 }
 
@@ -3136,6 +3259,7 @@ fn register_api() -> void:
         assert_eq!(status.status, 200);
         assert!(response_text(&status).contains("\"signaling\":true"));
         assert!(response_text(&status).contains("\"peer_connection\":false"));
+        assert!(response_text(&status).contains("\"active_peers\":0"));
 
         let unauthorized_register = invoke_app(
             &root,
@@ -3209,7 +3333,7 @@ fn register_api() -> void:
                 71,
             ),
         );
-        assert_eq!(csrf_denied.status, 500);
+        assert_eq!(csrf_denied.status, 403);
         assert!(response_text(&csrf_denied).contains("Invalid CSRF token."));
 
         let alice_register = invoke_app(
@@ -3225,6 +3349,7 @@ fn register_api() -> void:
         );
         assert_eq!(alice_register.status, 200);
         assert!(response_text(&alice_register).contains("\"registered\":true"));
+        assert!(response_text(&alice_register).contains("\"active_peers\":1"));
 
         let bob_register = invoke_app(
             &root,
@@ -3238,6 +3363,21 @@ fn register_api() -> void:
             ),
         );
         assert_eq!(bob_register.status, 200);
+        assert!(response_text(&bob_register).contains("\"active_peers\":2"));
+
+        let duplicate_claim = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/register",
+                Some(&bob_cookie),
+                Some(&bob_csrf),
+                r#"{"peer_id":"alice-peer"}"#,
+                72,
+            ),
+        );
+        assert_eq!(duplicate_claim.status, 409);
+        assert!(response_text(&duplicate_claim).contains("already registered"));
 
         let offer = invoke_app(
             &root,
@@ -3251,6 +3391,7 @@ fn register_api() -> void:
             ),
         );
         assert_eq!(offer.status, 202);
+        assert!(response_text(&offer).contains("bob-webrtc@example.com"));
 
         let candidate = invoke_app(
             &root,
@@ -3264,6 +3405,34 @@ fn register_api() -> void:
             ),
         );
         assert_eq!(candidate.status, 202);
+
+        let spoof_attempt = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/signal",
+                Some(&alice_cookie),
+                Some(&alice_csrf),
+                r#"{"from":"bob-peer","to":"alice-peer","kind":"offer","payload":"stolen"}"#,
+                71,
+            ),
+        );
+        assert_eq!(spoof_attempt.status, 403);
+        assert!(response_text(&spoof_attempt).contains("ownership mismatch"));
+
+        let missing_target = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/signal",
+                Some(&alice_cookie),
+                Some(&alice_csrf),
+                r#"{"from":"alice-peer","to":"ghost-peer","kind":"offer","payload":"ghost"}"#,
+                71,
+            ),
+        );
+        assert_eq!(missing_target.status, 404);
+        assert!(response_text(&missing_target).contains("destination peer"));
 
         let first_poll = invoke_app(
             &root,
@@ -3307,6 +3476,52 @@ fn register_api() -> void:
         );
         assert_eq!(empty_poll.status, 200);
         assert!(response_text(&empty_poll).contains("\"message\":null"));
+
+        let unauthorized_peer_poll = invoke_app(
+            &root,
+            query_request(
+                HttpMethod::Get,
+                "/api/webrtc/poll",
+                &[("peer_id", "alice-peer")],
+                Some(&bob_cookie),
+                72,
+            ),
+        );
+        assert_eq!(unauthorized_peer_poll.status, 403);
+        assert!(response_text(&unauthorized_peer_poll).contains("ownership mismatch"));
+
+        let alice_logout = invoke(
+            &root,
+            &engine,
+            request(
+                HttpMethod::Post,
+                "/logout",
+                Some(&alice_cookie),
+                Some(&form_body(&[("_csrf", &alice_csrf)])),
+                71,
+            ),
+        );
+        assert_eq!(alice_logout.status, 302);
+
+        let revoked_signal = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/signal",
+                Some(&alice_cookie),
+                Some(&alice_csrf),
+                r#"{"from":"alice-peer","to":"bob-peer","kind":"offer","payload":"after-logout"}"#,
+                71,
+            ),
+        );
+        assert_eq!(revoked_signal.status, 401);
+
+        let status_after_logout = invoke_app(
+            &root,
+            request(HttpMethod::Get, "/api/webrtc/status", None, None, 70),
+        );
+        assert_eq!(status_after_logout.status, 200);
+        assert!(response_text(&status_after_logout).contains("\"active_peers\":1"));
 
         fs::remove_dir_all(root).ok();
     }
