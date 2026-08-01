@@ -778,9 +778,11 @@ dependencies = [
  "agilang-runtime-crypto",
  "agilang-runtime-http",
  "anyhow",
+ "base64",
  "chrono",
  "serde",
  "serde_json",
+ "sha1",
 ]
 
 [[package]]
@@ -1054,6 +1056,14 @@ dependencies = [
  "uuid",
  "webrtc",
  "webrtc-ice 0.13.0",
+]
+
+[[package]]
+name = "agilang-runtime-websocket"
+version = "0.7.0"
+dependencies = [
+ "base64",
+ "sha1",
 ]
 
 [[package]]

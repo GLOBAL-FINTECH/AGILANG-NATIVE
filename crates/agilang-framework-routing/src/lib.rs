@@ -1,8 +1,15 @@
 use agilang_framework_http::HttpMethod;
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RouteKind {
+    Http,
+    WebSocket,
+}
+
 #[derive(Debug, Clone)]
 pub struct Route {
+    pub kind: RouteKind,
     pub method: HttpMethod,
     pub path: String,
     pub controller: String,
@@ -26,7 +33,29 @@ impl Router {
     }
 
     pub fn add(&mut self, method: HttpMethod, path: String, controller: &str, action: &str) {
+        self.add_with_kind(RouteKind::Http, method, path, controller, action);
+    }
+
+    pub fn add_websocket(&mut self, path: String, controller: &str, action: &str) {
+        self.add_with_kind(
+            RouteKind::WebSocket,
+            HttpMethod::Get,
+            path,
+            controller,
+            action,
+        );
+    }
+
+    fn add_with_kind(
+        &mut self,
+        kind: RouteKind,
+        method: HttpMethod,
+        path: String,
+        controller: &str,
+        action: &str,
+    ) {
         self.routes.push(Route {
+            kind,
             method,
             path,
             controller: controller.to_string(),
@@ -36,7 +65,19 @@ impl Router {
 
     pub fn match_route<'a>(&'a self, method: &HttpMethod, path: &str) -> Option<RouteMatch<'a>> {
         self.routes.iter().find_map(|route| {
+            if route.kind != RouteKind::Http {
+                return None;
+            }
             if &route.method != method {
+                return None;
+            }
+            match_path(&route.path, path).map(|params| RouteMatch { route, params })
+        })
+    }
+
+    pub fn match_websocket_route<'a>(&'a self, path: &str) -> Option<RouteMatch<'a>> {
+        self.routes.iter().find_map(|route| {
+            if route.kind != RouteKind::WebSocket {
                 return None;
             }
             match_path(&route.path, path).map(|params| RouteMatch { route, params })
@@ -70,7 +111,7 @@ impl Router {
                 current_prefix.clear();
             }
 
-            if let Some(method) = parse_method(line) {
+            if let Some((kind, method)) = parse_method(line) {
                 let path_start = line.find('"').or_else(|| line.find('\''));
                 if let Some(p_start) = path_start {
                     let sub = &line[p_start + 1..];
@@ -93,7 +134,14 @@ impl Router {
                                     .strip_prefix("App.Controllers.")
                                     .unwrap_or(controller_raw);
 
-                                self.add(method.clone(), full_path, controller, action);
+                                match kind {
+                                    RouteKind::Http => {
+                                        self.add(method.clone(), full_path, controller, action)
+                                    }
+                                    RouteKind::WebSocket => {
+                                        self.add_websocket(full_path, controller, action)
+                                    }
+                                }
                             }
                         }
                     }
@@ -104,17 +152,19 @@ impl Router {
     }
 }
 
-fn parse_method(line: &str) -> Option<HttpMethod> {
+fn parse_method(line: &str) -> Option<(RouteKind, HttpMethod)> {
     if line.contains("Route.get(") {
-        Some(HttpMethod::Get)
+        Some((RouteKind::Http, HttpMethod::Get))
     } else if line.contains("Route.post(") {
-        Some(HttpMethod::Post)
+        Some((RouteKind::Http, HttpMethod::Post))
     } else if line.contains("Route.put(") {
-        Some(HttpMethod::Put)
+        Some((RouteKind::Http, HttpMethod::Put))
     } else if line.contains("Route.patch(") {
-        Some(HttpMethod::Patch)
+        Some((RouteKind::Http, HttpMethod::Patch))
     } else if line.contains("Route.delete(") {
-        Some(HttpMethod::Delete)
+        Some((RouteKind::Http, HttpMethod::Delete))
+    } else if line.contains("Route.websocket(") {
+        Some((RouteKind::WebSocket, HttpMethod::Get))
     } else {
         None
     }
@@ -163,17 +213,18 @@ mod tests {
         let temp_dir = std::env::temp_dir().join("agi_route_test");
         fs::create_dir_all(&temp_dir).unwrap();
 
-        let web_agi = "Route.get(\"/\", HomeController.index)\nRoute.post(\"/login\", LoginController.login)\nRoute.put(\"/posts/{id}\", PostController.update)\nRoute.group(\"/api\", fn:\n    Route.get(\"/health\", HealthController.show)\n)\n";
+        let web_agi = "Route.get(\"/\", HomeController.index)\nRoute.post(\"/login\", LoginController.login)\nRoute.put(\"/posts/{id}\", PostController.update)\nRoute.websocket(\"/ws\", ChatController.echo)\nRoute.group(\"/api\", fn:\n    Route.get(\"/health\", HealthController.show)\n)\n";
         let file_path = temp_dir.join("web.agi");
         fs::write(&file_path, web_agi).unwrap();
 
         let mut router = Router::new();
         router.load_routes_from_file(&file_path).unwrap();
 
-        assert_eq!(router.routes.len(), 4);
+        assert_eq!(router.routes.len(), 5);
         assert_eq!(router.routes[0].path, "/");
         assert_eq!(router.routes[0].controller, "HomeController");
         assert_eq!(router.routes[0].action, "index");
+        assert_eq!(router.routes[0].kind, RouteKind::Http);
 
         assert_eq!(router.routes[1].method, HttpMethod::Post);
         assert_eq!(router.routes[1].path, "/login");
@@ -185,15 +236,33 @@ mod tests {
         assert_eq!(router.routes[2].controller, "PostController");
         assert_eq!(router.routes[2].action, "update");
 
-        assert_eq!(router.routes[3].path, "/api/health");
-        assert_eq!(router.routes[3].controller, "HealthController");
-        assert_eq!(router.routes[3].action, "show");
+        let health_route = router
+            .routes
+            .iter()
+            .find(|route| route.path == "/api/health")
+            .expect("health route should exist");
+        assert_eq!(health_route.controller, "HealthController");
+        assert_eq!(health_route.action, "show");
+
+        let websocket_route = router
+            .routes
+            .iter()
+            .find(|route| route.path == "/ws")
+            .expect("websocket route should exist");
+        assert_eq!(websocket_route.controller, "ChatController");
+        assert_eq!(websocket_route.action, "echo");
+        assert_eq!(websocket_route.kind, RouteKind::WebSocket);
 
         let route_match = router
             .match_route(&HttpMethod::Put, "/posts/42")
             .expect("route should match");
         assert_eq!(route_match.route.controller, "PostController");
         assert_eq!(route_match.params.get("id").map(String::as_str), Some("42"));
+
+        let ws_match = router
+            .match_websocket_route("/ws")
+            .expect("websocket route should match");
+        assert_eq!(ws_match.route.controller, "ChatController");
 
         fs::remove_dir_all(temp_dir).ok();
     }

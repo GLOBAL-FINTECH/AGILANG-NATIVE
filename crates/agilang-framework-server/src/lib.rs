@@ -1,5 +1,6 @@
 mod controller_runtime;
 mod framework_manifest;
+mod websocket;
 pub use framework_manifest::write_framework_manifest;
 
 use agilang_database_agidb::AgiDbConnection;
@@ -15,6 +16,7 @@ use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use websocket::{accept_websocket, WebSocketConnection, WebSocketError, WebSocketOpcode};
 
 pub enum ControllerResult {
     Render(String, HashMap<String, String>),
@@ -1640,35 +1642,23 @@ pub fn handle_client(
             let path = req.path();
             let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S");
 
-            let is_websocket = req
-                .headers
-                .get("upgrade")
-                .or_else(|| req.headers.get("Upgrade"))
-                .map(|v| v.to_lowercase() == "websocket")
-                .unwrap_or(false);
-
-            if is_websocket {
-                if let Some(key) = req
-                    .headers
-                    .get("Sec-WebSocket-Key")
-                    .or_else(|| req.headers.get("sec-websocket-key"))
-                {
-                    let accept_key = handle_websocket_upgrade(key);
-                    let handshake_response = format!(
-                        "HTTP/1.1 101 Switching Protocols\r\n\
-                         Upgrade: websocket\r\n\
-                         Connection: Upgrade\r\n\
-                         Sec-WebSocket-Accept: {}\r\n\r\n",
-                        accept_key
-                    );
-                    let _ = stream.write_all(handshake_response.as_bytes());
-                    let _ = stream.flush();
-
-                    if let Err(e) = run_websocket_echo_loop(stream) {
-                        eprintln!("websocket error: {}", e);
-                    }
-                    return Ok(());
+            if let Some(upgrade_response) =
+                try_handle_websocket_request(&mut stream, router, project_root, req)
+            {
+                let status = upgrade_response.status_code;
+                if let Some(message) = upgrade_response.log_message {
+                    eprintln!("{message}");
                 }
+                println!(
+                    "{} {:?} {} {} {}ms",
+                    now,
+                    req.method,
+                    path,
+                    status,
+                    start_time.elapsed().as_millis()
+                );
+                stream.flush().ok();
+                return Ok(());
             }
 
             if let Some((status, json)) = native_cj_response(req, project_root) {
@@ -1838,177 +1828,6 @@ pub fn start_stun_server() {
             }
         }
     });
-}
-
-fn handle_websocket_upgrade(key: &str) -> String {
-    let mut concatenated = key.to_string();
-    concatenated.push_str("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-    let hashed = sha1_hash(concatenated.as_bytes());
-    base64_encode(&hashed)
-}
-
-fn base64_encode(input: &[u8]) -> String {
-    const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut result = String::with_capacity(input.len().div_ceil(3) * 4);
-    let mut i = 0;
-    while i < input.len() {
-        let chunk = &input[i..std::cmp::min(i + 3, input.len())];
-        let mut b = 0u32;
-        for (j, val) in chunk.iter().enumerate() {
-            b |= (*val as u32) << (16 - j * 8);
-        }
-
-        result.push(CHARSET[((b >> 18) & 63) as usize] as char);
-        result.push(CHARSET[((b >> 12) & 63) as usize] as char);
-        if chunk.len() > 1 {
-            result.push(CHARSET[((b >> 6) & 63) as usize] as char);
-        } else {
-            result.push('=');
-        }
-        if chunk.len() > 2 {
-            result.push(CHARSET[(b & 63) as usize] as char);
-        } else {
-            result.push('=');
-        }
-        i += 3;
-    }
-    result
-}
-
-#[allow(clippy::needless_range_loop)]
-fn sha1_hash(data: &[u8]) -> [u8; 20] {
-    let mut h0: u32 = 0x67452301;
-    let mut h1: u32 = 0xEFCDAB89;
-    let mut h2: u32 = 0x98BADCFE;
-    let mut h3: u32 = 0x10325476;
-    let mut h4: u32 = 0xC3D2E1F0;
-
-    let mut padded = data.to_vec();
-    let original_len_bits = (data.len() as u64) * 8;
-
-    padded.push(0x80);
-
-    while (padded.len() % 64) != 56 {
-        padded.push(0x00);
-    }
-
-    padded.extend_from_slice(&original_len_bits.to_be_bytes());
-
-    for chunk in padded.chunks_exact(64) {
-        let mut w = [0u32; 80];
-        for i in 0..16 {
-            w[i] = u32::from_be_bytes([
-                chunk[i * 4],
-                chunk[i * 4 + 1],
-                chunk[i * 4 + 2],
-                chunk[i * 4 + 3],
-            ]);
-        }
-        for i in 16..80 {
-            w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]).rotate_left(1);
-        }
-
-        let mut a = h0;
-        let mut b = h1;
-        let mut c = h2;
-        let mut d = h3;
-        let mut e = h4;
-
-        for i in 0..80 {
-            let (f, k) = match i {
-                0..=19 => ((b & c) | (!b & d), 0x5A827999),
-                20..=39 => (b ^ c ^ d, 0x6ED9EBA1),
-                40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDC),
-                _ => (b ^ c ^ d, 0xCA62C1D6),
-            };
-
-            let temp = a
-                .rotate_left(5)
-                .wrapping_add(f)
-                .wrapping_add(e)
-                .wrapping_add(k)
-                .wrapping_add(w[i]);
-            e = d;
-            d = c;
-            c = b.rotate_left(30);
-            b = a;
-            a = temp;
-        }
-
-        h0 = h0.wrapping_add(a);
-        h1 = h1.wrapping_add(b);
-        h2 = h2.wrapping_add(c);
-        h3 = h3.wrapping_add(d);
-        h4 = h4.wrapping_add(e);
-    }
-
-    let mut result = [0u8; 20];
-    result[0..4].copy_from_slice(&h0.to_be_bytes());
-    result[4..8].copy_from_slice(&h1.to_be_bytes());
-    result[8..12].copy_from_slice(&h2.to_be_bytes());
-    result[12..16].copy_from_slice(&h3.to_be_bytes());
-    result[16..20].copy_from_slice(&h4.to_be_bytes());
-    result
-}
-
-fn run_websocket_echo_loop(mut stream: TcpStream) -> std::io::Result<()> {
-    let mut buf = [0u8; 4096];
-    loop {
-        stream.read_exact(&mut buf[..2])?;
-        let byte0 = buf[0];
-        let byte1 = buf[1];
-
-        let opcode = byte0 & 0x0F;
-        if opcode == 0x8 {
-            break;
-        }
-
-        let is_masked = (byte1 & 0x80) != 0;
-        let mut payload_len = (byte1 & 0x7F) as usize;
-
-        if payload_len == 126 {
-            stream.read_exact(&mut buf[2..4])?;
-            payload_len = u16::from_be_bytes([buf[2], buf[3]]) as usize;
-        } else if payload_len == 127 {
-            stream.read_exact(&mut buf[2..10])?;
-            let mut len_bytes = [0u8; 8];
-            len_bytes.copy_from_slice(&buf[2..10]);
-            payload_len = u64::from_be_bytes(len_bytes) as usize;
-        }
-
-        let mut mask_key = [0u8; 4];
-        if is_masked {
-            stream.read_exact(&mut mask_key)?;
-        }
-
-        let mut payload = vec![0u8; payload_len];
-        stream.read_exact(&mut payload)?;
-
-        if is_masked {
-            for i in 0..payload_len {
-                payload[i] ^= mask_key[i % 4];
-            }
-        }
-
-        if opcode == 0x1 {
-            let mut response_frame = Vec::new();
-            response_frame.push(0x81);
-
-            if payload_len <= 125 {
-                response_frame.push(payload_len as u8);
-            } else if payload_len <= 65535 {
-                response_frame.push(126);
-                response_frame.extend_from_slice(&(payload_len as u16).to_be_bytes());
-            } else {
-                response_frame.push(127);
-                response_frame.extend_from_slice(&(payload_len as u64).to_be_bytes());
-            }
-            response_frame.extend_from_slice(&payload);
-            stream.write_all(&response_frame)?;
-            stream.flush()?;
-        }
-    }
-    Ok(())
 }
 
 pub struct CertificateGenerator;
@@ -3044,5 +2863,104 @@ fn register_api() -> void:
     #[test]
     fn generated_post_resource_executes_end_to_end_on_sqlite() {
         run_generated_post_flow(FrameworkDriver::Sqlite, "generated_post_sqlite");
+    }
+}
+
+struct WebSocketUpgradeResult {
+    status_code: u16,
+    log_message: Option<String>,
+}
+
+fn try_handle_websocket_request(
+    stream: &mut TcpStream,
+    router: &Router,
+    project_root: &Path,
+    req: &Request,
+) -> Option<WebSocketUpgradeResult> {
+    let is_websocket = req
+        .headers
+        .get("upgrade")
+        .or_else(|| req.headers.get("Upgrade"))
+        .map(|v| v.eq_ignore_ascii_case("websocket"))
+        .unwrap_or(false);
+    if !is_websocket {
+        return None;
+    }
+
+    let path = req.path();
+    let Some(route_match) = router.match_websocket_route(path) else {
+        let response = build_text_response(
+            404,
+            "text/plain; charset=utf-8",
+            "WebSocket route not defined.".to_string(),
+        );
+        let _ = write_framework_response(stream, response);
+        return Some(WebSocketUpgradeResult {
+            status_code: 404,
+            log_message: None,
+        });
+    };
+
+    let status_code = match dispatch_websocket_route(project_root, req, route_match, &mut *stream) {
+        Ok(()) => 101,
+        Err(WebSocketError::BadRequest(message)) => {
+            let response = build_text_response(400, "text/plain; charset=utf-8", message);
+            let _ = write_framework_response(stream, response);
+            400
+        }
+        Err(WebSocketError::Protocol(message)) => {
+            let response = build_text_response(400, "text/plain; charset=utf-8", message);
+            let _ = write_framework_response(stream, response);
+            400
+        }
+        Err(error) => {
+            let response =
+                build_text_response(500, "text/plain; charset=utf-8", error.to_string());
+            let _ = write_framework_response(stream, response);
+            500
+        }
+    };
+
+    Some(WebSocketUpgradeResult {
+        status_code,
+        log_message: (status_code == 101).then_some(format!("websocket upgraded for {path}")),
+    })
+}
+
+fn dispatch_websocket_route(
+    _project_root: &Path,
+    req: &Request,
+    route_match: agilang_framework_routing::RouteMatch<'_>,
+    stream: &mut TcpStream,
+) -> Result<(), WebSocketError> {
+    let route = route_match.route;
+    let owned_stream = stream.try_clone()?;
+    let mut socket = accept_websocket(owned_stream, &req.headers)?;
+    match (route.controller.as_str(), route.action.as_str()) {
+        ("ChatController", "echo") | ("WebSocketController", "echo") => {
+            websocket_echo_handler(&mut socket)
+        }
+        _ => Err(WebSocketError::Protocol(format!(
+            "WebSocket handler `{}.{}` is not registered",
+            route.controller, route.action
+        ))),
+    }
+}
+
+fn websocket_echo_handler(
+    socket: &mut WebSocketConnection<TcpStream>,
+) -> Result<(), WebSocketError> {
+    loop {
+        let frame = socket.read_message()?;
+        match frame.opcode {
+            WebSocketOpcode::Text => socket.send_text(frame.text_value()?)?,
+            WebSocketOpcode::Binary => socket.send_binary(&frame.payload)?,
+            WebSocketOpcode::Close => return Ok(()),
+            WebSocketOpcode::Continuation | WebSocketOpcode::Ping | WebSocketOpcode::Pong => {
+                return Err(WebSocketError::Protocol(
+                    "unexpected internal WebSocket frame state".to_string(),
+                ))
+            }
+        }
     }
 }

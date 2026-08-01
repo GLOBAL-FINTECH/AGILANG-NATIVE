@@ -481,6 +481,38 @@ mod tests {
     use super::*;
     use std::io::Cursor;
 
+    #[derive(Default)]
+    struct MockStream {
+        read: Cursor<Vec<u8>>,
+        written: Vec<u8>,
+    }
+
+    impl MockStream {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                read: Cursor::new(bytes),
+                written: Vec::new(),
+            }
+        }
+    }
+
+    impl Read for MockStream {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            self.read.read(buf)
+        }
+    }
+
+    impl Write for MockStream {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.written.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
     fn upgrade_headers() -> HashMap<String, String> {
         HashMap::from([
             ("Upgrade".to_string(), "websocket".to_string()),
@@ -591,8 +623,11 @@ mod tests {
     fn ping_is_answered_with_pong_before_next_message() {
         let mut bytes = masked_frame(0x9, true, b"alive");
         bytes.extend(masked_frame(0x1, true, b"ready"));
-        let mut connection = WebSocketConnection::new(Cursor::new(bytes));
+        let mut connection = WebSocketConnection::new(MockStream::new(bytes));
         let frame = connection.read_message().unwrap();
         assert_eq!(frame.text_value().unwrap(), "ready");
+        let written = connection.into_inner().written;
+        assert_eq!(&written[..2], &[0x8A, 0x05]);
+        assert_eq!(&written[2..], b"alive");
     }
 }
