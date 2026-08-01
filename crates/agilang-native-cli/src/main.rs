@@ -1879,6 +1879,12 @@ fn format_hir_expr(expr: &agilang_ir::HirExpr) -> String {
                 .collect();
             format!("{{{}}}:{}", rendered.join(", "), ty)
         }
+        agilang_ir::HirExpr::EnumVariant {
+            enum_name,
+            variant,
+            ty,
+            ..
+        } => format!("{}.{}:{}", enum_name, variant, ty),
         agilang_ir::HirExpr::MemberAccess {
             object, member, ty, ..
         } => {

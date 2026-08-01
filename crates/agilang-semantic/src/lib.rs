@@ -1,8 +1,8 @@
-use agilang_ast::{BinaryOp, Expr, Function, Program, Stmt, StructDecl, TypeRef};
+use agilang_ast::{BinaryOp, EnumDecl, Expr, Function, Program, Stmt, StructDecl, TypeRef};
 use agilang_diagnostics::Diagnostic;
 use agilang_ir::{
-    HirBinaryOp, HirExpr, HirFunction, HirParameter, HirProgram, HirStmt, HirStruct,
-    HirStructField,
+    HirBinaryOp, HirEnum, HirEnumVariant, HirExpr, HirFunction, HirParameter, HirProgram,
+    HirStmt, HirStruct, HirStructField,
 };
 use agilang_source::Span;
 use agilang_symbols::{Symbol, SymbolKind, SymbolTable};
@@ -16,6 +16,7 @@ pub struct Analyser {
     current_local_symbols: Vec<Symbol>,
     loop_depth: usize,
     struct_defs: HashMap<String, StructDecl>,
+    enum_defs: HashMap<String, EnumDecl>,
 }
 
 impl Analyser {
@@ -130,6 +131,7 @@ impl Analyser {
             current_local_symbols: vec![],
             loop_depth: 0,
             struct_defs: HashMap::new(),
+            enum_defs: HashMap::new(),
         }
     }
 
@@ -147,6 +149,22 @@ impl Analyser {
                         "E1002",
                         format!("duplicate symbol `{}`", struct_decl.name),
                         struct_decl.span,
+                    )
+                    .with_hint(format!(
+                        "first declared at span {}..{}",
+                        existing.span.start, existing.span.end
+                    )),
+                );
+            }
+        }
+
+        for enum_decl in &program.enums {
+            if let Some(existing) = self.enum_defs.insert(enum_decl.name.clone(), enum_decl.clone()) {
+                self.errors.push(
+                    Diagnostic::error(
+                        "E1002",
+                        format!("duplicate symbol `{}`", enum_decl.name),
+                        enum_decl.span,
                     )
                     .with_hint(format!(
                         "first declared at span {}..{}",
@@ -203,9 +221,15 @@ impl Analyser {
 
         let mut hir_functions = vec![];
         let mut hir_structs = vec![];
+        let mut hir_enums = vec![];
         for struct_decl in &program.structs {
             if let Some(hir_struct) = self.analyse_struct(struct_decl) {
                 hir_structs.push(hir_struct);
+            }
+        }
+        for enum_decl in &program.enums {
+            if let Some(hir_enum) = self.analyse_enum(enum_decl) {
+                hir_enums.push(hir_enum);
             }
         }
         // Second pass: analyse function bodies
@@ -219,6 +243,7 @@ impl Analyser {
             Ok((
                 HirProgram {
                     structs: hir_structs,
+                    enums: hir_enums,
                     functions: hir_functions,
                 },
                 self.scopes,
@@ -282,6 +307,8 @@ impl Analyser {
             ty
         } else if self.struct_defs.contains_key(name) {
             Type::Struct(name.to_string())
+        } else if self.enum_defs.contains_key(name) {
+            Type::Enum(name.to_string())
         } else if is_framework_type_name(name) {
             Type::Unknown
         } else {
@@ -317,6 +344,39 @@ impl Analyser {
             name: struct_decl.name.clone(),
             fields,
             span: struct_decl.span,
+        })
+    }
+
+    fn analyse_enum(&mut self, enum_decl: &EnumDecl) -> Option<HirEnum> {
+        let mut variants = vec![];
+        let mut variant_names = HashMap::new();
+        for variant in &enum_decl.variants {
+            if let Some(existing_span) = variant_names.insert(variant.name.clone(), variant.span) {
+                self.errors.push(
+                    Diagnostic::error(
+                        "E1002",
+                        format!(
+                            "duplicate variant `{}` in enum `{}`",
+                            variant.name, enum_decl.name
+                        ),
+                        variant.span,
+                    )
+                    .with_hint(format!(
+                        "first declared at span {}..{}",
+                        existing_span.start, existing_span.end
+                    )),
+                );
+                continue;
+            }
+            variants.push(HirEnumVariant {
+                name: variant.name.clone(),
+                span: variant.span,
+            });
+        }
+        Some(HirEnum {
+            name: enum_decl.name.clone(),
+            variants,
+            span: enum_decl.span,
         })
     }
 
@@ -738,7 +798,19 @@ impl Analyser {
             Expr::Identifier(name, span) => match self.lookup(name) {
                 Some(sym) => Some(HirExpr::Identifier(name.clone(), sym.ty.clone(), *span)),
                 None => {
-                    if name.chars().next().map(char::is_uppercase).unwrap_or(false) {
+                    if self.struct_defs.contains_key(name) {
+                        Some(HirExpr::Identifier(
+                            name.clone(),
+                            Type::Struct(name.clone()),
+                            *span,
+                        ))
+                    } else if self.enum_defs.contains_key(name) {
+                        Some(HirExpr::Identifier(
+                            name.clone(),
+                            Type::Enum(name.clone()),
+                            *span,
+                        ))
+                    } else if name.chars().next().map(char::is_uppercase).unwrap_or(false) {
                         Some(HirExpr::Identifier(name.clone(), Type::Unknown, *span))
                     } else {
                         self.errors.push(Diagnostic::error(
@@ -868,6 +940,41 @@ impl Analyser {
                 span,
             } => {
                 let hir_object = self.analyse_expr(object, None)?;
+                match hir_object.ty() {
+                    Type::Enum(enum_name) => {
+                        if let Some(enum_decl) = self.enum_defs.get(enum_name) {
+                            if enum_decl.variants.iter().any(|variant| variant.name == *member) {
+                                return Some(HirExpr::EnumVariant {
+                                    enum_name: enum_name.clone(),
+                                    variant: member.clone(),
+                                    ty: Type::Enum(enum_name.clone()),
+                                    span: *span,
+                                });
+                            }
+                            self.errors.push(Diagnostic::error(
+                                "E2106",
+                                format!(
+                                    "unknown variant `{}` for enum `{}`",
+                                    member, enum_name
+                                ),
+                                *span,
+                            ));
+                            return Some(HirExpr::EnumVariant {
+                                enum_name: enum_name.clone(),
+                                variant: member.clone(),
+                                ty: Type::Error,
+                                span: *span,
+                            });
+                        }
+                        return Some(HirExpr::EnumVariant {
+                            enum_name: enum_name.clone(),
+                            variant: member.clone(),
+                            ty: Type::Error,
+                            span: *span,
+                        });
+                    }
+                    _ => {}
+                }
                 let result_ty = match hir_object.ty() {
                     Type::Struct(struct_name) => {
                         if let Some(struct_decl) = self.struct_defs.get(struct_name) {
@@ -1777,6 +1884,19 @@ mod tests {
         let src = "fn main() -> i32:\n    let x: i32 = 0\n";
         let errs = check_source(src).unwrap_err();
         assert!(errs.iter().any(|e| e.code == "E2008"));
+    }
+
+    #[test]
+    fn test_enum_variant_equality() {
+        let src = "enum Status:\n    Pending\n    Active\n\nfn is_active(status: Status) -> bool:\n    return status == Status.Active\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_unknown_enum_variant_is_rejected() {
+        let src = "enum Status:\n    Pending\n    Active\n\nfn main() -> bool:\n    return Status.Unknown == Status.Active\n";
+        let errs = check_source(src).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2106"));
     }
 }
 

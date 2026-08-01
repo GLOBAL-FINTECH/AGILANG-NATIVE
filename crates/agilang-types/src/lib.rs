@@ -22,6 +22,7 @@ pub enum Type {
     Unknown,
     Error,
     Struct(String),
+    Enum(String),
     Function(FunctionType),
 }
 
@@ -90,6 +91,7 @@ impl Type {
                     || left.is_compatible(right)
             }
             (Self::Struct(left), Self::Struct(right)) => left == right,
+            (Self::Enum(left), Self::Enum(right)) => left == right,
             _ => self == other,
         }
     }
@@ -117,6 +119,7 @@ impl fmt::Display for Type {
             Self::Unknown => write!(f, "unknown"),
             Self::Error => write!(f, "error"),
             Self::Struct(name) => write!(f, "{name}"),
+            Self::Enum(name) => write!(f, "{name}"),
             Self::Function(func) => {
                 write!(f, "(")?;
                 for (i, p) in func.params.iter().enumerate() {

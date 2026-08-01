@@ -6,6 +6,7 @@ pub struct Program {
     pub module_name: Option<ModuleDecl>,
     pub imports: Vec<ImportDecl>,
     pub structs: Vec<StructDecl>,
+    pub enums: Vec<EnumDecl>,
     pub functions: Vec<Function>,
 }
 
@@ -32,6 +33,19 @@ pub struct StructDecl {
 pub struct StructField {
     pub name: String,
     pub ty: TypeRef,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumDecl {
+    pub name: String,
+    pub variants: Vec<EnumVariant>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumVariant {
+    pub name: String,
     pub span: Span,
 }
 #[derive(Debug, Clone, PartialEq)]

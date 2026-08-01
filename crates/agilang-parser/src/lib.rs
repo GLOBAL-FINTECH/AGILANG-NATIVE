@@ -22,6 +22,7 @@ impl<'a> Parser<'a> {
         let mut module_name = None;
         let mut imports = vec![];
         let mut structs = vec![];
+        let mut enums = vec![];
         let mut functions = vec![];
         self.skip_newlines();
         while !self.at(&TokenKind::Eof) {
@@ -39,6 +40,7 @@ impl<'a> Parser<'a> {
                 }
                 Some(Item::Import(import_decl)) => imports.push(import_decl),
                 Some(Item::Struct(struct_decl)) => structs.push(struct_decl),
+                Some(Item::Enum(enum_decl)) => enums.push(enum_decl),
                 Some(Item::Functions(mut parsed)) => functions.append(&mut parsed),
                 None => self.synchronize(),
             }
@@ -49,6 +51,7 @@ impl<'a> Parser<'a> {
                 module_name,
                 imports,
                 structs,
+                enums,
                 functions,
             })
         } else {
@@ -64,6 +67,9 @@ impl<'a> Parser<'a> {
         }
         if self.at(&TokenKind::Struct) {
             return self.struct_item();
+        }
+        if self.at(&TokenKind::Enum) {
+            return self.enum_item();
         }
         if self.at(&TokenKind::Class) {
             return self.class_item().map(Item::Functions);
@@ -116,6 +122,34 @@ impl<'a> Parser<'a> {
         Some(Item::Struct(StructDecl {
             name,
             fields,
+            span: Span::new(start, end),
+        }))
+    }
+    fn enum_item(&mut self) -> Option<Item> {
+        let start = self.expect(&TokenKind::Enum, "E165", "expected `enum`")?.span.start;
+        let (name, _) = self.identifier("expected enum name")?;
+        self.expect(&TokenKind::Colon, "E166", "expected `:`")?;
+        self.expect(&TokenKind::Newline, "E167", "expected newline")?;
+        self.expect(&TokenKind::Indent, "E168", "expected indented enum body")?;
+        let mut variants = vec![];
+        while !self.at(&TokenKind::Dedent) && !self.at(&TokenKind::Eof) {
+            if self.eat(&TokenKind::Newline).is_some() {
+                continue;
+            }
+            let (variant_name, variant_span) = self.identifier("expected enum variant")?;
+            self.line_end();
+            variants.push(EnumVariant {
+                name: variant_name,
+                span: variant_span,
+            });
+        }
+        let end = self
+            .expect(&TokenKind::Dedent, "E169", "expected end of enum body")
+            .map(|t| t.span.end)
+            .unwrap_or(start);
+        Some(Item::Enum(EnumDecl {
+            name,
+            variants,
             span: Span::new(start, end),
         }))
     }
@@ -832,6 +866,7 @@ enum Item {
     Module(ModuleDecl),
     Import(ImportDecl),
     Struct(StructDecl),
+    Enum(EnumDecl),
     Functions(Vec<Function>),
 }
 #[cfg(test)]
@@ -849,6 +884,7 @@ mod tests {
         assert!(p.module_name.is_none());
         assert!(p.imports.is_empty());
         assert!(p.structs.is_empty());
+        assert!(p.enums.is_empty());
         assert_eq!(p.functions[0].name, "main");
         assert_eq!(p.functions[0].body.len(), 2);
     }
@@ -878,6 +914,19 @@ mod tests {
         assert_eq!(p.structs[0].fields.len(), 2);
         assert_eq!(p.structs[0].fields[0].name, "x");
         assert_eq!(p.structs[0].fields[1].name, "y");
+    }
+
+    #[test]
+    fn parses_enum_declaration() {
+        let s = SourceFile::new(
+            "x.agi",
+            "enum Status:\n    Pending\n    Active\n    Suspended\n\nfn main() -> i32:\n    return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        assert_eq!(p.enums.len(), 1);
+        assert_eq!(p.enums[0].name, "Status");
+        assert_eq!(p.enums[0].variants.len(), 3);
+        assert_eq!(p.enums[0].variants[1].name, "Active");
     }
 
     #[test]

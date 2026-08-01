@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HirProgram {
     pub structs: Vec<HirStruct>,
+    pub enums: Vec<HirEnum>,
     pub functions: Vec<HirFunction>,
 }
 
@@ -20,6 +21,19 @@ pub struct HirStruct {
 pub struct HirStructField {
     pub name: String,
     pub ty: Type,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirEnum {
+    pub name: String,
+    pub variants: Vec<HirEnumVariant>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HirEnumVariant {
+    pub name: String,
     pub span: Span,
 }
 
@@ -110,6 +124,12 @@ pub enum HirExpr {
     Bool(bool, Type, Span),
     ListLiteral(Vec<HirExpr>, Type, Span),
     ObjectLiteral(Vec<(String, HirExpr)>, Type, Span),
+    EnumVariant {
+        enum_name: String,
+        variant: String,
+        ty: Type,
+        span: Span,
+    },
     MemberAccess {
         object: Box<HirExpr>,
         member: String,
@@ -147,6 +167,7 @@ impl HirExpr {
             Self::Bool(_, ty, _) => ty,
             Self::ListLiteral(_, ty, _) => ty,
             Self::ObjectLiteral(_, ty, _) => ty,
+            Self::EnumVariant { ty, .. } => ty,
             Self::MemberAccess { ty, .. } => ty,
             Self::Index { ty, .. } => ty,
             Self::Call { ty, .. } => ty,
@@ -163,6 +184,7 @@ impl HirExpr {
             Self::Bool(_, _, span) => *span,
             Self::ListLiteral(_, _, span) => *span,
             Self::ObjectLiteral(_, _, span) => *span,
+            Self::EnumVariant { span, .. } => *span,
             Self::MemberAccess { span, .. } => *span,
             Self::Index { span, .. } => *span,
             Self::Call { span, .. } => *span,

@@ -32,6 +32,22 @@ pub fn generate(program: &HirProgram) -> String {
         out.push_str(&format!("}} {};\n\n", struct_decl.name));
     }
 
+    for enum_decl in &program.enums {
+        out.push_str("typedef enum {\n");
+        for (index, variant) in enum_decl.variants.iter().enumerate() {
+            let suffix = if index + 1 == enum_decl.variants.len() {
+                ""
+            } else {
+                ","
+            };
+            out.push_str(&format!(
+                "    {}_{}{}\n",
+                enum_decl.name, variant.name, suffix
+            ));
+        }
+        out.push_str(&format!("}} {};\n\n", enum_decl.name));
+    }
+
     // Declare the runtime print function
     out.push_str("// Linked AGILANG runtime ABI\n");
     out.push_str("extern void agi_print(const char* msg);\n");
@@ -462,6 +478,7 @@ fn c_type(ty: &Type) -> String {
         }
         Type::Optional(inner) => c_type(inner),
         Type::Struct(name) => name.clone(),
+        Type::Enum(name) => name.clone(),
         Type::Void => "void".to_string(),
         _ => "void*".to_string(),
     }
@@ -663,7 +680,15 @@ fn generate_expr(expr: &HirExpr) -> String {
             }
             "/* unsupported list literal */ 0".to_string()
         }
-        HirExpr::ObjectLiteral(items, _, _) => generate_json_object_expr(items),
+        HirExpr::ObjectLiteral(items, ty, _) => match ty {
+            Type::Struct(name) => generate_struct_object_expr(items, name),
+            _ => generate_json_object_expr(items),
+        },
+        HirExpr::EnumVariant {
+            enum_name,
+            variant,
+            ..
+        } => format!("{}_{}", enum_name, variant),
         HirExpr::MemberAccess { object, member, .. } => {
             format!("{}.{}", generate_expr(object), member)
         }
@@ -1496,6 +1521,7 @@ mod tests {
     fn generated_runtime_contains_deterministic_list_ownership_helpers() {
         let program = HirProgram {
             structs: vec![],
+            enums: vec![],
             functions: vec![],
         };
         let c_code = generate(&program);
@@ -1529,5 +1555,30 @@ mod tests {
             return;
         };
         assert_eq!(code, 10);
+    }
+
+    #[test]
+    fn test_codegen_enum_typedef_and_variant_lowering() {
+        let source = SourceFile::new(
+            "enum.agi",
+            "enum Status:\n    Pending\n    Active\n    Suspended\n\nfn main() -> bool:\n    let status: Status = Status.Active\n    return status == Status.Active\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("typedef enum {\n    Status_Pending,\n    Status_Active,\n    Status_Suspended\n} Status;"));
+        assert!(c_code.contains("Status status = Status_Active;"));
+        assert!(c_code.contains("return (status == Status_Active);"));
+    }
+
+    #[test]
+    fn test_codegen_exec_enum_binary() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "enum_exec.agi",
+            "enum Status:\n    Pending\n    Active\n    Suspended\n\nfn main() -> i32:\n    let status: Status = Status.Active\n    if status == Status.Active:\n        return 7\n    return 2\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 7);
     }
 }

@@ -10,6 +10,7 @@ pub enum TokenKind {
     Import,
     Use,
     Struct,
+    Enum,
     Class,
     Extends,
     Let,
@@ -303,6 +304,7 @@ impl<'a> Lexer<'a> {
             "import" => TokenKind::Import,
             "use" => TokenKind::Use,
             "struct" => TokenKind::Struct,
+            "enum" => TokenKind::Enum,
             "class" => TokenKind::Class,
             "extends" => TokenKind::Extends,
             "let" => TokenKind::Let,
@@ -503,5 +505,15 @@ mod tests {
         );
         let t = lex(&s).unwrap();
         assert!(t.iter().any(|x| x.kind == TokenKind::Struct));
+    }
+
+    #[test]
+    fn lexes_enum_keyword() {
+        let s = SourceFile::new(
+            "x.agi",
+            "enum Status:\n    Pending\n    Active\n",
+        );
+        let t = lex(&s).unwrap();
+        assert!(t.iter().any(|x| x.kind == TokenKind::Enum));
     }
 }
