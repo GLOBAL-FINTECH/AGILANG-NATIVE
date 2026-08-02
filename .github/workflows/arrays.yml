@@ -1,0 +1,56 @@
+name: AGILANG Native Arrays
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/agilang-types/**"
+      - "crates/agilang-lexer/**"
+      - "crates/agilang-ast/**"
+      - "crates/agilang-parser/**"
+      - "crates/agilang-semantic/**"
+      - "crates/agilang-ir/**"
+      - "crates/agilang-codegen-c/**"
+      - "crates/agilang-compiler/**"
+      - "examples/native/arrays.agi"
+      - "compat/feature-matrix.csv"
+      - ".github/workflows/arrays.yml"
+  push:
+    branches: [feat/native-language-arrays]
+
+permissions:
+  contents: read
+
+jobs:
+  arrays:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.81.0
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Check array compiler path
+        run: cargo check -p agilang-types -p agilang-lexer -p agilang-ast -p agilang-parser -p agilang-semantic -p agilang-ir -p agilang-compiler -p agilang-codegen-c -p agilang-native-cli
+
+      - name: Lint array compiler path
+        run: cargo clippy -p agilang-types -p agilang-lexer -p agilang-ast -p agilang-parser -p agilang-semantic -p agilang-ir -p agilang-compiler -p agilang-codegen-c -p agilang-native-cli --all-targets -- -D warnings
+
+      - name: Run array unit and integration tests
+        run: cargo test -p agilang-types -p agilang-lexer -p agilang-parser -p agilang-semantic -p agilang-compiler -p agilang-codegen-c
+
+      - name: Type-check array example
+        run: cargo run -p agilang-native-cli -- check examples/native/arrays.agi
+
+      - name: Run array executable smoke test
+        run: cargo run -p agilang-native-cli -- run examples/native/arrays.agi
