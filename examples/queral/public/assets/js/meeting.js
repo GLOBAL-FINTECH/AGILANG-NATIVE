@@ -94,6 +94,10 @@ function derivePeerIdentity() {
   } else {
     meetingState.targetPeerId = meetingState.hostPeerId;
   }
+  syncRoleLabels();
+}
+
+function syncRoleLabels() {
   q('meeting-id-label').textContent = meetingState.meetingId || 'Not created';
   q('participant-name').textContent = meetingState.auth?.user?.name || meetingState.auth?.user?.email || 'Guest';
   q('participant-role').textContent = meetingState.isHost ? 'Host' : 'Participant';
@@ -134,7 +138,19 @@ async function resolveMeeting() {
   const hostPeerId = safeSegment(result.json?.host_peer_id);
   if (hostPeerId) {
     meetingState.hostPeerId = hostPeerId;
-    if (!meetingState.isHost) updateRemoteParticipant(hostPeerId);
+    if (meetingState.localPeerId && hostPeerId !== meetingState.localPeerId) {
+      meetingState.isHost = false;
+      updateRemoteParticipant(hostPeerId);
+      syncRoleLabels();
+      setJoinStage('meeting', `Role set to participant; host is ${hostPeerId}.`, 'success');
+    } else if (meetingState.localPeerId && hostPeerId === meetingState.localPeerId) {
+      meetingState.isHost = true;
+      meetingState.targetPeerId = '';
+      syncRoleLabels();
+      setJoinStage('meeting', `Role confirmed as host for ${hostPeerId}.`, 'success');
+    } else if (!meetingState.isHost) {
+      updateRemoteParticipant(hostPeerId);
+    }
     setJoinStage('meeting', `Resolved host peer ${hostPeerId}.`, 'success');
   }
   syncMembersFromMeeting(result.json);
