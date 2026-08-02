@@ -20,6 +20,7 @@ const meetingState = {
   pendingCandidates: [],
   socket: null,
   offerSent: false,
+  localMediaMode: 'none',
 };
 
 function safeSegment(value) {
@@ -169,12 +170,37 @@ function openMeetingFromCode() {
 
 async function startLocalMedia() {
   if (meetingState.localStream) return meetingState.localStream;
-  meetingState.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-  q('local-video').srcObject = meetingState.localStream;
-  q('local-placeholder').hidden = true;
-  attachTracks();
-  addActivity('Camera and microphone are ready.', 'success');
-  return meetingState.localStream;
+  const attempts = [
+    { constraints: { audio: true, video: true }, mode: 'av', label: 'camera and microphone' },
+    { constraints: { audio: true, video: false }, mode: 'audio', label: 'microphone only' },
+    { constraints: { audio: false, video: true }, mode: 'video', label: 'camera only' },
+  ];
+  const failures = [];
+  for (const attempt of attempts) {
+    try {
+      meetingState.localStream = await navigator.mediaDevices.getUserMedia(attempt.constraints);
+      meetingState.localMediaMode = attempt.mode;
+      q('local-video').srcObject = meetingState.localStream;
+      q('local-placeholder').hidden = true;
+      attachTracks();
+      addActivity(`Local media ready: ${attempt.label}.`, 'success');
+      return meetingState.localStream;
+    } catch (error) {
+      failures.push(`${attempt.label}: ${formatMediaError(error)}`);
+    }
+  }
+  meetingState.localMediaMode = 'none';
+  const message = `Media unavailable. ${failures[0] || 'No microphone or camera source could be opened.'}`;
+  addActivity(message, 'warn');
+  q('local-placeholder').hidden = false;
+  return null;
+}
+
+function formatMediaError(error) {
+  if (!error) return 'Unknown media error';
+  const name = error.name || 'MediaError';
+  const message = error.message || 'Unable to access the requested device.';
+  return `${name}: ${message}`;
 }
 
 function createPeerConnection() {
@@ -368,7 +394,12 @@ async function enterMeeting() {
     q('prejoin-screen').hidden = true;
     q('live-room').hidden = false;
     q('invite-link').value = inviteUrl();
-    setStatus(meetingState.isHost ? 'Waiting for participants' : 'Connecting to host…', 'ready');
+    setStatus(
+      meetingState.isHost
+        ? (meetingState.localMediaMode === 'none' ? 'Waiting for participants without local media' : 'Waiting for participants')
+        : (meetingState.localMediaMode === 'none' ? 'Connecting without local media…' : 'Connecting to host…'),
+      meetingState.localMediaMode === 'none' ? 'warn' : 'ready',
+    );
     if (!meetingState.isHost) await maybeStartGuestOffer();
   } catch (error) {
     setStatus(error.message, 'error');
@@ -433,11 +464,19 @@ function endPeerConnection(notifyRemote = true) {
   if (notifyRemote && meetingState.targetPeerId) sendSignal('hangup', 'hangup').catch(() => {});
   try { meetingState.dataChannel?.close(); } catch (_) {}
   try { meetingState.pc?.close(); } catch (_) {}
+  try { meetingState.remoteStream?.getTracks().forEach(track => track.stop()); } catch (_) {}
   meetingState.pc = null;
   meetingState.dataChannel = null;
+  meetingState.remoteStream = null;
   meetingState.offerSent = false;
+  meetingState.pendingCandidates = [];
+  meetingState.targetPeerId = meetingState.isHost ? '' : meetingState.hostPeerId;
   q('remote-placeholder').hidden = false;
+  q('remote-video').srcObject = null;
+  q('remote-name').textContent = 'Waiting for participant';
   q('chat-state').textContent = 'offline';
+  q('connection-label').textContent = 'idle';
+  q('ice-label').textContent = 'idle';
   setStatus('Call ended', 'warn');
 }
 
