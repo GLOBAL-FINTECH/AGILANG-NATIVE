@@ -727,6 +727,10 @@ fn meeting_status_payload(meeting_id: &str) -> serde_json::Value {
     }
 }
 
+fn log_webrtc_trace(event: &str, details: serde_json::Value) {
+    eprintln!("[queral-webrtc] {event} {details}");
+}
+
 fn block_on_runtime<F, T>(future: F) -> Result<T, String>
 where
     F: std::future::Future<Output = T>,
@@ -1446,6 +1450,16 @@ pub(crate) fn handle_webrtc_request(
                 "active_peers": webrtc_peer_registry().lock().unwrap().len(),
                 "meeting": meeting,
             });
+            log_webrtc_trace(
+                "register",
+                serde_json::json!({
+                    "meeting_id": meeting_id,
+                    "peer_id": peer_id,
+                    "user_id": user.id,
+                    "role": role,
+                    "active_peers": webrtc_peer_registry().lock().unwrap().len(),
+                }),
+            );
             Ok(Some(build_json_response(200, body.to_string())))
         }
         "/api/webrtc/meeting" => {
@@ -1463,6 +1477,13 @@ pub(crate) fn handle_webrtc_request(
                     serde_json::json!({ "error": "meeting_id is required" }).to_string(),
                 )));
             }
+            log_webrtc_trace(
+                "meeting_lookup",
+                serde_json::json!({
+                    "meeting_id": meeting_id,
+                    "user_id": user.id,
+                }),
+            );
             Ok(Some(build_json_response(
                 200,
                 meeting_status_payload(&meeting_id).to_string(),
@@ -1519,6 +1540,10 @@ pub(crate) fn handle_webrtc_request(
             }
 
             let kind = kind.expect("validated above");
+            let signal_kind = format_signal_kind(&kind).to_string();
+            let signal_payload_size = signal_payload.len();
+            let log_from = from.clone();
+            let log_to = to.clone();
             let Some(from_registration) = registered_webrtc_peer(&from) else {
                 return Ok(Some(build_json_response(
                     409,
@@ -1551,6 +1576,18 @@ pub(crate) fn handle_webrtc_request(
                     })
                     .await;
             })?;
+            log_webrtc_trace(
+                "signal_publish",
+                serde_json::json!({
+                    "meeting_id": from_registration.meeting_id,
+                    "kind": signal_kind,
+                    "from": log_from,
+                    "to": log_to,
+                    "from_user_id": from_registration.user_id,
+                    "to_user_id": destination_registration.user_id,
+                    "payload_size": signal_payload_size,
+                }),
+            );
             Ok(Some(build_json_response(
                 202,
                 serde_json::json!({
@@ -1591,6 +1628,19 @@ pub(crate) fn handle_webrtc_request(
                 )));
             }
             let message = block_on_runtime(async { webrtc_signaling_hub().receive(&peer_id).await })?;
+            if let Some(ref message) = message {
+                log_webrtc_trace(
+                    "signal_deliver",
+                    serde_json::json!({
+                        "meeting_id": registration.meeting_id,
+                        "peer_id": peer_id,
+                        "kind": format_signal_kind(&message.kind),
+                        "from": message.from,
+                        "to": message.to,
+                        "payload_size": message.payload.len(),
+                    }),
+                );
+            }
             let body = if let Some(message) = message {
                 serde_json::json!({
                     "message": {

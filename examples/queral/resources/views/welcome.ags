@@ -87,7 +87,7 @@
                                     <strong id="remote-name">Waiting for participant</strong>
                                     <span>The remote video appears automatically after connection.</span>
                                 </div>
-                                <footer><span id="remote-caption">Remote participant</span><span class="media-badge">Remote</span></footer>
+                                <footer><span id="remote-caption">Remote participant</span><span id="remote-media-badge" class="media-badge">Waiting</span></footer>
                             </article>
                             <article class="video-tile local-tile">
                                 <video id="local-video" autoplay muted playsinline></video>
@@ -95,7 +95,7 @@
                                     <div class="participant-avatar">Y</div>
                                     <strong>You</strong>
                                 </div>
-                                <footer><span>You</span><span class="media-badge">Local</span></footer>
+                                <footer><span>You</span><span id="local-media-badge" class="media-badge">No media</span></footer>
                             </article>
                         </div>
 
