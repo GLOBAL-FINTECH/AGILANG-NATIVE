@@ -7,7 +7,7 @@
 
 use agilang_runtime_core::{AgilangError, ErrorCode, RuntimeResult};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
@@ -462,9 +462,32 @@ impl Block {
     }
 }
 
+/// Serialize with the same consensus-visible rules as Genesis
+/// `json.dumps(..., sort_keys=True, separators=(",", ":"))`.
 pub fn stable_json<T: Serialize + ?Sized>(value: &T) -> RuntimeResult<String> {
-    serde_json::to_string(value)
+    let value = serde_json::to_value(value)
+        .map_err(|error| AgilangError::new(ErrorCode::InvalidArgument, error.to_string()))?;
+    let canonical = canonicalize_json(value);
+    serde_json::to_string(&canonical)
         .map_err(|error| AgilangError::new(ErrorCode::InvalidArgument, error.to_string()))
+}
+
+fn canonicalize_json(value: Value) -> Value {
+    match value {
+        Value::Array(values) => {
+            Value::Array(values.into_iter().map(canonicalize_json).collect())
+        }
+        Value::Object(values) => {
+            let mut entries = values.into_iter().collect::<Vec<_>>();
+            entries.sort_by(|left, right| left.0.cmp(&right.0));
+            let mut canonical = Map::new();
+            for (key, value) in entries {
+                canonical.insert(key, canonicalize_json(value));
+            }
+            Value::Object(canonical)
+        }
+        scalar => scalar,
+    }
 }
 
 pub fn stable_hash<T: Serialize + ?Sized>(value: &T) -> RuntimeResult<String> {
@@ -513,6 +536,7 @@ fn invalid<T>(message: impl Into<String>) -> RuntimeResult<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn consensus_aliases_match_genesis() {
@@ -522,6 +546,28 @@ mod tests {
             ConsensusMode::DelegatedProofOfStake
         );
         assert_eq!(ConsensusMode::parse("developer").unwrap(), ConsensusMode::Development);
+    }
+
+    #[test]
+    fn canonical_json_sorts_nested_keys_recursively() {
+        let value = json!({
+            "z": {"b": 2, "a": 1},
+            "a": [{"d": 4, "c": 3}]
+        });
+        assert_eq!(
+            stable_json(&value).unwrap(),
+            r#"{"a":[{"c":3,"d":4}],"z":{"a":1,"b":2}}"#
+        );
+    }
+
+    #[test]
+    fn transaction_hash_matches_genesis_vector() {
+        let transaction = Transaction::transfer("alice", "bob", 25, 0).unwrap();
+        assert_eq!(
+            transaction.hash,
+            "0xbe0840258e1cafa5d4c2f30d5e601effaee66ea017e21469086a595db290931a"
+        );
+        transaction.validate().unwrap();
     }
 
     #[test]
