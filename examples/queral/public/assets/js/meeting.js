@@ -21,6 +21,7 @@ const meetingState = {
   socket: null,
   offerSent: false,
   localMediaMode: 'none',
+  joinStage: 'idle',
 };
 
 function safeSegment(value) {
@@ -39,6 +40,11 @@ function addActivity(text, tone = '') {
   item.textContent = `${new Date().toLocaleTimeString()}  ${text}`;
   list.prepend(item);
   while (list.children.length > 30) list.lastElementChild.remove();
+}
+
+function setJoinStage(stage, text, tone = '') {
+  meetingState.joinStage = stage;
+  addActivity(`[${stage}] ${text}`, tone);
 }
 
 function addMessage(side, text, sender = '') {
@@ -107,6 +113,7 @@ function updateRemoteParticipant(peerId) {
 }
 
 async function resolveMeeting() {
+  setJoinStage('meeting', `Resolving meeting ${meetingState.meetingId}.`);
   if (!meetingState.meetingId) return null;
   const result = await api(`/api/webrtc/meeting?meeting_id=${encodeURIComponent(meetingState.meetingId)}`);
   if (!result.response.ok) {
@@ -116,6 +123,7 @@ async function resolveMeeting() {
   if (hostPeerId) {
     meetingState.hostPeerId = hostPeerId;
     if (!meetingState.isHost) updateRemoteParticipant(hostPeerId);
+    setJoinStage('meeting', `Resolved host peer ${hostPeerId}.`, 'success');
   }
   q('peer-count').textContent = String(result.json?.member_count ?? q('peer-count').textContent);
   return result.json;
@@ -170,6 +178,7 @@ function openMeetingFromCode() {
 
 async function startLocalMedia() {
   if (meetingState.localStream) return meetingState.localStream;
+  setJoinStage('media', 'Opening local camera and microphone.');
   const attempts = [
     { constraints: { audio: true, video: true }, mode: 'av', label: 'camera and microphone' },
     { constraints: { audio: true, video: false }, mode: 'audio', label: 'microphone only' },
@@ -183,6 +192,7 @@ async function startLocalMedia() {
       q('local-video').srcObject = meetingState.localStream;
       q('local-placeholder').hidden = true;
       attachTracks();
+      setJoinStage('media', `Local media ready in ${attempt.mode} mode.`, 'success');
       addActivity(`Local media ready: ${attempt.label}.`, 'success');
       return meetingState.localStream;
     } catch (error) {
@@ -191,6 +201,7 @@ async function startLocalMedia() {
   }
   meetingState.localMediaMode = 'none';
   const message = `Media unavailable. ${failures[0] || 'No microphone or camera source could be opened.'}`;
+  setJoinStage('media', message, 'warn');
   addActivity(message, 'warn');
   q('local-placeholder').hidden = false;
   return null;
@@ -205,6 +216,7 @@ function formatMediaError(error) {
 
 function createPeerConnection() {
   if (meetingState.pc && meetingState.pc.signalingState !== 'closed') return meetingState.pc;
+  setJoinStage('peer', 'Creating RTCPeerConnection.');
   const pc = new RTCPeerConnection({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -217,6 +229,7 @@ function createPeerConnection() {
 
   pc.onicecandidate = event => {
     if (event.candidate && meetingState.targetPeerId) {
+      addActivity(`[ice] candidate queued for ${meetingState.targetPeerId}`);
       sendSignal('ice-candidate', JSON.stringify(event.candidate)).catch(error => addActivity(error.message, 'error'));
     }
   };
@@ -229,12 +242,14 @@ function createPeerConnection() {
     }
     q('remote-placeholder').hidden = true;
     setStatus('Connected', 'success');
+    setJoinStage('track', 'Remote media track attached.', 'success');
     addActivity('Remote video and audio connected.', 'success');
   };
   pc.ondatachannel = event => bindDataChannel(event.channel);
   pc.onconnectionstatechange = () => {
     const state = pc.connectionState;
     q('connection-label').textContent = state;
+    addActivity(`[connection] ${state}`);
     if (state === 'connected') setStatus('Meeting live', 'success');
     if (state === 'failed' || state === 'disconnected') {
       setStatus('Reconnecting…', 'warn');
@@ -273,6 +288,7 @@ function bindDataChannel(channel) {
 }
 
 async function registerPeer() {
+  setJoinStage('register', `Registering peer ${meetingState.localPeerId}.`);
   const result = await api('/api/webrtc/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': meetingState.csrf },
@@ -292,11 +308,13 @@ async function registerPeer() {
     meetingState.hostPeerId = hostPeerId;
     if (!meetingState.isHost) updateRemoteParticipant(hostPeerId);
   }
+  setJoinStage('register', `Peer registered. Active members: ${q('peer-count').textContent}.`, 'success');
   addActivity('Secure meeting identity registered.', 'success');
 }
 
 async function sendSignal(kind, payload) {
   if (!meetingState.targetPeerId) throw new Error('Remote participant is not known yet.');
+  addActivity(`[signal:${kind}] ${meetingState.localPeerId} -> ${meetingState.targetPeerId}`);
   const result = await api('/api/webrtc/signal', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': meetingState.csrf },
@@ -322,6 +340,7 @@ async function pollOnce() {
     if (!result.response.ok) throw new Error(result.json?.error || `Signaling poll failed (${result.response.status})`);
     const message = result.json?.message;
     if (message) {
+      addActivity(`[poll] received ${message.kind} from ${message.from}`);
       meetingState.pollDelay = 80;
       await receiveSignal(message);
     } else {
@@ -342,14 +361,17 @@ async function receiveSignal(message) {
   }
   const pc = createPeerConnection();
   if (message.kind === 'offer') {
+    setJoinStage('offer', `Received offer from ${message.from}.`);
     await startLocalMedia();
     await pc.setRemoteDescription({ type: 'offer', sdp: message.payload });
     await flushCandidates();
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     await sendSignal('answer', answer.sdp || '');
+    setJoinStage('answer', `Answer sent to ${message.from}.`, 'success');
     addActivity('Incoming call accepted automatically.', 'success');
   } else if (message.kind === 'answer') {
+    setJoinStage('answer', `Received answer from ${message.from}.`, 'success');
     await pc.setRemoteDescription({ type: 'answer', sdp: message.payload });
     await flushCandidates();
   } else if (message.kind === 'ice-candidate') {
@@ -376,6 +398,7 @@ async function createOffer() {
   await pc.setLocalDescription(offer);
   await sendSignal('offer', offer.sdp || '');
   meetingState.offerSent = true;
+  setJoinStage('offer', `Offer sent to ${meetingState.targetPeerId}.`, 'success');
   setStatus('Calling participant…', 'ready');
   addActivity('Secure call invitation sent.', 'success');
 }
@@ -385,12 +408,15 @@ async function enterMeeting() {
   meetingState.joining = true;
   q('join-now').disabled = true;
   try {
-    setStatus('Preparing devices…', 'ready');
-    await startLocalMedia();
+    setJoinStage('join', 'Entering meeting.');
+    setStatus('Preparing secure room…', 'ready');
     createPeerConnection();
     await registerPeer();
+    setJoinStage('poll', 'Starting signaling poll loop.');
     pollOnce();
+    setJoinStage('socket', 'Connecting presence socket.');
     connectActivitySocket();
+    await startLocalMedia();
     q('prejoin-screen').hidden = true;
     q('live-room').hidden = false;
     q('invite-link').value = inviteUrl();
@@ -417,6 +443,7 @@ function connectActivitySocket() {
   meetingState.socket = socket;
   socket.onopen = () => {
     q('socket-label').textContent = 'live';
+    setJoinStage('socket', 'Presence socket connected.', 'success');
     socket.send(JSON.stringify({ type: 'presence', meeting: meetingState.meetingId, peer: meetingState.localPeerId }));
   };
   socket.onmessage = event => {
@@ -432,6 +459,7 @@ function connectActivitySocket() {
   };
   socket.onclose = () => {
     q('socket-label').textContent = 'reconnecting';
+    addActivity('[socket] reconnecting');
     setTimeout(connectActivitySocket, 1200);
   };
 }
@@ -450,7 +478,11 @@ function sendChat() {
   input.value = '';
 }
 
-function toggleMedia(kind) {
+async function toggleMedia(kind) {
+  if (!meetingState.localStream) {
+    await startLocalMedia();
+    if (!meetingState.localStream) return;
+  }
   const tracks = kind === 'audio' ? meetingState.localStream?.getAudioTracks() : meetingState.localStream?.getVideoTracks();
   if (!tracks?.length) return;
   const enabled = !tracks[0].enabled;
@@ -511,8 +543,8 @@ q('new-meeting').addEventListener('click', createNewMeeting);
 q('join-meeting').addEventListener('click', openMeetingFromCode);
 q('join-now').addEventListener('click', enterMeeting);
 q('copy-invite').addEventListener('click', () => copyInvite().catch(error => addActivity(error.message, 'error')));
-q('toggle-audio').addEventListener('click', () => toggleMedia('audio'));
-q('toggle-video').addEventListener('click', () => toggleMedia('video'));
+q('toggle-audio').addEventListener('click', () => toggleMedia('audio').catch(error => addActivity(error.message, 'error')));
+q('toggle-video').addEventListener('click', () => toggleMedia('video').catch(error => addActivity(error.message, 'error')));
 q('leave-call').addEventListener('click', () => endPeerConnection(true));
 q('chat-send').addEventListener('click', sendChat);
 q('chat-input').addEventListener('keydown', event => { if (event.key === 'Enter') sendChat(); });
