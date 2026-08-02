@@ -13,6 +13,7 @@ const meetingState = {
   polling: false,
   pollDelay: 350,
   pollTimer: null,
+  meetingRefreshTimer: null,
   pc: null,
   localStream: null,
   remoteStream: null,
@@ -112,6 +113,17 @@ function updateRemoteParticipant(peerId) {
   q('remote-name').textContent = peerId.replace(/^meeting-[^-]+-/, '').replace(/-/g, ' ');
 }
 
+function syncMembersFromMeeting(meeting) {
+  const members = Array.isArray(meeting?.members) ? meeting.members : [];
+  const memberCount = Number(meeting?.member_count ?? members.length ?? 0);
+  q('peer-count').textContent = String(memberCount);
+  const remoteMember = members.find(member => member.peer_id && member.peer_id !== meetingState.localPeerId);
+  if (remoteMember?.peer_id) {
+    updateRemoteParticipant(remoteMember.peer_id);
+    addActivity(`[members] remote participant ${remoteMember.peer_id} is present`);
+  }
+}
+
 async function resolveMeeting() {
   setJoinStage('meeting', `Resolving meeting ${meetingState.meetingId}.`);
   if (!meetingState.meetingId) return null;
@@ -125,7 +137,7 @@ async function resolveMeeting() {
     if (!meetingState.isHost) updateRemoteParticipant(hostPeerId);
     setJoinStage('meeting', `Resolved host peer ${hostPeerId}.`, 'success');
   }
-  q('peer-count').textContent = String(result.json?.member_count ?? q('peer-count').textContent);
+  syncMembersFromMeeting(result.json);
   return result.json;
 }
 
@@ -136,6 +148,24 @@ async function maybeStartGuestOffer() {
   }
   if (!meetingState.targetPeerId) return;
   await createOffer();
+}
+
+function scheduleMeetingRefresh(delay = 2000) {
+  clearTimeout(meetingState.meetingRefreshTimer);
+  meetingState.meetingRefreshTimer = setTimeout(async () => {
+    try {
+      await resolveMeeting();
+      if (meetingState.registered && !meetingState.isHost) {
+        await maybeStartGuestOffer();
+      }
+    } catch (error) {
+      addActivity(error.message, 'error');
+    } finally {
+      if (meetingState.meetingId) {
+        scheduleMeetingRefresh(meetingState.registered ? 1500 : 3000);
+      }
+    }
+  }, delay);
 }
 
 async function loadAuthAndCsrf() {
@@ -308,6 +338,7 @@ async function registerPeer() {
     meetingState.hostPeerId = hostPeerId;
     if (!meetingState.isHost) updateRemoteParticipant(hostPeerId);
   }
+  syncMembersFromMeeting(result.json?.meeting);
   setJoinStage('register', `Peer registered. Active members: ${q('peer-count').textContent}.`, 'success');
   addActivity('Secure meeting identity registered.', 'success');
 }
@@ -416,6 +447,7 @@ async function enterMeeting() {
     pollOnce();
     setJoinStage('socket', 'Connecting presence socket.');
     connectActivitySocket();
+    scheduleMeetingRefresh(500);
     await startLocalMedia();
     q('prejoin-screen').hidden = true;
     q('live-room').hidden = false;
@@ -454,6 +486,7 @@ function connectActivitySocket() {
         updateRemoteParticipant(payload.peer);
         q('peer-count').textContent = String(Math.max(Number(q('peer-count').textContent || 1), 2));
         maybeStartGuestOffer().catch(error => addActivity(error.message, 'error'));
+        scheduleMeetingRefresh(250);
       }
     } catch (_) {}
   };
@@ -503,6 +536,7 @@ function endPeerConnection(notifyRemote = true) {
   meetingState.offerSent = false;
   meetingState.pendingCandidates = [];
   meetingState.targetPeerId = meetingState.isHost ? '' : meetingState.hostPeerId;
+  clearTimeout(meetingState.meetingRefreshTimer);
   q('remote-placeholder').hidden = false;
   q('remote-video').srcObject = null;
   q('remote-name').textContent = 'Waiting for participant';
@@ -510,6 +544,9 @@ function endPeerConnection(notifyRemote = true) {
   q('connection-label').textContent = 'idle';
   q('ice-label').textContent = 'idle';
   setStatus('Call ended', 'warn');
+  if (meetingState.meetingId) {
+    scheduleMeetingRefresh(1000);
+  }
 }
 
 async function copyInvite() {
@@ -534,6 +571,7 @@ async function bootstrap() {
   q('live-room').hidden = true;
   q('invite-link').value = inviteUrl();
   setStatus(meetingState.isHost ? 'Ready to start meeting' : 'Ready to join meeting', 'ready');
+  scheduleMeetingRefresh(1000);
   if (!meetingState.isHost) {
     resolveMeeting().catch(() => {});
   }
