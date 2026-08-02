@@ -48,6 +48,7 @@ struct AuthSessionRecord {
 #[derive(Debug, Clone)]
 struct AuthUserRecord {
     id: String,
+    numeric_id: Option<i64>,
     name: String,
     email: String,
     password_hash: String,
@@ -174,6 +175,7 @@ fn open_auth_db(project_root: &Path) -> Result<AgiDbConnection, String> {
     let path = auth_db_path(project_root);
     let mut conn = AgiDbConnection::new(path);
     ensure_auth_tables(&mut conn)?;
+    repair_legacy_auth_rows(&mut conn)?;
     prune_expired_sessions(&mut conn)?;
     Ok(conn)
 }
@@ -185,10 +187,36 @@ fn ensure_auth_tables(conn: &mut AgiDbConnection) -> Result<(), String> {
     )
     .map_err(|err| err.to_string())?;
     conn.execute(
-        "CREATE TABLE sessions (id INTEGER, user_id TEXT, token TEXT, expires_at INTEGER, created_at INTEGER, csrf_secret TEXT)",
+        "CREATE TABLE sessions (id INTEGER, user_id INTEGER, token TEXT, expires_at INTEGER, created_at INTEGER, csrf_secret TEXT)",
         &[],
     )
     .map_err(|err| err.to_string())?;
+    Ok(())
+}
+
+fn repair_legacy_auth_rows(conn: &mut AgiDbConnection) -> Result<(), String> {
+    let session_rows = conn
+        .query("SELECT * FROM sessions", &[])
+        .map_err(|err| err.to_string())?;
+    for row in session_rows {
+        let Some(session_id) = row_integer(&row, "id") else {
+            continue;
+        };
+        let Some(user_id_text) = row_text(&row, "user_id") else {
+            continue;
+        };
+        let Ok(user_id_value) = user_id_text.parse::<i64>() else {
+            continue;
+        };
+        conn.execute(
+            "UPDATE sessions SET user_id = ? WHERE id = ?",
+            &[
+                DatabaseValue::Integer(user_id_value),
+                DatabaseValue::Integer(session_id),
+            ],
+        )
+        .map_err(|err| err.to_string())?;
+    }
     Ok(())
 }
 
@@ -284,7 +312,10 @@ fn load_session_by_cookie(
     }
     Ok(Some(AuthSessionRecord {
         token_hash,
-        user_id: row_text(row, "user_id").unwrap_or_default().to_string(),
+        user_id: row_integer(row, "user_id")
+            .map(|value| value.to_string())
+            .or_else(|| row_text(row, "user_id").map(|value| value.to_string()))
+            .unwrap_or_default(),
         csrf_secret: row_text(row, "csrf_secret").unwrap_or_default().to_string(),
         expires_at,
     }))
@@ -304,18 +335,42 @@ fn load_user_by_id(
     let rows = conn
         .query("SELECT * FROM users WHERE id = ? LIMIT 1", &params)
         .map_err(|err| err.to_string())?;
-    Ok(rows.first().map(|row| AuthUserRecord {
-        id: row_integer(row, "id")
+    Ok(rows.first().map(auth_user_from_row))
+}
+
+fn auth_user_from_row(row: &DatabaseRow) -> AuthUserRecord {
+    let numeric_id = row_integer(row, "id");
+    AuthUserRecord {
+        id: numeric_id
             .map(|value| value.to_string())
             .or_else(|| row_text(row, "id").map(|value| value.to_string()))
             .unwrap_or_default(),
+        numeric_id,
         name: row_text(row, "name").unwrap_or_default().to_string(),
         email: row_text(row, "email").unwrap_or_default().to_string(),
         password_hash: row_text(row, "password_hash")
             .unwrap_or_default()
             .to_string(),
         role: row_text(row, "role").unwrap_or("user").to_string(),
-    }))
+    }
+}
+
+fn load_users_by_email(
+    conn: &mut AgiDbConnection,
+    email: &str,
+) -> Result<Vec<AuthUserRecord>, String> {
+    let rows = conn
+        .query(
+            "SELECT * FROM users WHERE email = ?",
+            &[DatabaseValue::Text(email.to_string())],
+        )
+        .map_err(|err| err.to_string())?;
+    let mut users = rows
+        .iter()
+        .map(auth_user_from_row)
+        .collect::<Vec<_>>();
+    users.sort_by_key(|user| user.numeric_id.unwrap_or_default());
+    Ok(users)
 }
 
 fn local_cookie_request(req: &Request) -> bool {
@@ -395,7 +450,10 @@ fn create_session(
     conn.execute(
         "INSERT INTO sessions (user_id, token, expires_at, created_at, csrf_secret) VALUES (?, ?, ?, ?, ?)",
         &[
-            DatabaseValue::Text(user_id.to_string()),
+            match user_id.parse::<i64>() {
+                Ok(value) => DatabaseValue::Integer(value),
+                Err(_) => DatabaseValue::Text(user_id.to_string()),
+            },
             DatabaseValue::Text(token_hash.clone()),
             DatabaseValue::Integer(expires_at),
             DatabaseValue::Integer(now),
@@ -989,12 +1047,7 @@ fn handle_auth_request(
         }
         let _registration_guard = RegistrationGuard::acquire(&email);
         let mut conn = open_auth_db(project_root)?;
-        let duplicate = conn
-            .query(
-                "SELECT * FROM users WHERE email = ? LIMIT 1",
-                &[DatabaseValue::Text(email.clone())],
-            )
-            .map_err(|err| err.to_string())?;
+        let duplicate = load_users_by_email(&mut conn, &email)?;
         if !duplicate.is_empty() {
             let mut response = render_auth_view(
                 view_engine,
@@ -1012,24 +1065,26 @@ fn handle_auth_request(
             .hash(password.as_bytes())
             .map_err(|err| err.to_string())?;
         let now = now_unix() as i64;
-        let result = conn
-            .execute(
-                "INSERT INTO users (name, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                &[
-                    DatabaseValue::Text(name.clone()),
-                    DatabaseValue::Text(email),
-                    DatabaseValue::Text(hash),
-                    DatabaseValue::Text("user".to_string()),
-                    DatabaseValue::Integer(now),
-                    DatabaseValue::Integer(now),
-                ],
-            )
-            .map_err(|err| err.to_string())?;
+        let inserted_email = email.clone();
+        conn.execute(
+            "INSERT INTO users (name, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            &[
+                DatabaseValue::Text(name.clone()),
+                DatabaseValue::Text(email),
+                DatabaseValue::Text(hash),
+                DatabaseValue::Text("user".to_string()),
+                DatabaseValue::Integer(now),
+                DatabaseValue::Integer(now),
+            ],
+        )
+        .map_err(|err| err.to_string())?;
+        let inserted_users = load_users_by_email(&mut conn, &inserted_email)?;
         delete_session(&mut conn, &session.token_hash);
-        let user_id = result
-            .last_insert_id
-            .map(|value| value.to_string())
-            .unwrap_or_else(|| "1".to_string());
+        let user_id = inserted_users
+            .last()
+            .map(|user| user.id.clone())
+            .filter(|id| !id.is_empty())
+            .ok_or_else(|| "AGIDB did not return the registered user id".to_string())?;
         let (cookie_token, _) = create_session(&mut conn, &user_id, None)?;
         let mut response = redirect_response(dashboard_or_return_to(&return_to));
         response.headers.insert(
@@ -1063,13 +1118,14 @@ fn handle_auth_request(
             .cloned()
             .unwrap_or_default();
         let generic_error = "Invalid credentials.";
-        let rows = conn
-            .query(
-                "SELECT * FROM users WHERE email = ? LIMIT 1",
-                &[DatabaseValue::Text(email)],
-            )
-            .map_err(|err| err.to_string())?;
-        let Some(row) = rows.first() else {
+        let users = load_users_by_email(&mut conn, &email)?;
+        let Some(user) = users.iter().rev().find_map(|candidate| {
+            let hasher = Argon2idPasswordHasher::default();
+            match hasher.verify(password.as_bytes(), &candidate.password_hash) {
+                Ok(true) => Some(candidate.clone()),
+                _ => None,
+            }
+        }) else {
             let mut response = render_auth_view(
                 view_engine,
                 "auth/login",
@@ -1081,34 +1137,6 @@ fn handle_auth_request(
             response.status = 401;
             return Ok(Some(response));
         };
-        let user = AuthUserRecord {
-            id: row_integer(row, "id")
-                .map(|value| value.to_string())
-                .or_else(|| row_text(row, "id").map(|value| value.to_string()))
-                .unwrap_or_default(),
-            name: row_text(row, "name").unwrap_or_default().to_string(),
-            email: row_text(row, "email").unwrap_or_default().to_string(),
-            password_hash: row_text(row, "password_hash")
-                .unwrap_or_default()
-                .to_string(),
-            role: row_text(row, "role").unwrap_or("user").to_string(),
-        };
-        let hasher = Argon2idPasswordHasher::default();
-        let verified = hasher
-            .verify(password.as_bytes(), &user.password_hash)
-            .map_err(|err| err.to_string())?;
-        if !verified {
-            let mut response = render_auth_view(
-                view_engine,
-                "auth/login",
-                "Sign in",
-                &session.csrf_secret,
-                Some(generic_error),
-                &return_to,
-            )?;
-            response.status = 401;
-            return Ok(Some(response));
-        }
         delete_session(&mut conn, &session.token_hash);
         let (cookie_token, _) = create_session(&mut conn, &user.id, None)?;
         let mut response = redirect_response(dashboard_or_return_to(&return_to));
@@ -2972,7 +3000,10 @@ fn register_api() -> void:
         assert_eq!(
             session_rows(&root)
                 .iter()
-                .filter(|row| !row_text(row, "user_id").unwrap_or_default().is_empty())
+                .filter(|row| {
+                    row_integer(row, "user_id").is_some()
+                        || !row_text(row, "user_id").unwrap_or_default().is_empty()
+                })
                 .count(),
             1
         );
@@ -3449,6 +3480,149 @@ fn register_api() -> void:
         let localhost_cookie = localhost_login.headers.get("Set-Cookie").cloned().unwrap_or_default();
         assert!(localhost_cookie.contains("SameSite=Lax"));
         assert!(!localhost_cookie.contains("Secure"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn login_recovers_from_legacy_duplicate_email_rows() {
+        let (root, engine) = setup_auth_project("duplicate_email_rows");
+
+        let register_page = invoke(
+            &root,
+            &engine,
+            request(HttpMethod::Get, "/register", None, None, 51),
+        );
+        let register_cookie = cookie_from(&register_page);
+        let register_csrf = csrf_from(&register_page);
+
+        let registered = invoke(
+            &root,
+            &engine,
+            request(
+                HttpMethod::Post,
+                "/register",
+                Some(&register_cookie),
+                Some(&form_body(&[
+                    ("_csrf", &register_csrf),
+                    ("name", "Duplicate Session User"),
+                    ("email", "duplicate.session@example.com"),
+                    ("password", "Password123!"),
+                ])),
+                51,
+            ),
+        );
+        assert_eq!(registered.status, 302);
+
+        let mut conn = open_auth_db(&root).unwrap();
+        let legacy_hash = Argon2idPasswordHasher::default()
+            .hash(b"OlderPassword456!")
+            .unwrap();
+        conn.execute(
+            "INSERT INTO users (name, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            &[
+                DatabaseValue::Text("Legacy Duplicate".to_string()),
+                DatabaseValue::Text("duplicate.session@example.com".to_string()),
+                DatabaseValue::Text(legacy_hash),
+                DatabaseValue::Text("user".to_string()),
+                DatabaseValue::Integer(1),
+                DatabaseValue::Integer(1),
+            ],
+        )
+        .unwrap();
+
+        let (_guest_cookie, login_cookie) = login_user(
+            &root,
+            &engine,
+            52,
+            "duplicate.session@example.com",
+            "Password123!",
+        );
+
+        let me = invoke(
+            &root,
+            &engine,
+            request(HttpMethod::Get, "/api/auth/me", Some(&login_cookie), None, 52),
+        );
+        assert_eq!(me.status, 200);
+        assert!(response_text(&me).contains("duplicate.session@example.com"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn meeting_login_flow_persists_session_in_agidb() {
+        let (root, engine) = setup_auth_project("meeting_login_flow");
+
+        let auth_cookie = register_user(
+            &root,
+            &engine,
+            53,
+            "meeting.flow@example.com",
+            "Password123!",
+            "Meeting Flow User",
+        );
+
+        let me_after_register = invoke(
+            &root,
+            &engine,
+            request(HttpMethod::Get, "/api/auth/me", Some(&auth_cookie), None, 53),
+        );
+        assert_eq!(me_after_register.status, 200);
+        assert!(response_text(&me_after_register).contains("meeting.flow@example.com"));
+
+        let session_count_after_register = session_rows(&root)
+            .iter()
+            .filter(|row| {
+                row_integer(row, "user_id").is_some()
+                    || !row_text(row, "user_id").unwrap_or_default().is_empty()
+            })
+            .count();
+        assert!(session_count_after_register >= 1);
+
+        let login_page = invoke(
+            &root,
+            &engine,
+            query_request(
+                HttpMethod::Get,
+                "/login",
+                &[("return_to", "/?meeting=246945224")],
+                None,
+                54,
+            ),
+        );
+        let guest_cookie = cookie_from(&login_page);
+        let csrf = csrf_from(&login_page);
+        let login_response = invoke(
+            &root,
+            &engine,
+            request(
+                HttpMethod::Post,
+                "/login",
+                Some(&guest_cookie),
+                Some(&form_body(&[
+                    ("email", "meeting.flow@example.com"),
+                    ("password", "Password123!"),
+                    ("return_to", "/?meeting=246945224"),
+                    ("_csrf", &csrf),
+                ])),
+                54,
+            ),
+        );
+        assert_eq!(login_response.status, 302);
+        assert_eq!(
+            login_response.headers.get("Location").map(String::as_str),
+            Some("/?meeting=246945224")
+        );
+
+        let login_cookie = cookie_from(&login_response);
+        let me_after_login = invoke(
+            &root,
+            &engine,
+            request(HttpMethod::Get, "/api/auth/me", Some(&login_cookie), None, 54),
+        );
+        assert_eq!(me_after_login.status, 200);
+        assert!(response_text(&me_after_login).contains("meeting.flow@example.com"));
 
         fs::remove_dir_all(root).ok();
     }
