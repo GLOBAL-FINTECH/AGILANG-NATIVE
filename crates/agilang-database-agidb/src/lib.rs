@@ -9,10 +9,14 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 static DB_PROCESS_LOCK: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+static DB_STORE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 #[derive(Debug)]
 pub struct AgiDbEngine {
@@ -116,7 +120,32 @@ impl AgiDbStore {
                 .context("failed to serialize AGIDB store")?
                 .as_bytes(),
         );
-        fs::write(path, bytes).with_context(|| format!("failed to write {}", path.display()))?;
+        let tmp_name = format!(
+            ".{}.tmp-{}-{}",
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("agidb"),
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        );
+        let tmp_path = path.with_file_name(tmp_name);
+        {
+            let mut file = File::create(&tmp_path)
+                .with_context(|| format!("failed to create {}", tmp_path.display()))?;
+            file.write_all(&bytes)
+                .with_context(|| format!("failed to write {}", tmp_path.display()))?;
+            file.sync_all()
+                .with_context(|| format!("failed to flush {}", tmp_path.display()))?;
+        }
+        if path.exists() {
+            fs::remove_file(path)
+                .with_context(|| format!("failed to replace {}", path.display()))?;
+        }
+        fs::rename(&tmp_path, path)
+            .with_context(|| format!("failed to move {} into place", tmp_path.display()))?;
         Ok(())
     }
 }
@@ -151,6 +180,7 @@ impl AgiDbConnection {
 
 impl DatabaseConnection for AgiDbConnection {
     fn execute(&mut self, sql: &str, params: &[DatabaseValue]) -> Result<ExecutionResult> {
+        let _guard = DB_STORE_LOCK.lock().unwrap();
         let mut store = self.read_store()?;
         let statement = sql.trim().trim_end_matches(';').trim();
         let upper = statement.to_ascii_uppercase();
@@ -182,6 +212,7 @@ impl DatabaseConnection for AgiDbConnection {
         if self.in_transaction {
             bail!("E6311 Transaction already active");
         }
+        let _guard = DB_STORE_LOCK.lock().unwrap();
         self.transaction_snapshot = Some(self.read_store()?);
         self.in_transaction = true;
         Ok(())
@@ -195,6 +226,7 @@ impl DatabaseConnection for AgiDbConnection {
 
     fn rollback(&mut self) -> Result<()> {
         if let Some(snapshot) = self.transaction_snapshot.take() {
+            let _guard = DB_STORE_LOCK.lock().unwrap();
             self.write_store(&snapshot)?;
         }
         self.in_transaction = false;
@@ -582,6 +614,8 @@ fn row_matches(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+    use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_db_path(name: &str) -> String {
@@ -658,5 +692,37 @@ mod tests {
 
         let rows = conn.query("SELECT * FROM users", &[]).unwrap();
         assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn concurrent_writes_keep_valid_json_and_preserve_rows() {
+        let path = Arc::new(temp_db_path("concurrent"));
+        let mut conn = AgiDbConnection::new(path.as_ref().clone());
+        conn.execute("CREATE TABLE users (id INTEGER, email TEXT)", &[])
+            .unwrap();
+
+        let mut handles = Vec::new();
+        for index in 0..8 {
+            let path = Arc::clone(&path);
+            handles.push(thread::spawn(move || {
+                let mut conn = AgiDbConnection::new(path.as_ref().clone());
+                conn.execute(
+                    "INSERT INTO users (email) VALUES (?)",
+                    &[DatabaseValue::Text(format!("user{index}@example.com"))],
+                )
+                .unwrap();
+            }));
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let bytes = fs::read(path.as_ref()).unwrap();
+        assert_eq!(&bytes[..MAGIC_BYTES.len()], MAGIC_BYTES);
+        let payload = std::str::from_utf8(&bytes[MAGIC_BYTES.len()..]).unwrap();
+        let store: AgiDbStore = serde_json::from_str(payload).unwrap();
+        let users = store.tables.get("users").unwrap();
+        assert_eq!(users.rows.len(), 8);
     }
 }
