@@ -1,37 +1,41 @@
 fn factorial(n: i32) -> i32:
     let result: i32 = 1
     let i: i32 = 2
-    
-    // Loop: calculate n!
-    // Note: Full while loop support coming in Phase 2
-    // This demonstrates the control flow that will be available
-    
-    print("Factorial computation structure defined")
-    return 0
+
+    while i <= n:
+        result *= i
+        i += 1
+
+    return result
+
+fn array_total(values: array) -> f64:
+    let total: f64 = 0.0
+
+    for value in values:
+        total += value
+
+    return total
 
 fn main() -> i32:
     print("AGILANG Native Compiler Bootstrap Suite")
     print("")
-    print("=== Syntax Features ===")
-    print("✅ Functions (fn)")
-    print("✅ Type annotations (i32, i64, string, bool)")
-    print("✅ Variables (let, const)")
-    print("✅ Return statements (return value)")
-    print("✅ Function calls (function(arg1, arg2))")
-    print("✅ Binary operations (+, -, *, /, ==, !=, <, >, <=, >=)")
-    print("✅ String and numeric literals")
+    print("=== Language Features ===")
+    print("Functions and typed parameters")
+    print("Variables and constants")
+    print("Conditional and loop control flow")
+    print("Native arrays, indexing, append, length, and iteration")
+    print("Modules, structs, enums, aliases, and classes")
+    print("Native executable generation")
     print("")
-    print("=== In Development ===")
-    print("🔄 Control flow (if/else, while, for)")
-    print("🔄 Collections (array, map)")
-    print("🔄 Module system (use, module)")
-    print("🔄 AGS templates (reactive views)")
-    print("🔄 AIFlow tensor runtime (inference/training)")
-    print("")
-    print("=== Native Execution ===")
-    print("All code compiles to native C → native executable")
-    print("No Python, no runtime overhead, pure native performance")
-    print("")
-    
-    let status = factorial(5)
-    return status
+
+    let values: array = [1.0, 2.0, 3.0]
+    append(values, 4.0)
+    values[0] = 10.0
+
+    let factorial_result: i32 = factorial(5)
+    let total: f64 = array_total(values)
+
+    if factorial_result == 120 and len(values) == 4 and total == 19.0:
+        return 0
+
+    return 1

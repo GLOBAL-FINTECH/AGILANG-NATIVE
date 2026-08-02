@@ -1,0 +1,25 @@
+fn sum_array(values: array) -> f64:
+    let total: f64 = 0.0
+
+    for value in values:
+        total += value
+
+    return total
+
+fn first_value(values: array) -> f64:
+    return values[0]
+
+fn main() -> i32:
+    let values: array = [1.0, 2.0, 3.0, 4.0]
+
+    append(values, 5.0)
+    values[0] = 10.0
+
+    let count: i64 = len(values)
+    let first: f64 = first_value(values)
+    let total: f64 = sum_array(values)
+
+    if count == 5 and first == 10.0 and total == 24.0:
+        return 0
+
+    return 1
