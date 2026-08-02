@@ -35,7 +35,23 @@ pub struct FunctionType {
 impl Type {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(name: &str) -> Self {
-        match name {
+        let normalized = name.trim();
+
+        if let Some(inner) = Self::generic_argument(normalized, "array")
+            .or_else(|| Self::generic_argument(normalized, "list"))
+        {
+            return Self::List(Box::new(Self::from_str(inner)));
+        }
+
+        if let Some(inner) = normalized.strip_suffix("[]") {
+            return Self::List(Box::new(Self::from_str(inner)));
+        }
+
+        if let Some(inner) = Self::generic_argument(normalized, "optional") {
+            return Self::Optional(Box::new(Self::from_str(inner)));
+        }
+
+        match normalized {
             "i32" => Self::I32,
             "i64" => Self::I64,
             "int" => Self::I64,
@@ -46,11 +62,23 @@ impl Type {
             "bool" => Self::Bool,
             "string" => Self::String,
             "bytes" => Self::Bytes,
+            "array" | "list" => Self::List(Box::new(Self::Unknown)),
             "vector" => Self::Vector,
             "matrix" => Self::Matrix,
             "complex" => Self::Complex,
             "void" => Self::Void,
+            "never" => Self::Never,
             _ => Self::Unknown,
+        }
+    }
+
+    fn generic_argument<'a>(name: &'a str, constructor: &str) -> Option<&'a str> {
+        let prefix = format!("{constructor}<");
+        let inner = name.strip_prefix(&prefix)?.strip_suffix('>')?.trim();
+        if inner.is_empty() {
+            None
+        } else {
+            Some(inner)
         }
     }
 
@@ -69,8 +97,22 @@ impl Type {
         matches!(self, Self::F32 | Self::F64)
     }
 
+    pub fn is_array(&self) -> bool {
+        matches!(self, Self::List(_))
+    }
+
+    pub fn array_element(&self) -> Option<&Type> {
+        match self {
+            Self::List(inner) => Some(inner.as_ref()),
+            _ => None,
+        }
+    }
+
     pub fn is_compatible(&self, other: &Self) -> bool {
         if self == &Self::Error || other == &Self::Error {
+            return true;
+        }
+        if self == &Self::Unknown || other == &Self::Unknown {
             return true;
         }
         if self.is_integer() && other.is_integer() {
@@ -109,7 +151,7 @@ impl fmt::Display for Type {
             Self::Bool => write!(f, "bool"),
             Self::String => write!(f, "string"),
             Self::Bytes => write!(f, "bytes"),
-            Self::List(inner) => write!(f, "list<{}>", inner),
+            Self::List(inner) => write!(f, "array<{}>", inner),
             Self::Vector => write!(f, "vector"),
             Self::Matrix => write!(f, "matrix"),
             Self::Complex => write!(f, "complex"),
@@ -131,5 +173,40 @@ impl fmt::Display for Type {
                 write!(f, ") -> {}", func.ret)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_native_array_aliases() {
+        assert_eq!(Type::from_str("array"), Type::List(Box::new(Type::Unknown)));
+        assert_eq!(Type::from_str("list"), Type::List(Box::new(Type::Unknown)));
+        assert_eq!(Type::from_str("array<f64>"), Type::List(Box::new(Type::F64)));
+        assert_eq!(Type::from_str("list<i64>"), Type::List(Box::new(Type::I64)));
+        assert_eq!(Type::from_str("f64[]"), Type::List(Box::new(Type::F64)));
+    }
+
+    #[test]
+    fn parses_nested_native_arrays() {
+        assert_eq!(
+            Type::from_str("array<array<f64>>"),
+            Type::List(Box::new(Type::List(Box::new(Type::F64))))
+        );
+    }
+
+    #[test]
+    fn displays_arrays_using_agilang_native_syntax() {
+        let ty = Type::List(Box::new(Type::I64));
+        assert_eq!(ty.to_string(), "array<i64>");
+    }
+
+    #[test]
+    fn unknown_arrays_accept_inferred_element_types() {
+        let untyped = Type::List(Box::new(Type::Unknown));
+        let typed = Type::List(Box::new(Type::F64));
+        assert!(untyped.is_compatible(&typed));
     }
 }
