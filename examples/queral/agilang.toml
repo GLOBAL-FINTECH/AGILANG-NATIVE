@@ -24,6 +24,11 @@ database_verification = true
 host = "127.0.0.1"
 port = 8080
 
+[database]
+driver = "agidb"
+path = "storage/database/main.agidb"
+persistent = true
+
 [routes]
 web = "routes/web.agi"
 api = "routes/api.agi"

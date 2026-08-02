@@ -172,15 +172,33 @@ fn hash_session_token(token: &str) -> String {
         .collect()
 }
 
-fn auth_db_path(project_root: &Path) -> String {
+pub fn resolved_auth_db_path(project_root: &Path) -> String {
     let config = agilang_framework_config::Config::load(project_root);
     let configured = config.get("AGIDB_DATABASE", "");
     if !configured.is_empty() {
-        return configured;
+        let path = Path::new(&configured);
+        return if path.is_absolute() {
+            path.to_string_lossy().to_string()
+        } else {
+            project_root.join(path).to_string_lossy().to_string()
+        };
     }
     let configured = config.get("DATABASE_PATH", "");
     if !configured.is_empty() {
-        return configured;
+        let path = Path::new(&configured);
+        return if path.is_absolute() {
+            path.to_string_lossy().to_string()
+        } else {
+            project_root.join(path).to_string_lossy().to_string()
+        };
+    }
+    if let Some(configured) = agilang_toml_database_path(project_root) {
+        let path = Path::new(&configured);
+        return if path.is_absolute() {
+            path.to_string_lossy().to_string()
+        } else {
+            project_root.join(path).to_string_lossy().to_string()
+        };
     }
     project_root
         .join("storage/database/main.agidb")
@@ -188,8 +206,33 @@ fn auth_db_path(project_root: &Path) -> String {
         .to_string()
 }
 
+fn agilang_toml_database_path(project_root: &Path) -> Option<String> {
+    let config_path = project_root.join("agilang.toml");
+    let content = std::fs::read_to_string(config_path).ok()?;
+    let mut in_database_section = false;
+    for raw_line in content.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            in_database_section = line == "[database]";
+            continue;
+        }
+        if !in_database_section {
+            continue;
+        }
+        if let Some((key, value)) = line.split_once('=') {
+            if key.trim() == "path" {
+                return Some(value.trim().trim_matches('"').to_string());
+            }
+        }
+    }
+    None
+}
+
 fn open_auth_db(project_root: &Path) -> Result<AgiDbConnection, String> {
-    let path = auth_db_path(project_root);
+    let path = resolved_auth_db_path(project_root);
     let mut conn = AgiDbConnection::new(path);
     ensure_auth_tables(&mut conn)?;
     repair_legacy_auth_rows(&mut conn)?;
@@ -1050,7 +1093,7 @@ fn handle_auth_request(
                 "Dashboard".to_string()
             },
         );
-        data.insert("database".to_string(), auth_db_path(project_root));
+        data.insert("database".to_string(), resolved_auth_db_path(project_root));
         data.insert("user_name".to_string(), user.name.clone());
         data.insert("error_message".to_string(), String::new());
         data.insert("csrf_token".to_string(), csrf_secret);
@@ -3767,6 +3810,44 @@ fn register_api() -> void:
         );
         assert_eq!(me_after_login.status, 200);
         assert!(response_text(&me_after_login).contains("meeting.flow@example.com"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn resolved_auth_db_path_uses_project_relative_env_file() {
+        let root = unique_test_root("auth_db_relative_env");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join(".env"), "AGIDB_DATABASE=storage/database/main.agidb\n").unwrap();
+
+        let resolved = resolved_auth_db_path(&root);
+        assert_eq!(
+            resolved,
+            root.join("storage/database/main.agidb")
+                .to_string_lossy()
+                .to_string()
+        );
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn resolved_auth_db_path_uses_project_relative_agilang_toml_database_path() {
+        let root = unique_test_root("auth_db_toml");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("agilang.toml"),
+            "[database]\npath = \"storage/database/main.agidb\"\n",
+        )
+        .unwrap();
+
+        let resolved = resolved_auth_db_path(&root);
+        assert_eq!(
+            resolved,
+            root.join("storage/database/main.agidb")
+                .to_string_lossy()
+                .to_string()
+        );
 
         fs::remove_dir_all(root).ok();
     }

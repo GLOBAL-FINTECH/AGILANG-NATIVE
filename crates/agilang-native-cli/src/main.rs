@@ -564,6 +564,17 @@ fn main() -> Result<()> {
                 if is_start { "production" } else { "local" }
             );
             println!("Address: {}://{}:{}", protocol_scheme, host, bound_port);
+            let auth_db_path = agilang_framework_server::resolved_auth_db_path(&project_root);
+            let auth_db_metadata = std::fs::metadata(&auth_db_path).ok();
+            println!("Authentication storage: AGIDB");
+            println!("Database path: {}", auth_db_path);
+            println!(
+                "Database existed before startup: {}",
+                auth_db_metadata.is_some()
+            );
+            if let Some(metadata) = auth_db_metadata {
+                println!("Database size: {} bytes", metadata.len());
+            }
             if use_https {
                 if !cert_file.is_empty() {
                     println!("Certificate: {}", cert_file);
