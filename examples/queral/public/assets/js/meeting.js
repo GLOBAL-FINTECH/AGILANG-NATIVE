@@ -24,6 +24,8 @@ const meetingState = {
   localMediaMode: 'none',
   joinStage: 'idle',
   traceId: '',
+  meetingMembers: [],
+  sidebarTab: 'chat',
 };
 
 function peerLabelFromPeerId(peerId) {
@@ -36,6 +38,11 @@ function remoteIdentityFromMember(member) {
   const role = member.role === 'host' ? 'Host' : 'Participant';
   const caption = member.email ? `${role} · ${member.email}` : role;
   return { title, caption };
+}
+
+function personInitial(name, email, peerId) {
+  const source = String(name || email || peerId || 'P').trim();
+  return source ? source.charAt(0).toUpperCase() : 'P';
 }
 
 function safeSegment(value) {
@@ -122,6 +129,56 @@ function syncRoleLabels() {
   q('participant-role').textContent = meetingState.isHost ? 'Host' : 'Participant';
 }
 
+function setSidebarTab(tab) {
+  meetingState.sidebarTab = tab === 'people' ? 'people' : 'chat';
+  q('tab-chat').classList.toggle('active', meetingState.sidebarTab === 'chat');
+  q('tab-people').classList.toggle('active', meetingState.sidebarTab === 'people');
+  q('chat-panel').hidden = meetingState.sidebarTab !== 'chat';
+  q('people-panel').hidden = meetingState.sidebarTab !== 'people';
+}
+
+function renderPeopleList() {
+  const members = Array.isArray(meetingState.meetingMembers) ? meetingState.meetingMembers : [];
+  const roster = members.length ? members : [{
+    peer_id: meetingState.localPeerId,
+    name: meetingState.auth?.user?.name || 'You',
+    email: meetingState.auth?.user?.email || '',
+    role: meetingState.isHost ? 'host' : 'participant',
+  }];
+  q('people-summary').textContent = `${roster.length} participant${roster.length === 1 ? '' : 's'}`;
+  const list = q('people-list');
+  list.innerHTML = '';
+  for (const member of roster) {
+    const isLocal = member.peer_id === meetingState.localPeerId;
+    const role = member.role === 'host' ? 'Host' : 'Participant';
+
+    const card = document.createElement('article');
+    card.className = `person-card${isLocal ? ' self' : ''}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'person-avatar';
+    avatar.textContent = personInitial(member.name, member.email, member.peer_id);
+    card.appendChild(avatar);
+
+    const copy = document.createElement('div');
+    copy.className = 'person-copy';
+    const title = document.createElement('strong');
+    title.textContent = isLocal ? `${member.name || 'You'} (You)` : (member.name || peerLabelFromPeerId(member.peer_id) || 'Participant');
+    copy.appendChild(title);
+    const meta = document.createElement('span');
+    meta.textContent = member.email ? `${role} | ${member.email}` : role;
+    copy.appendChild(meta);
+    card.appendChild(copy);
+
+    const badge = document.createElement('span');
+    badge.className = 'person-badge';
+    badge.textContent = isLocal ? 'Local' : 'Remote';
+    card.appendChild(badge);
+
+    list.appendChild(card);
+  }
+}
+
 function inviteUrl() {
   const url = new URL(location.origin + '/');
   url.searchParams.set('meeting', meetingState.meetingId);
@@ -138,6 +195,7 @@ function updateRemoteParticipant(peerId) {
 
 function syncMembersFromMeeting(meeting) {
   const members = Array.isArray(meeting?.members) ? meeting.members : [];
+  meetingState.meetingMembers = members;
   const memberCount = Number(meeting?.member_count ?? members.length ?? 0);
   q('peer-count').textContent = String(memberCount);
   const remoteMember = members.find(member => member.peer_id && member.peer_id !== meetingState.localPeerId);
@@ -151,6 +209,7 @@ function syncMembersFromMeeting(meeting) {
     q('remote-name').textContent = 'Waiting for participant';
     q('remote-caption').textContent = 'Remote participant';
   }
+  renderPeopleList();
 }
 
 async function resolveMeeting() {
@@ -242,6 +301,8 @@ function createNewMeeting() {
   q('invite-link').value = inviteUrl();
   q('welcome-screen').hidden = true;
   q('meeting-screen').hidden = false;
+  setSidebarTab('chat');
+  renderPeopleList();
   setStatus('Ready to start', 'ready');
 }
 
@@ -721,12 +782,14 @@ function endPeerConnection(notifyRemote = true) {
   q('remote-video').style.visibility = 'hidden';
   q('remote-video').style.opacity = '0';
   q('remote-name').textContent = 'Waiting for participant';
+  q('remote-caption').textContent = 'Remote participant';
   q('remote-media-badge').textContent = 'Waiting';
   q('local-media-badge').textContent = streamHasEnabledVideo(meetingState.localStream) ? 'Local' : (streamHasLiveAudio(meetingState.localStream) ? 'Audio only' : 'No media');
   q('chat-state').textContent = 'offline';
   q('connection-label').textContent = 'idle';
   q('ice-label').textContent = 'idle';
   setStatus('Call ended', 'warn');
+  renderPeopleList();
   if (meetingState.meetingId) {
     scheduleMeetingRefresh(1000);
   }
@@ -741,6 +804,7 @@ async function copyInvite() {
 
 async function bootstrap() {
   readUrl();
+  setSidebarTab('chat');
   if (!(await loadAuthAndCsrf())) return;
   if (!meetingState.meetingId) {
     q('welcome-screen').hidden = false;
@@ -748,6 +812,7 @@ async function bootstrap() {
     return;
   }
   derivePeerIdentity();
+  renderPeopleList();
   q('welcome-screen').hidden = true;
   q('meeting-screen').hidden = false;
   q('prejoin-screen').hidden = false;
@@ -770,6 +835,8 @@ q('leave-call').addEventListener('click', () => endPeerConnection(true));
 q('chat-send').addEventListener('click', sendChat);
 q('chat-input').addEventListener('keydown', event => { if (event.key === 'Enter') sendChat(); });
 q('toggle-sidebar').addEventListener('click', () => q('meeting-shell').classList.toggle('sidebar-closed'));
+q('tab-chat').addEventListener('click', () => setSidebarTab('chat'));
+q('tab-people').addEventListener('click', () => setSidebarTab('people'));
 q('open-diagnostics').addEventListener('click', () => q('diagnostics').showModal());
 q('close-diagnostics').addEventListener('click', () => q('diagnostics').close());
 

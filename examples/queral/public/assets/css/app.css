@@ -225,6 +225,16 @@ button { color: inherit; }
 .sidebar-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); cursor: pointer; }
 .sidebar-tabs button.active { color: white; border-color: var(--brand); }
 .chat-panel { min-height: 0; display: grid; grid-template-rows: minmax(0,1fr) 68px; }
+.people-panel { min-height: 0; display: grid; grid-template-rows: 42px minmax(0,1fr); border-bottom: 1px solid var(--line); }
+.people-panel header { display: flex; align-items: center; justify-content: space-between; padding: 0 14px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--line); }
+.people-list { min-height: 0; overflow: auto; padding: 12px; display: grid; align-content: start; gap: 10px; }
+.person-card { display: grid; grid-template-columns: 36px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid rgba(255,255,255,.05); }
+.person-card.self { border-color: rgba(45,140,255,.35); }
+.person-avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg,#2d8cff,#6759e8); color: white; font-size: 15px; font-weight: 800; }
+.person-copy { min-width: 0; display: grid; gap: 2px; }
+.person-copy strong, .person-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person-copy span { color: var(--muted); font-size: 12px; }
+.person-badge { padding: 6px 9px; border-radius: 999px; background: rgba(45,140,255,.14); color: #9cc8ff; font-size: 11px; }
 .chat-list { min-height: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .message { max-width: 86%; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); display: grid; gap: 3px; }
 .message.local { align-self: flex-end; background: #1769c7; }

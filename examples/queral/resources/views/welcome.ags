@@ -111,16 +111,29 @@
 
                 <aside class="meeting-sidebar">
                     <nav class="sidebar-tabs">
-                        <button class="active" type="button">Chat</button>
-                        <button type="button">People <span id="peer-count">1</span></button>
+                        <button id="tab-chat" class="active" type="button">Chat</button>
+                        <button id="tab-people" type="button">People <span id="peer-count">1</span></button>
                     </nav>
-                    <section class="chat-panel">
+                    <section id="chat-panel" class="chat-panel">
                         <div id="chat-list" class="chat-list">
                             <div class="message system"><span>Messages are delivered automatically when the WebRTC data channel opens.</span></div>
                         </div>
                         <div class="chat-composer">
                             <input id="chat-input" type="text" autocomplete="off" placeholder="Message everyone">
                             <button id="chat-send" type="button" aria-label="Send message">➤</button>
+                        </div>
+                    </section>
+                    <section id="people-panel" class="people-panel" hidden>
+                        <header><strong>Meeting people</strong><span id="people-summary">1 participant</span></header>
+                        <div id="people-list" class="people-list">
+                            <article class="person-card self">
+                                <div class="person-avatar">Y</div>
+                                <div class="person-copy">
+                                    <strong>You</strong>
+                                    <span>Authenticated participant</span>
+                                </div>
+                                <span class="person-badge">Local</span>
+                            </article>
                         </div>
                     </section>
                     <section class="activity-panel">
