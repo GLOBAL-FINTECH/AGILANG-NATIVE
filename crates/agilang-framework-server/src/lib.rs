@@ -69,6 +69,7 @@ struct WebRtcPeerRegistration {
 struct WebRtcMeetingMember {
     peer_id: String,
     user_id: String,
+    name: String,
     email: String,
     role: String,
 }
@@ -653,6 +654,7 @@ fn register_webrtc_peer(
                     WebRtcMeetingMember {
                         peer_id: peer_id.to_string(),
                         user_id: user.id.clone(),
+                        name: user.name.clone(),
                         email: user.email.clone(),
                         role: role.clone(),
                     },
@@ -713,6 +715,7 @@ fn meeting_status_payload(meeting_id: &str) -> serde_json::Value {
             "members": meeting.members.values().map(|member| serde_json::json!({
                 "peer_id": member.peer_id,
                 "user_id": member.user_id,
+                "name": member.name,
                 "email": member.email,
                 "role": member.role,
             })).collect::<Vec<_>>(),
@@ -729,6 +732,12 @@ fn meeting_status_payload(meeting_id: &str) -> serde_json::Value {
 
 fn log_webrtc_trace(event: &str, details: serde_json::Value) {
     eprintln!("[queral-webrtc] {event} {details}");
+}
+
+#[cfg(test)]
+fn reset_webrtc_runtime_state() {
+    webrtc_peer_registry().lock().unwrap().clear();
+    webrtc_meeting_registry().lock().unwrap().clear();
 }
 
 fn block_on_runtime<F, T>(future: F) -> Result<T, String>
@@ -3914,6 +3923,7 @@ fn register_api() -> void:
 
     #[test]
     fn webrtc_signaling_requires_authentication() {
+        reset_webrtc_runtime_state();
         let (root, _) = setup_auth_project("webrtc_auth");
 
         let status = invoke_app(
@@ -3951,10 +3961,12 @@ fn register_api() -> void:
         assert_eq!(unauthorized_poll.status, 401);
 
         fs::remove_dir_all(root).ok();
+        reset_webrtc_runtime_state();
     }
 
     #[test]
     fn webrtc_signaling_enforces_csrf_and_delivers_messages() {
+        reset_webrtc_runtime_state();
         let (root, engine) = setup_auth_project("webrtc_signal");
         let alice_cookie = register_user(
             &root,
@@ -4188,10 +4200,12 @@ fn register_api() -> void:
         assert!(response_text(&status_after_logout).contains("\"active_peers\":1"));
 
         fs::remove_dir_all(root).ok();
+        reset_webrtc_runtime_state();
     }
 
     #[test]
     fn webrtc_meeting_registry_resolves_host_and_cleans_up_members() {
+        reset_webrtc_runtime_state();
         let (root, engine) = setup_auth_project("webrtc_meeting_registry");
         let host_cookie = register_user(
             &root,
@@ -4234,6 +4248,7 @@ fn register_api() -> void:
         );
         assert_eq!(host_register.status, 200);
         assert!(response_text(&host_register).contains("\"host_peer_id\":\"meeting-123-host\""));
+        assert!(response_text(&host_register).contains("\"name\":\"Host\""));
         assert!(response_text(&host_register).contains("\"member_count\":1"));
 
         let guest_register = invoke_app(
@@ -4249,6 +4264,7 @@ fn register_api() -> void:
         );
         assert_eq!(guest_register.status, 200);
         assert!(response_text(&guest_register).contains("\"host_peer_id\":\"meeting-123-host\""));
+        assert!(response_text(&guest_register).contains("\"name\":\"Guest\""));
         assert!(response_text(&guest_register).contains("\"member_count\":2"));
 
         let meeting_lookup = invoke_app(
@@ -4264,6 +4280,8 @@ fn register_api() -> void:
         assert_eq!(meeting_lookup.status, 200);
         assert!(response_text(&meeting_lookup).contains("\"host_peer_id\":\"meeting-123-host\""));
         assert!(response_text(&meeting_lookup).contains("\"member_count\":2"));
+        assert!(response_text(&meeting_lookup).contains("\"name\":\"Host\""));
+        assert!(response_text(&meeting_lookup).contains("\"name\":\"Guest\""));
 
         let logout = invoke(
             &root,
@@ -4293,6 +4311,7 @@ fn register_api() -> void:
         assert!(response_text(&meeting_after_logout).contains("\"member_count\":1"));
 
         fs::remove_dir_all(root).ok();
+        reset_webrtc_runtime_state();
     }
 }
 

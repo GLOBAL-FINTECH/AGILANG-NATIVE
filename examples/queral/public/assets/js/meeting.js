@@ -26,6 +26,18 @@ const meetingState = {
   traceId: '',
 };
 
+function peerLabelFromPeerId(peerId) {
+  return String(peerId || '').replace(/^meeting-[^-]+-/, '').replace(/-/g, ' ').trim();
+}
+
+function remoteIdentityFromMember(member) {
+  if (!member) return { title: 'Waiting for participant', caption: 'Remote participant' };
+  const title = member.name || peerLabelFromPeerId(member.peer_id) || member.email || 'Remote participant';
+  const role = member.role === 'host' ? 'Host' : 'Participant';
+  const caption = member.email ? `${role} · ${member.email}` : role;
+  return { title, caption };
+}
+
 function safeSegment(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 56);
 }
@@ -121,7 +133,7 @@ function updateRemoteParticipant(peerId) {
   if (!peerId || peerId === meetingState.localPeerId) return;
   meetingState.targetPeerId = peerId;
   if (!meetingState.hostPeerId) meetingState.hostPeerId = peerId;
-  q('remote-name').textContent = peerId.replace(/^meeting-[^-]+-/, '').replace(/-/g, ' ');
+  q('remote-name').textContent = peerLabelFromPeerId(peerId) || 'Remote participant';
 }
 
 function syncMembersFromMeeting(meeting) {
@@ -131,7 +143,13 @@ function syncMembersFromMeeting(meeting) {
   const remoteMember = members.find(member => member.peer_id && member.peer_id !== meetingState.localPeerId);
   if (remoteMember?.peer_id) {
     updateRemoteParticipant(remoteMember.peer_id);
+    const identity = remoteIdentityFromMember(remoteMember);
+    q('remote-name').textContent = identity.title;
+    q('remote-caption').textContent = identity.caption;
     addActivity(`[members] remote participant ${remoteMember.peer_id} is present`);
+  } else {
+    q('remote-name').textContent = 'Waiting for participant';
+    q('remote-caption').textContent = 'Remote participant';
   }
 }
 
