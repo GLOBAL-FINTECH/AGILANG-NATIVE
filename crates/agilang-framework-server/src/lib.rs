@@ -29,6 +29,8 @@ static AUTH_RATE_LIMITER: OnceLock<Mutex<HashMap<String, Vec<u64>>>> = OnceLock:
 static ACTIVE_REGISTRATIONS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 static WEBRTC_SIGNALING_HUB: OnceLock<SignalingHub> = OnceLock::new();
 static WEBRTC_PEER_REGISTRY: OnceLock<Mutex<HashMap<String, WebRtcPeerRegistration>>> = OnceLock::new();
+static WEBRTC_MEETING_REGISTRY: OnceLock<Mutex<HashMap<String, WebRtcMeetingRegistration>>> =
+    OnceLock::new();
 
 const SESSION_COOKIE_NAME: &str = "agilang_session";
 const SESSION_TTL_SECS: u64 = 7200;
@@ -60,6 +62,21 @@ struct WebRtcPeerRegistration {
     session_token_hash: String,
     user_id: String,
     email: String,
+    meeting_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct WebRtcMeetingMember {
+    peer_id: String,
+    user_id: String,
+    email: String,
+    role: String,
+}
+
+#[derive(Debug, Clone, Default)]
+struct WebRtcMeetingRegistration {
+    host_peer_id: Option<String>,
+    members: BTreeMap<String, WebRtcMeetingMember>,
 }
 
 struct RegistrationGuard {
@@ -528,6 +545,9 @@ fn clear_auth_runtime_state() {
     if let Some(peers) = WEBRTC_PEER_REGISTRY.get() {
         peers.lock().unwrap().clear();
     }
+    if let Some(meetings) = WEBRTC_MEETING_REGISTRY.get() {
+        meetings.lock().unwrap().clear();
+    }
 }
 
 fn hidden_csrf_field(secret: &str) -> String {
@@ -542,11 +562,33 @@ fn webrtc_peer_registry() -> &'static Mutex<HashMap<String, WebRtcPeerRegistrati
     WEBRTC_PEER_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+fn webrtc_meeting_registry() -> &'static Mutex<HashMap<String, WebRtcMeetingRegistration>> {
+    WEBRTC_MEETING_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 fn register_webrtc_peer(
     peer_id: &str,
+    meeting_id: Option<&str>,
+    role: Option<&str>,
     session: &AuthSessionRecord,
     user: &AuthUserRecord,
 ) -> Result<(), Response> {
+    let meeting_id = meeting_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    let role = role
+        .map(str::trim)
+        .filter(|value| *value == "host" || *value == "participant")
+        .unwrap_or("participant")
+        .to_string();
+    let registration = WebRtcPeerRegistration {
+        session_token_hash: session.token_hash.clone(),
+        user_id: user.id.clone(),
+        email: user.email.clone(),
+        meeting_id: meeting_id.clone(),
+    };
+
     let mut registry = webrtc_peer_registry().lock().unwrap();
     match registry.get(peer_id) {
         Some(existing)
@@ -558,14 +600,24 @@ fn register_webrtc_peer(
             ))
         }
         _ => {
-            registry.insert(
-                peer_id.to_string(),
-                WebRtcPeerRegistration {
-                    session_token_hash: session.token_hash.clone(),
-                    user_id: user.id.clone(),
-                    email: user.email.clone(),
-                },
-            );
+            registry.insert(peer_id.to_string(), registration);
+            drop(registry);
+            if let Some(meeting_id) = meeting_id {
+                let mut meetings = webrtc_meeting_registry().lock().unwrap();
+                let meeting = meetings.entry(meeting_id).or_default();
+                meeting.members.insert(
+                    peer_id.to_string(),
+                    WebRtcMeetingMember {
+                        peer_id: peer_id.to_string(),
+                        user_id: user.id.clone(),
+                        email: user.email.clone(),
+                        role: role.clone(),
+                    },
+                );
+                if role == "host" || meeting.host_peer_id.is_none() {
+                    meeting.host_peer_id = Some(peer_id.to_string());
+                }
+            }
             Ok(())
         }
     }
@@ -577,7 +629,59 @@ fn registered_webrtc_peer(peer_id: &str) -> Option<WebRtcPeerRegistration> {
 
 fn unregister_webrtc_session_peers(token_hash: &str) {
     let mut registry = webrtc_peer_registry().lock().unwrap();
+    let removed = registry
+        .iter()
+        .filter(|(_, registration)| registration.session_token_hash == token_hash)
+        .map(|(peer_id, registration)| (peer_id.clone(), registration.meeting_id.clone()))
+        .collect::<Vec<_>>();
     registry.retain(|_, registration| registration.session_token_hash != token_hash);
+    drop(registry);
+
+    let mut meetings = webrtc_meeting_registry().lock().unwrap();
+    for (peer_id, meeting_id) in removed {
+        let Some(meeting_id) = meeting_id else {
+            continue;
+        };
+        let Some(meeting) = meetings.get_mut(&meeting_id) else {
+            continue;
+        };
+        meeting.members.remove(&peer_id);
+        if meeting.host_peer_id.as_deref() == Some(peer_id.as_str()) {
+            meeting.host_peer_id = meeting
+                .members
+                .values()
+                .find(|member| member.role == "host")
+                .map(|member| member.peer_id.clone())
+                .or_else(|| meeting.members.keys().next().cloned());
+        }
+        if meeting.members.is_empty() {
+            meetings.remove(&meeting_id);
+        }
+    }
+}
+
+fn meeting_status_payload(meeting_id: &str) -> serde_json::Value {
+    let meetings = webrtc_meeting_registry().lock().unwrap();
+    if let Some(meeting) = meetings.get(meeting_id) {
+        serde_json::json!({
+            "meeting_id": meeting_id,
+            "host_peer_id": meeting.host_peer_id,
+            "member_count": meeting.members.len(),
+            "members": meeting.members.values().map(|member| serde_json::json!({
+                "peer_id": member.peer_id,
+                "user_id": member.user_id,
+                "email": member.email,
+                "role": member.role,
+            })).collect::<Vec<_>>(),
+        })
+    } else {
+        serde_json::json!({
+            "meeting_id": meeting_id,
+            "host_peer_id": serde_json::Value::Null,
+            "member_count": 0,
+            "members": [],
+        })
+    }
 }
 
 fn block_on_runtime<F, T>(future: F) -> Result<T, String>
@@ -1199,6 +1303,7 @@ pub(crate) fn handle_webrtc_request(
         path,
         "/api/webrtc/status"
             | "/api/webrtc/register"
+            | "/api/webrtc/meeting"
             | "/api/webrtc/signal"
             | "/api/webrtc/poll"
     );
@@ -1260,15 +1365,33 @@ pub(crate) fn handle_webrtc_request(
                 .unwrap_or_default()
                 .trim()
                 .to_string();
+            let meeting_id = payload
+                .get("meeting_id")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
+            let role = payload
+                .get("role")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string);
             if peer_id.is_empty() {
                 return Ok(Some(build_json_response(
                     422,
                     serde_json::json!({ "error": "peer_id is required" }).to_string(),
                 )));
             }
-            if let Err(response) = register_webrtc_peer(&peer_id, &session, &user) {
+            if let Err(response) =
+                register_webrtc_peer(&peer_id, meeting_id.as_deref(), role.as_deref(), &session, &user)
+            {
                 return Ok(Some(response));
             }
+            let meeting = meeting_id
+                .as_deref()
+                .map(meeting_status_payload)
+                .unwrap_or_else(|| serde_json::json!(null));
             let body = serde_json::json!({
                 "registered": true,
                 "peer_id": peer_id,
@@ -1278,8 +1401,29 @@ pub(crate) fn handle_webrtc_request(
                     "role": user.role,
                 },
                 "active_peers": webrtc_peer_registry().lock().unwrap().len(),
+                "meeting": meeting,
             });
             Ok(Some(build_json_response(200, body.to_string())))
+        }
+        "/api/webrtc/meeting" => {
+            if req.method != HttpMethod::Get {
+                return Ok(Some(build_text_response(
+                    405,
+                    "application/json",
+                    r#"{"error":"Method Not Allowed"}"#.to_string(),
+                )));
+            }
+            let meeting_id = req.query("meeting_id").unwrap_or("").trim().to_string();
+            if meeting_id.is_empty() {
+                return Ok(Some(build_json_response(
+                    422,
+                    serde_json::json!({ "error": "meeting_id is required" }).to_string(),
+                )));
+            }
+            Ok(Some(build_json_response(
+                200,
+                meeting_status_payload(&meeting_id).to_string(),
+            )))
         }
         "/api/webrtc/signal" => {
             if req.method != HttpMethod::Post {
@@ -3911,6 +4055,111 @@ fn register_api() -> void:
         );
         assert_eq!(status_after_logout.status, 200);
         assert!(response_text(&status_after_logout).contains("\"active_peers\":1"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn webrtc_meeting_registry_resolves_host_and_cleans_up_members() {
+        let (root, engine) = setup_auth_project("webrtc_meeting_registry");
+        let host_cookie = register_user(
+            &root,
+            &engine,
+            73,
+            "host-webrtc@example.com",
+            "Password123!",
+            "Host",
+        );
+        let guest_cookie = register_user(
+            &root,
+            &engine,
+            74,
+            "guest-webrtc@example.com",
+            "Password123!",
+            "Guest",
+        );
+
+        let host_csrf = csrf_from(&invoke(
+            &root,
+            &engine,
+            request(HttpMethod::Get, "/dashboard", Some(&host_cookie), None, 73),
+        ));
+        let guest_csrf = csrf_from(&invoke(
+            &root,
+            &engine,
+            request(HttpMethod::Get, "/dashboard", Some(&guest_cookie), None, 74),
+        ));
+
+        let host_register = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/register",
+                Some(&host_cookie),
+                Some(&host_csrf),
+                r#"{"peer_id":"meeting-123-host","meeting_id":"meeting-123","role":"host"}"#,
+                73,
+            ),
+        );
+        assert_eq!(host_register.status, 200);
+        assert!(response_text(&host_register).contains("\"host_peer_id\":\"meeting-123-host\""));
+        assert!(response_text(&host_register).contains("\"member_count\":1"));
+
+        let guest_register = invoke_app(
+            &root,
+            json_request(
+                HttpMethod::Post,
+                "/api/webrtc/register",
+                Some(&guest_cookie),
+                Some(&guest_csrf),
+                r#"{"peer_id":"meeting-123-guest","meeting_id":"meeting-123","role":"participant"}"#,
+                74,
+            ),
+        );
+        assert_eq!(guest_register.status, 200);
+        assert!(response_text(&guest_register).contains("\"host_peer_id\":\"meeting-123-host\""));
+        assert!(response_text(&guest_register).contains("\"member_count\":2"));
+
+        let meeting_lookup = invoke_app(
+            &root,
+            query_request(
+                HttpMethod::Get,
+                "/api/webrtc/meeting",
+                &[("meeting_id", "meeting-123")],
+                Some(&guest_cookie),
+                74,
+            ),
+        );
+        assert_eq!(meeting_lookup.status, 200);
+        assert!(response_text(&meeting_lookup).contains("\"host_peer_id\":\"meeting-123-host\""));
+        assert!(response_text(&meeting_lookup).contains("\"member_count\":2"));
+
+        let logout = invoke(
+            &root,
+            &engine,
+            request(
+                HttpMethod::Post,
+                "/logout",
+                Some(&host_cookie),
+                Some(&form_body(&[("_csrf", &host_csrf)])),
+                73,
+            ),
+        );
+        assert_eq!(logout.status, 302);
+
+        let meeting_after_logout = invoke_app(
+            &root,
+            query_request(
+                HttpMethod::Get,
+                "/api/webrtc/meeting",
+                &[("meeting_id", "meeting-123")],
+                Some(&guest_cookie),
+                74,
+            ),
+        );
+        assert_eq!(meeting_after_logout.status, 200);
+        assert!(response_text(&meeting_after_logout).contains("\"host_peer_id\":\"meeting-123-guest\""));
+        assert!(response_text(&meeting_after_logout).contains("\"member_count\":1"));
 
         fs::remove_dir_all(root).ok();
     }

@@ -19,6 +19,7 @@ const meetingState = {
   dataChannel: null,
   pendingCandidates: [],
   socket: null,
+  offerSent: false,
 };
 
 function safeSegment(value) {
@@ -93,8 +94,39 @@ function derivePeerIdentity() {
 function inviteUrl() {
   const url = new URL(location.origin + '/');
   url.searchParams.set('meeting', meetingState.meetingId);
-  url.searchParams.set('host', meetingState.hostPeerId);
+  if (meetingState.hostPeerId) url.searchParams.set('host', meetingState.hostPeerId);
   return url.toString();
+}
+
+function updateRemoteParticipant(peerId) {
+  if (!peerId || peerId === meetingState.localPeerId) return;
+  meetingState.targetPeerId = peerId;
+  if (!meetingState.hostPeerId) meetingState.hostPeerId = peerId;
+  q('remote-name').textContent = peerId.replace(/^meeting-[^-]+-/, '').replace(/-/g, ' ');
+}
+
+async function resolveMeeting() {
+  if (!meetingState.meetingId) return null;
+  const result = await api(`/api/webrtc/meeting?meeting_id=${encodeURIComponent(meetingState.meetingId)}`);
+  if (!result.response.ok) {
+    throw new Error(result.json?.error || `Meeting lookup failed (${result.response.status})`);
+  }
+  const hostPeerId = safeSegment(result.json?.host_peer_id);
+  if (hostPeerId) {
+    meetingState.hostPeerId = hostPeerId;
+    if (!meetingState.isHost) updateRemoteParticipant(hostPeerId);
+  }
+  q('peer-count').textContent = String(result.json?.member_count ?? q('peer-count').textContent);
+  return result.json;
+}
+
+async function maybeStartGuestOffer() {
+  if (meetingState.isHost || !meetingState.registered || meetingState.offerSent) return;
+  if (!meetingState.targetPeerId) {
+    await resolveMeeting();
+  }
+  if (!meetingState.targetPeerId) return;
+  await createOffer();
 }
 
 async function loadAuthAndCsrf() {
@@ -218,13 +250,22 @@ async function registerPeer() {
   const result = await api('/api/webrtc/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': meetingState.csrf },
-    body: JSON.stringify({ peer_id: meetingState.localPeerId }),
+    body: JSON.stringify({
+      peer_id: meetingState.localPeerId,
+      meeting_id: meetingState.meetingId,
+      role: meetingState.isHost ? 'host' : 'participant',
+    }),
   });
   if (!result.response.ok && result.response.status !== 409) {
     throw new Error(result.json?.error || `Peer registration failed (${result.response.status})`);
   }
   meetingState.registered = true;
-  q('peer-count').textContent = String(result.json?.active_peers ?? '—');
+  q('peer-count').textContent = String(result.json?.meeting?.member_count ?? result.json?.active_peers ?? '—');
+  const hostPeerId = safeSegment(result.json?.meeting?.host_peer_id);
+  if (hostPeerId) {
+    meetingState.hostPeerId = hostPeerId;
+    if (!meetingState.isHost) updateRemoteParticipant(hostPeerId);
+  }
   addActivity('Secure meeting identity registered.', 'success');
 }
 
@@ -271,8 +312,7 @@ async function pollOnce() {
 
 async function receiveSignal(message) {
   if (message.from && message.from !== meetingState.localPeerId) {
-    meetingState.targetPeerId = message.from;
-    q('remote-name').textContent = message.from.replace(/^meeting-[^-]+-/, '').replace(/-/g, ' ');
+    updateRemoteParticipant(message.from);
   }
   const pc = createPeerConnection();
   if (message.kind === 'offer') {
@@ -303,11 +343,13 @@ async function flushCandidates() {
 }
 
 async function createOffer() {
+  if (meetingState.offerSent) return;
   const pc = createPeerConnection();
   if (!meetingState.dataChannel) bindDataChannel(pc.createDataChannel('queral-chat', { ordered: true }));
   const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
   await pc.setLocalDescription(offer);
   await sendSignal('offer', offer.sdp || '');
+  meetingState.offerSent = true;
   setStatus('Calling participant…', 'ready');
   addActivity('Secure call invitation sent.', 'success');
 }
@@ -327,7 +369,7 @@ async function enterMeeting() {
     q('live-room').hidden = false;
     q('invite-link').value = inviteUrl();
     setStatus(meetingState.isHost ? 'Waiting for participants' : 'Connecting to host…', 'ready');
-    if (!meetingState.isHost) await createOffer();
+    if (!meetingState.isHost) await maybeStartGuestOffer();
   } catch (error) {
     setStatus(error.message, 'error');
     addActivity(error.message, 'error');
@@ -346,7 +388,17 @@ function connectActivitySocket() {
     q('socket-label').textContent = 'live';
     socket.send(JSON.stringify({ type: 'presence', meeting: meetingState.meetingId, peer: meetingState.localPeerId }));
   };
-  socket.onmessage = event => addActivity(`Realtime event: ${event.data}`);
+  socket.onmessage = event => {
+    addActivity(`Realtime event: ${event.data}`);
+    try {
+      const payload = JSON.parse(event.data);
+      if (payload.type === 'presence' && payload.meeting === meetingState.meetingId && payload.peer && payload.peer !== meetingState.localPeerId) {
+        updateRemoteParticipant(payload.peer);
+        q('peer-count').textContent = String(Math.max(Number(q('peer-count').textContent || 1), 2));
+        maybeStartGuestOffer().catch(error => addActivity(error.message, 'error'));
+      }
+    } catch (_) {}
+  };
   socket.onclose = () => {
     q('socket-label').textContent = 'reconnecting';
     setTimeout(connectActivitySocket, 1200);
@@ -383,6 +435,7 @@ function endPeerConnection(notifyRemote = true) {
   try { meetingState.pc?.close(); } catch (_) {}
   meetingState.pc = null;
   meetingState.dataChannel = null;
+  meetingState.offerSent = false;
   q('remote-placeholder').hidden = false;
   q('chat-state').textContent = 'offline';
   setStatus('Call ended', 'warn');
@@ -410,6 +463,9 @@ async function bootstrap() {
   q('live-room').hidden = true;
   q('invite-link').value = inviteUrl();
   setStatus(meetingState.isHost ? 'Ready to start meeting' : 'Ready to join meeting', 'ready');
+  if (!meetingState.isHost) {
+    resolveMeeting().catch(() => {});
+  }
 }
 
 q('new-meeting').addEventListener('click', createNewMeeting);
