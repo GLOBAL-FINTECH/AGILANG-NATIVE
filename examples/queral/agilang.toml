@@ -1,0 +1,49 @@
+[project]
+name = "queral"
+version = "0.1.0"
+edition = "2026"
+type = "web"
+toolchain = "0.7.0"
+
+[template]
+name = "web"
+version = "0.7.0"
+
+[application]
+id = "queral"
+entry = "bootstrap/app.agi"
+environment = "local"
+
+[security]
+fail_closed = true
+require_tls_in_production = true
+reject_plaintext_production_env = true
+database_verification = true
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[routes]
+web = "routes/web.agi"
+api = "routes/api.agi"
+
+[views]
+path = "resources/views"
+cache = "storage/cache/views"
+
+[public]
+path = "public"
+
+[branding]
+logo = ".agilang/branding/agilang-logo.png"
+language_id = "agilang"
+template_language_id = "agilang-ags"
+
+[editor]
+syntax_grammar = ".agilang/editor/agilang.tmLanguage.json"
+ags_syntax_grammar = ".agilang/editor/ags.tmLanguage.json"
+
+[build]
+target = "native"
+output = "build/queral"

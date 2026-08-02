@@ -1,0 +1,10 @@
+use Framework.Auth.AuthConfig
+
+return AuthConfig {
+    enabled: true,
+    default_role: "user",
+    roles: [
+        "user",
+        "admin"
+    ]
+}

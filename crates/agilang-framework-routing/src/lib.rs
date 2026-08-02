@@ -16,7 +16,7 @@ pub struct Route {
     pub action: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Router {
     pub routes: Vec<Route>,
 }

@@ -1,0 +1,23 @@
+{
+  "implemented": [
+    "lexer",
+    "parser",
+    "classes",
+    "functions",
+    "primitive_types",
+    "let_binding",
+    "if_expression",
+    "while_loop"
+  ],
+  "partial": [
+    "structs",
+    "lists"
+  ],
+  "scaffoldOnly": [
+    "auth_security"
+  ],
+  "planned": [
+    "generics",
+    "async_await"
+  ]
+}

@@ -1,0 +1,12 @@
+[database.primary]
+driver = "agidb"
+database = "storage/database/main.agidb"
+credential_source = "vault:database/roles/queral-runtime"
+tls = "verify-full"
+pool_min = 2
+pool_max = 20
+connection_timeout_ms = 5000
+statement_timeout_ms = 15000
+prepared_statements_only = true
+raw_sql_requires_unsafe = true
+audit_queries = true

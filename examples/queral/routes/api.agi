@@ -1,0 +1,7 @@
+use Framework.Routing.Route
+use App.Controllers.Api.HealthController
+
+fn register_api() -> void:
+    Route.group("/api", fn:
+        Route.get("/health", HealthController.show)
+    )

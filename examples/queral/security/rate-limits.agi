@@ -1,0 +1,5 @@
+return {
+    "authentication": { "limit": 10, "window": "1m" },
+    "api_per_user": { "limit": 120, "window": "1m" },
+    "api_per_ip": { "limit": 500, "window": "1m" }
+}

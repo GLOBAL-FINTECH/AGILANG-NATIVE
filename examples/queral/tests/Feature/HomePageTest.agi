@@ -1,0 +1,6 @@
+use Framework.Testing.WebTest
+
+test "home page returns successful response":
+    let response = WebTest.get("/")
+    response.assert_status(200)
+    response.assert_contains("AGILANG Native Framework")

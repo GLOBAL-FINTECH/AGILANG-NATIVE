@@ -1,0 +1,8 @@
+use Framework.Testing.WebTest
+
+test "health API returns healthy status":
+    let response = WebTest.get("/api/health")
+    response.assert_status(200)
+    response.assert_json({
+        "status": "healthy"
+    })

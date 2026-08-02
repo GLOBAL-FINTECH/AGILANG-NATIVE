@@ -1,0 +1,16 @@
+use Framework.Database.Migration
+use Framework.Database.Schema
+
+class CreateUsersTable extends Migration:
+    fn up() -> void:
+        Schema.create("users", fn table:
+            table.id()
+            table.string("name")
+            table.string("email").unique()
+            table.string("password_hash")
+            table.string("role").default("user")
+            table.timestamps()
+        )
+
+    fn down() -> void:
+        Schema.drop_if_exists("users")

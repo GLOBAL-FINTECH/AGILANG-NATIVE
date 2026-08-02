@@ -1,0 +1,6 @@
+use Framework.Testing.UnitTest
+use App.Services.ApplicationService
+
+test "version returns 0.5.0":
+    let service = ApplicationService()
+    assert(service.get_version() == "0.4.0")

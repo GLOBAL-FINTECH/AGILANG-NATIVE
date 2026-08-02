@@ -1,0 +1,11 @@
+module App.Providers
+
+use Framework.Application
+use Framework.Providers.ServiceProvider
+use Routes.Web
+use Routes.Api
+
+class RouteServiceProvider extends ServiceProvider:
+    fn boot(app: Application) -> void:
+        Web.register_web()
+        Api.register_api()

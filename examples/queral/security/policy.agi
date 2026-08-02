@@ -1,0 +1,9 @@
+use Framework.Security.Policy
+
+return Policy.secure_defaults({
+    "fail_closed": true,
+    "require_tls_in_production": true,
+    "reject_plaintext_production_env": true,
+    "prepared_statements_only": true,
+    "audit_security_events": true
+})

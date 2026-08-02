@@ -1,0 +1,137 @@
+:root {
+    font-family: Inter, system-ui, sans-serif;
+    color: #eef6ff;
+    background: #07111f;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #173968, transparent 42%), #07111f;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.brand, nav a {
+    color: white;
+    text-decoration: none;
+}
+
+nav {
+    display: flex;
+    gap: 24px;
+}
+
+.hero {
+    min-height: calc(100vh - 82px);
+    display: grid;
+    place-items: center;
+    padding: 32px;
+}
+
+.hero-card {
+    width: min(760px, 100%);
+    padding: 56px;
+    border-radius: 28px;
+    border: 1px solid rgba(113, 177, 255, 0.28);
+    background: rgba(8, 24, 45, 0.88);
+    box-shadow: 0 32px 100px rgba(0,0,0,0.45);
+}
+
+.eyebrow {
+    color: #77b9ff;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+h1 {
+    margin: 16px 0;
+    font-size: clamp(42px, 7vw, 72px);
+}
+
+p {
+    color: #abc0dc;
+    font-size: 19px;
+}
+
+.network-matrix {
+    display: flex;
+    gap: 16px;
+    margin: 24px 0;
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.matrix-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.matrix-item .label {
+    font-size: 13px;
+    color: #8fa0b5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.badge.warning {
+    color: #ffe082;
+    background: rgba(255, 224, 130, 0.15);
+    border: 1px solid rgba(255, 224, 130, 0.3);
+}
+
+.badge.success {
+    color: #81c784;
+    background: rgba(129, 199, 132, 0.15);
+    border: 1px solid rgba(129, 199, 132, 0.3);
+}
+
+.badge.error {
+    color: #e57373;
+    background: rgba(229, 115, 115, 0.15);
+    border: 1px solid rgba(229, 115, 115, 0.3);
+}
+
+.actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 32px;
+}
+
+.button {
+    padding: 13px 20px;
+    border-radius: 10px;
+    text-decoration: none;
+}
+
+.primary {
+    color: white;
+    background: #1769e0;
+}
+
+.secondary {
+    color: white;
+    border: 1px solid rgba(255,255,255,0.24);
+}

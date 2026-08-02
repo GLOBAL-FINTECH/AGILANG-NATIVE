@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    "*.agi": "agilang",
+    "*.ags": "agilang-ags"
+  }
+}

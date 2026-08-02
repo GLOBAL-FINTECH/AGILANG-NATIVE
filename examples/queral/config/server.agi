@@ -1,0 +1,8 @@
+use Framework.Config.ServerConfig
+
+return ServerConfig {
+    host: env("APP_HOST", "127.0.0.1"),
+    port: env_i32("APP_PORT", 8080),
+    https_port: env_i32("APP_HTTPS_PORT", 8443),
+    force_https: env_bool("FORCE_HTTPS", false)
+}

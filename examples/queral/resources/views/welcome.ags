@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUERAL</title>
+    <meta name="description" content="Realtime meetings, messaging, notifications, and WebRTC collaboration on AGILANG.">
+    <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+    <div class="shell">
+        <header class="hero hero-product">
+            <div class="hero-copy">
+                <p class="eyebrow">AGILANG realtime communications workspace</p>
+                <h1>QUERAL</h1>
+                <p class="lead">Launch a live meeting, join from a second browser, and test video, audio, chat, notifications, and WebSocket activity as one product flow.</p>
+                <div class="pill-row">
+                    <span class="pill" id="auth-state">Checking auth</span>
+                    <span class="pill" id="webrtc-mode">Checking WebRTC</span>
+                    <span class="pill" id="ws-state">WebSocket idle</span>
+                    <span class="pill" id="media-state">Media off</span>
+                </div>
+            </div>
+            <div class="hero-actions">
+                <a class="button primary" href="/register">Create account</a>
+                <a class="button" href="/login">Login</a>
+                <a class="button ghost" href="/dashboard">Dashboard</a>
+            </div>
+        </header>
+
+        <main class="product-grid">
+            <section class="panel meeting-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Meeting Setup</h2>
+                        <p class="panel-copy">Create a meeting link, open it in another signed-in browser, then join the room.</p>
+                    </div>
+                    <div class="inline">
+                        <button class="button small" id="refresh-runtime" type="button">Refresh status</button>
+                        <button class="button small" id="csrf-refresh" type="button">Fetch CSRF</button>
+                    </div>
+                </div>
+
+                <div class="meeting-grid">
+                    <label>
+                        <span>Display name</span>
+                        <input id="display-name" type="text" placeholder="Your name">
+                    </label>
+                    <label>
+                        <span>Meeting ID</span>
+                        <input id="meeting-id" type="text" placeholder="482771905">
+                    </label>
+                    <label class="span-2">
+                        <span>Invite link</span>
+                        <div class="inline">
+                            <input id="invite-link" type="text" placeholder="Create a meeting to generate a shareable link." readonly>
+                            <button class="button" id="copy-invite" type="button">Copy</button>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="button-row">
+                    <button class="button primary" id="meeting-create" type="button">New meeting</button>
+                    <button class="button" id="meeting-join" type="button">Join meeting</button>
+                    <button class="button" id="peer-register" type="button">Enter waiting room</button>
+                    <button class="button" id="peer-autopoll" type="button">Start listening</button>
+                </div>
+
+                <div class="status-strip">
+                    <div><span>User</span><strong id="auth-user">Guest</strong></div>
+                    <div><span>Role</span><strong id="auth-role">guest</strong></div>
+                    <div><span>Local peer</span><strong id="peer-summary">not-ready</strong></div>
+                    <div><span>Remote peer</span><strong id="target-summary">waiting</strong></div>
+                    <div><span>Active peers</span><strong id="active-peers">0</strong></div>
+                    <div><span>Signal polling</span><strong id="poll-state">Stopped</strong></div>
+                </div>
+
+                <div class="helper-card">
+                    <p class="helper-title">Recommended live test flow</p>
+                    <p class="helper-copy">Tab 1 creates the meeting and waits. Tab 2 opens the invite link, joins, starts the call, and Tab 1 auto-answers. After the room connects, use chat and the WebSocket notifications rail.</p>
+                </div>
+            </section>
+
+            <section class="panel room-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Meeting Room</h2>
+                        <p class="panel-copy">Camera preview, remote video, and room controls.</p>
+                    </div>
+                    <div class="button-row">
+                        <button class="button primary" id="media-start" type="button">Start camera</button>
+                        <button class="button" id="pc-offer" type="button">Start call</button>
+                        <button class="button" id="call-hangup" type="button">Leave call</button>
+                    </div>
+                </div>
+
+                <div class="video-stage">
+                    <div class="video-card featured">
+                        <div class="video-head">
+                            <b>Remote participant</b>
+                            <span id="remote-label">waiting</span>
+                        </div>
+                        <video id="remote-video" playsinline autoplay></video>
+                    </div>
+                    <div class="video-sidebar">
+                        <div class="video-card inset">
+                            <div class="video-head">
+                                <b>You</b>
+                                <span id="local-label">camera-off</span>
+                            </div>
+                            <video id="local-video" playsinline autoplay muted></video>
+                        </div>
+                        <div class="control-stack">
+                            <button class="button" id="toggle-audio" type="button">Mute audio</button>
+                            <button class="button" id="toggle-video" type="button">Hide video</button>
+                            <button class="button ghost" id="pc-reset" type="button">Reset connection</button>
+                            <label class="toggle">
+                                <input id="auto-answer" type="checkbox" checked>
+                                <span>Auto-answer incoming calls</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="connection-strip">
+                    <div><span>Signaling</span><strong id="pc-signaling">idle</strong></div>
+                    <div><span>Connection</span><strong id="pc-connection">idle</strong></div>
+                    <div><span>ICE</span><strong id="pc-ice">idle</strong></div>
+                    <div><span>Data channel</span><strong id="pc-channel">not-open</strong></div>
+                </div>
+            </section>
+
+            <aside class="panel sidebar-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Activity</h2>
+                        <p class="panel-copy">Live chat, presence, and notifications.</p>
+                    </div>
+                    <button class="button small" id="clear-notifications" type="button">Clear</button>
+                </div>
+
+                <section class="stack-section">
+                    <div class="section-head">
+                        <h3>Live Messaging</h3>
+                        <span class="subtle">Data channel</span>
+                    </div>
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="chat-entry system">Messages appear here after the peer data channel opens.</div>
+                    </div>
+                    <div class="inline">
+                        <input id="dc-message" type="text" value="hello from QUERAL chat">
+                        <button class="button primary" id="dc-send" type="button">Send</button>
+                    </div>
+                </section>
+
+                <section class="stack-section">
+                    <div class="section-head">
+                        <h3>Notifications</h3>
+                        <button class="button small" id="ws-connect" type="button">Connect socket</button>
+                    </div>
+                    <div id="notifications" class="notifications">
+                        <div class="notification muted">No live events yet.</div>
+                    </div>
+                </section>
+
+                <section class="stack-section compact-form">
+                    <div class="section-head">
+                        <h3>Socket message</h3>
+                    </div>
+                    <div class="inline">
+                        <input id="ws-message" type="text" value="queral websocket ping">
+                        <button class="button" id="ws-send" type="button">Send</button>
+                    </div>
+                </section>
+            </aside>
+
+            <section class="panel diagnostics-panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>Developer Details</h2>
+                        <p class="panel-copy">Keep protocol evidence available without making it the product surface.</p>
+                    </div>
+                    <button class="button small" id="session-refresh" type="button">Refresh session</button>
+                </div>
+                <details class="developer-details">
+                    <summary>Open runtime and protocol logs</summary>
+                    <div class="diagnostics-grid">
+                        <div>
+                            <h3>Runtime JSON</h3>
+                            <pre id="runtime-json" class="log compact">Loading runtime status...</pre>
+                        </div>
+                        <div>
+                            <h3>WebSocket</h3>
+                            <pre id="ws-log" class="log compact">WebSocket not connected.</pre>
+                        </div>
+                        <div>
+                            <h3>Signaling</h3>
+                            <pre id="signal-log" class="log">Signaling idle. Join the meeting and start listening.</pre>
+                        </div>
+                        <div>
+                            <h3>PeerConnection</h3>
+                            <pre id="pc-log" class="log">Peer connection idle.</pre>
+                        </div>
+                    </div>
+                </details>
+            </section>
+        </main>
+    </div>
+
+    <input id="peer-id" type="hidden">
+    <input id="target-peer-id" type="hidden">
+
+    <script src="/assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+module App.Console.Commands
+
+class HelloCommand:
+    fn handle() -> void:
+        print("Hello from AGILANG Console")

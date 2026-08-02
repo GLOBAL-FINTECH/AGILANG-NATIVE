@@ -1,0 +1,26 @@
+module App.Controllers
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.View
+
+class DashboardController:
+    fn index(request: Request) -> Response:
+        return View.render("dashboard/user", {
+            "title": "Dashboard",
+            "user_name": "Local AGILANG User",
+            "database": "storage/database/main.agidb"
+        })
+
+    fn user(request: Request) -> Response:
+        return View.render("dashboard/user", {
+            "title": "Dashboard",
+            "user_name": "Local AGILANG User",
+            "database": "storage/database/main.agidb"
+        })
+
+    fn admin(request: Request) -> Response:
+        return View.render("dashboard/admin", {
+            "title": "Admin Dashboard",
+            "database": "storage/database/main.agidb"
+        })

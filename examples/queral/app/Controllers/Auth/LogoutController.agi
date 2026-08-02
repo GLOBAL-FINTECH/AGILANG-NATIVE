@@ -1,0 +1,8 @@
+module App.Controllers.Auth
+
+use Framework.Http.Request
+use Framework.Http.Response
+
+class LogoutController:
+    fn logout(request: Request) -> Response:
+        return Response.html("<h1>Signed out</h1><p>Your local session has been closed.</p><p><a href=\"/login\">Sign in again</a></p>")

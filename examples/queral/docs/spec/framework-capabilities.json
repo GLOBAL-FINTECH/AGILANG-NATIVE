@@ -1,0 +1,18 @@
+{
+  "implemented": [
+    "http_server",
+    "http_router",
+    "ags_template_engine",
+    "websockets",
+    "webrtc_stun"
+  ],
+  "partial": [
+    "session_persistence"
+  ],
+  "scaffoldOnly": [
+    "database_orm"
+  ],
+  "planned": [
+    "queue_workers"
+  ]
+}

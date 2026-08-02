@@ -1,0 +1,77 @@
+@page title="QUERAL Dashboard" robots="noindex,nofollow"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+    <div class="shell">
+        <header class="hero">
+            <div>
+                <p class="eyebrow">Authenticated realtime workspace</p>
+                <h1>QUERAL Dashboard</h1>
+                <p class="lead">You are signed in and ready to launch WebRTC video, audio, chat, and notifications testing.</p>
+            </div>
+            <div class="hero-actions">
+                <a class="button primary" href="/">Open realtime app</a>
+                <a class="button" href="/dashboard/admin">Admin view</a>
+                <form method="POST" action="/logout">
+                    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                    <button class="button ghost" type="submit">Sign out</button>
+                </form>
+            </div>
+        </header>
+
+        <main class="layout">
+            <section class="panel runtime-panel">
+                <div class="panel-head">
+                    <h2>Session</h2>
+                </div>
+                <div class="status-grid">
+                    <div><span>Signed in as</span><strong>{{ user_name }}</strong></div>
+                    <div><span>Database</span><strong>AGIDB</strong></div>
+                    <div><span>Store</span><strong>{{ database }}</strong></div>
+                    <div><span>Mode</span><strong>Realtime testing</strong></div>
+                </div>
+                <pre class="log compact">Use two signed-in browser tabs with separate peer IDs.
+
+Suggested IDs:
+- alpha-video-peer
+- beta-video-peer
+
+Suggested accounts:
+- video.alpha@queral.local
+- video.beta@queral.local</pre>
+            </section>
+
+            <aside class="panel notifications-panel">
+                <div class="panel-head">
+                    <h2>Launch Checklist</h2>
+                </div>
+                <div class="notifications">
+                    <div class="notification success">1. Open the realtime app homepage.</div>
+                    <div class="notification">2. Start camera and microphone in both tabs.</div>
+                    <div class="notification">3. Register one peer ID per tab.</div>
+                    <div class="notification">4. Start polling on both sides.</div>
+                    <div class="notification">5. Start a call from one tab.</div>
+                    <div class="notification">6. Use the data-channel chat during the call.</div>
+                </div>
+            </aside>
+
+            <section class="panel span-2">
+                <div class="panel-head">
+                    <h2>Quick Actions</h2>
+                </div>
+                <div class="button-row">
+                    <a class="button primary" href="/">Go to QUERAL Home</a>
+                    <a class="button" href="/api/auth/me">Current user JSON</a>
+                    <a class="button" href="/api/webrtc/status">WebRTC status JSON</a>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

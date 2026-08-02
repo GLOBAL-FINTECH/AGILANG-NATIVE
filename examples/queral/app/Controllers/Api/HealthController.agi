@@ -1,0 +1,12 @@
+module App.Controllers.Api
+
+use Framework.Http.Request
+use Framework.Http.Response
+
+class HealthController:
+    fn show(request: Request) -> Response:
+        return Response.json({
+            "status": "healthy",
+            "framework": "AGILANG",
+            "version": "0.5.0"
+        })

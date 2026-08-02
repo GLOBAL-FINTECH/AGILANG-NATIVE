@@ -1,0 +1,19 @@
+module App.Controllers.Auth
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.View
+
+class LoginController:
+    fn show(request: Request) -> Response:
+        return View.render("auth/login", {
+            "title": "Sign in",
+            "csrf_field": ""
+        })
+
+    fn login(request: Request) -> Response:
+        return View.render("dashboard/user", {
+            "title": "Dashboard",
+            "user_name": "Local AGILANG User",
+            "database": "storage/database/main.agidb"
+        })

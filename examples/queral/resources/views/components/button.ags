@@ -1,0 +1,2 @@
+<!-- Button Component -->
+<button class="btn">{{ text }}</button>

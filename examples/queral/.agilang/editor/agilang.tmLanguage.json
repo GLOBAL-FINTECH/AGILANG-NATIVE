@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "AGILANG",
+  "scopeName": "source.agilang",
+  "patterns": [
+    {
+      "name": "comment.line.double-slash.agilang",
+      "match": "//.*$"
+    },
+    {
+      "name": "comment.block.agilang",
+      "begin": "/\\*",
+      "end": "\\*/"
+    },
+    {
+      "name": "keyword.control.agilang",
+      "match": "\\b(fn|return|if|else|for|while|break|continue|match|case|use|module|include|let|const|class|struct|enum|extends|implements|async|await|agent|role|state|on)\\b"
+    },
+    {
+      "name": "storage.type.agilang",
+      "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool|string|bytes|void|array|map|Result|Option)\\b"
+    },
+    {
+      "name": "constant.language.agilang",
+      "match": "\\b(true|false|null|self)\\b"
+    },
+    {
+      "name": "string.quoted.double.agilang",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.agilang",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "name": "constant.numeric.agilang",
+      "match": "\\b(0x[0-9A-Fa-f]+|[0-9]+(?:\\.[0-9]+)?)\\b"
+    },
+    {
+      "name": "entity.name.function.agilang",
+      "match": "(?<=\\bfn\\s)[A-Za-z_][A-Za-z0-9_]*"
+    },
+    {
+      "name": "entity.name.type.agilang",
+      "match": "(?<=\\b(class|struct|enum|module)\\s)[A-Za-z_][A-Za-z0-9_.]*"
+    }
+  ]
+}

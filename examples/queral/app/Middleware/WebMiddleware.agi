@@ -1,0 +1,11 @@
+module App.Middleware
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.Middleware.Next
+
+class WebMiddleware:
+    fn handle(request: Request, next: Next) -> Response:
+        let response = next(request)
+        response.header("X-Powered-By", "AGILANG")
+        return response

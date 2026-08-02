@@ -1,0 +1,12 @@
+{
+  "directories": [
+    "app",
+    "config",
+    "database",
+    "routes",
+    "resources",
+    "public",
+    "tests",
+    "storage"
+  ]
+}

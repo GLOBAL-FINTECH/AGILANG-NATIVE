@@ -1,0 +1,5 @@
+use Framework.Database.Seeder
+
+class DatabaseSeeder extends Seeder:
+    fn run() -> void:
+        print("Database seeding complete via configured driver")

@@ -1,0 +1,32 @@
+@page title="Sign in" robots="noindex,nofollow"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/app.js" defer></script>
+</head>
+<body>
+    <main class="auth-shell">
+        <section class="auth-panel">
+            <a class="auth-brand" href="/">
+                <img src="/assets/images/agilang-logo.png" alt="AGILANG">
+                <span>AGILANG</span>
+            </a>
+            <h1>Sign in</h1>
+            <p>Use your local AGIDB-backed account to open the application dashboard.</p>
+            {{ error_message }}
+            <form method="POST" action="/login" class="auth-form">
+                {{ csrf_field }}
+                <input type="hidden" name="return_to" value="{{ return_to }}">
+                <label>Email<input type="email" name="email" required autocomplete="email"></label>
+                <label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+                <button class="btn primary" type="submit">Sign in</button>
+            </form>
+            <p class="auth-alt">No account yet? <a href="/register{{ return_to_query }}">Create one</a></p>
+        </section>
+    </main>
+</body>
+</html>

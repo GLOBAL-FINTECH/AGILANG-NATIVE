@@ -1,0 +1,8 @@
+{
+  "examples": [
+    {
+      "name": "hello_world",
+      "path": "examples/native/hello.agi"
+    }
+  ]
+}

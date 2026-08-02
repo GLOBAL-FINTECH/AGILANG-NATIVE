@@ -1,0 +1,11 @@
+module App.Models
+
+class User:
+    let id: i64
+    let name: string
+    let email: string
+    let password_hash: string
+    let role: string
+
+    fn is_admin() -> bool:
+        return self.role == "admin"

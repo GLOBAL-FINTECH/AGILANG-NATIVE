@@ -1,0 +1,8 @@
+use Framework.Config.AppConfig
+
+return AppConfig {
+    name: env("APP_NAME", "AGILANG Application"),
+    environment: env("APP_ENV", "local"),
+    url: env("APP_URL", "http://127.0.0.1:8080"),
+    debug: env_bool("APP_DEBUG", true)
+}

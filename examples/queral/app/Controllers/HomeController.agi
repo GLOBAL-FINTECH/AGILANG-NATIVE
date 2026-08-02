@@ -1,0 +1,17 @@
+module App.Controllers
+
+use Framework.Http.Request
+use Framework.Http.Response
+use Framework.View
+
+class HomeController:
+    fn index(request: Request) -> Response:
+        return View.render("welcome", {
+            "title": "QUERAL",
+            "message": "Realtime meetings, messaging, and notifications workspace."
+        })
+
+    fn about(request: Request) -> Response:
+        return Response.html(
+            "<h1>About QUERAL</h1><p>QUERAL is a realtime communications workspace for AGILANG with meetings, chat, notifications, and authenticated WebRTC signaling.</p>"
+        )

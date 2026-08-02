@@ -1,0 +1,36 @@
+return {
+    "default": "agidb",
+    "connections": {
+        "agidb": {
+            "driver": "agidb",
+            "database": "storage/database/main.agidb",
+            "credential_source": "vault:database/roles/queral-runtime",
+            "pool_min": 2,
+            "pool_max": 20,
+            "connection_timeout_ms": 5000,
+            "statement_timeout_ms": 15000
+        },
+        "sqlite": {
+            "driver": "sqlite",
+            "database": "storage/database/main.sqlite",
+            "pool_min": 1,
+            "pool_max": 10,
+            "connection_timeout_ms": 5000,
+            "statement_timeout_ms": 15000
+        },
+        "mysql": {
+            "driver": "mysql",
+            "host": env("DB_HOST", "127.0.0.1"),
+            "port": env_i32("DB_PORT", 3306),
+            "database": env("DB_DATABASE", "queral"),
+            "username": env("DB_USERNAME", ""),
+            "password_secret": env("DB_PASSWORD_SECRET", "vault:database/mysql/queral"),
+            "tls": env("DB_TLS_MODE", "verify-full"),
+            "pool_min": 2,
+            "pool_max": 20,
+            "connection_timeout_ms": 5000,
+            "statement_timeout_ms": 15000
+        }
+    },
+    "strict_driver_selection": true
+}

@@ -1,0 +1,8 @@
+[vault]
+provider = "native"
+namespace = "apps/queral/APP_ENV"
+address = "https://127.0.0.1:8720"
+authentication = "application_identity"
+fail_closed = true
+audit_access = true
+rotation_enabled = true

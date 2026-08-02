@@ -584,17 +584,19 @@ fn main() -> Result<()> {
             for stream in listener.incoming() {
                 match stream {
                     Ok(client_stream) => {
-                        let router_ref = &router;
-                        let view_ref = &view_engine;
-                        let root_ref = &project_root;
-                        if let Err(e) = agilang_framework_server::handle_client(
-                            client_stream,
-                            router_ref,
-                            view_ref,
-                            root_ref,
-                        ) {
-                            eprintln!("request error: {}", e);
-                        }
+                        let router = router.clone();
+                        let view_engine = view_engine.clone();
+                        let project_root = project_root.clone();
+                        std::thread::spawn(move || {
+                            if let Err(e) = agilang_framework_server::handle_client(
+                                client_stream,
+                                &router,
+                                &view_engine,
+                                &project_root,
+                            ) {
+                                eprintln!("request error: {}", e);
+                            }
+                        });
                     }
                     Err(e) => {
                         eprintln!("connection error: {}", e);

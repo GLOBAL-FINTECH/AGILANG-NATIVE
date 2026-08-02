@@ -318,14 +318,66 @@ fn load_user_by_id(
     }))
 }
 
-fn build_cookie_header(token: &str, max_age: u64) -> String {
+fn local_cookie_request(req: &Request) -> bool {
+    req.headers
+        .get("host")
+        .map(|host| {
+            let host = host.to_ascii_lowercase();
+            host.starts_with("127.0.0.1")
+                || host.starts_with("localhost")
+                || host.starts_with("[::1]")
+        })
+        .unwrap_or(false)
+}
+
+fn build_cookie_header(req: &Request, token: &str, max_age: u64) -> String {
+    let secure = if local_cookie_request(req) {
+        ""
+    } else {
+        "; Secure"
+    };
     format!(
-        "{SESSION_COOKIE_NAME}={token}; Path=/; Max-Age={max_age}; SameSite=Strict; HttpOnly; Secure"
+        "{SESSION_COOKIE_NAME}={token}; Path=/; Max-Age={max_age}; SameSite=Lax; HttpOnly{secure}"
     )
 }
 
-fn build_logout_cookie_header() -> String {
-    format!("{SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Strict; HttpOnly; Secure")
+fn build_logout_cookie_header(req: &Request) -> String {
+    let secure = if local_cookie_request(req) {
+        ""
+    } else {
+        "; Secure"
+    };
+    format!(
+        "{SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly{secure}"
+    )
+}
+
+fn escape_html_attribute(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '&' => escaped.push_str("&amp;"),
+            '"' => escaped.push_str("&quot;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '\'' => escaped.push_str("&#39;"),
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
+}
+
+fn percent_encode(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                encoded.push(byte as char)
+            }
+            _ => encoded.push_str(&format!("%{:02X}", byte)),
+        }
+    }
+    encoded
 }
 
 fn create_session(
@@ -524,11 +576,32 @@ fn render_auth_view(
     title: &str,
     csrf_secret: &str,
     error_message: Option<&str>,
+    return_to: &str,
 ) -> Result<Response, String> {
     let mut data = HashMap::new();
     data.insert("title".to_string(), title.to_string());
     data.insert("csrf_field".to_string(), hidden_csrf_field(csrf_secret));
     data.insert("csrf_token".to_string(), csrf_secret.to_string());
+    data.insert("return_to".to_string(), return_to.to_string());
+    data.insert(
+        "return_to_query".to_string(),
+        if return_to.is_empty() {
+            String::new()
+        } else {
+            format!("?return_to={}", percent_encode(return_to))
+        },
+    );
+    data.insert(
+        "return_to_field".to_string(),
+        if return_to.is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"<input type="hidden" name="return_to" value="{}">"#,
+                escape_html_attribute(return_to)
+            )
+        },
+    );
     data.insert(
         "error_message".to_string(),
         error_message
@@ -546,6 +619,37 @@ fn redirect_response(location: &str) -> Response {
         status: 302,
         headers,
         body: Vec::new(),
+    }
+}
+
+fn normalized_return_to(req: &Request) -> String {
+    normalize_return_to_value(req.query("return_to").unwrap_or(""))
+}
+
+fn normalize_return_to_value(raw: &str) -> String {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return String::new();
+    }
+    if !raw.starts_with('/') || raw.starts_with("//") {
+        return String::new();
+    }
+    raw.to_string()
+}
+
+fn dashboard_or_return_to(return_to: &str) -> &str {
+    if return_to.is_empty() {
+        "/dashboard"
+    } else {
+        return_to
+    }
+}
+
+fn login_location(return_to: &str) -> String {
+    if return_to.is_empty() {
+        "/login".to_string()
+    } else {
+        format!("/login?return_to={}", percent_encode(return_to))
     }
 }
 
@@ -683,6 +787,7 @@ fn handle_auth_request(
     project_root: &Path,
 ) -> Result<Option<Response>, String> {
     let path = req.path();
+    let return_to = normalized_return_to(req);
     let is_auth_page = matches!(path, "/login" | "/register");
     let is_logout = path == "/logout" || path == "/api/auth/logout";
     let is_current_user = path == "/api/auth/me";
@@ -703,7 +808,7 @@ fn handle_auth_request(
 
     if req.method == HttpMethod::Get && is_auth_page {
         if existing_user.is_some() {
-            return Ok(Some(redirect_response("/dashboard")));
+            return Ok(Some(redirect_response(dashboard_or_return_to(&return_to))));
         }
         let (cookie_token, session) = match existing_session {
             Some(session) => {
@@ -722,6 +827,7 @@ fn handle_auth_request(
                 "Sign in",
                 &session.csrf_secret,
                 None,
+                &return_to,
             )?
         } else {
             render_auth_view(
@@ -730,11 +836,12 @@ fn handle_auth_request(
                 "Create account",
                 &session.csrf_secret,
                 None,
+                &return_to,
             )?
         };
         response.headers.insert(
             "Set-Cookie".to_string(),
-            build_cookie_header(&cookie_token, SESSION_TTL_SECS),
+            build_cookie_header(req, &cookie_token, SESSION_TTL_SECS),
         );
         return Ok(Some(response));
     }
@@ -759,7 +866,8 @@ fn handle_auth_request(
 
     if is_protected {
         let Some(user) = existing_user.clone() else {
-            return Ok(Some(redirect_response("/login")));
+            let location = login_location(&req.path);
+            return Ok(Some(redirect_response(&location)));
         };
         if path == "/dashboard/admin" && user.role != "admin" {
             let mut response =
@@ -802,17 +910,27 @@ fn handle_auth_request(
         .map(|addr| addr.ip().to_string())
         .unwrap_or_else(|| "unknown".to_string());
     let form = parse_form_body(req);
+    let form_return_to = form
+        .get("return_to")
+        .and_then(|values| values.first())
+        .map(|value| normalize_return_to_value(value))
+        .unwrap_or_default();
+    let return_to = if form_return_to.is_empty() {
+        return_to
+    } else {
+        form_return_to
+    };
     let csrf = form
         .get("_csrf")
         .and_then(|values| values.first())
         .cloned()
         .unwrap_or_default();
-    let Some(session) = existing_session else {
+        let Some(session) = existing_session else {
         if is_logout {
             let mut response = redirect_response("/login");
             response
                 .headers
-                .insert("Set-Cookie".to_string(), build_logout_cookie_header());
+                .insert("Set-Cookie".to_string(), build_logout_cookie_header(req));
             return Ok(Some(response));
         }
         let mut response =
@@ -831,7 +949,7 @@ fn handle_auth_request(
         let mut response = redirect_response("/login");
         response
             .headers
-            .insert("Set-Cookie".to_string(), build_logout_cookie_header());
+            .insert("Set-Cookie".to_string(), build_logout_cookie_header(req));
         return Ok(Some(response));
     }
 
@@ -864,6 +982,7 @@ fn handle_auth_request(
                 "Create account",
                 &session.csrf_secret,
                 Some("Please complete all fields and use a longer password."),
+                &return_to,
             )?;
             response.status = 400;
             return Ok(Some(response));
@@ -883,6 +1002,7 @@ fn handle_auth_request(
                 "Create account",
                 &session.csrf_secret,
                 Some("The email address is already registered."),
+                &return_to,
             )?;
             response.status = 409;
             return Ok(Some(response));
@@ -911,10 +1031,10 @@ fn handle_auth_request(
             .map(|value| value.to_string())
             .unwrap_or_else(|| "1".to_string());
         let (cookie_token, _) = create_session(&mut conn, &user_id, None)?;
-        let mut response = redirect_response("/dashboard");
+        let mut response = redirect_response(dashboard_or_return_to(&return_to));
         response.headers.insert(
             "Set-Cookie".to_string(),
-            build_cookie_header(&cookie_token, SESSION_TTL_SECS),
+            build_cookie_header(req, &cookie_token, SESSION_TTL_SECS),
         );
         return Ok(Some(response));
     }
@@ -927,6 +1047,7 @@ fn handle_auth_request(
                 "Sign in",
                 &session.csrf_secret,
                 Some("Too many attempts. Please try again later."),
+                &return_to,
             )?;
             response.status = 429;
             return Ok(Some(response));
@@ -955,6 +1076,7 @@ fn handle_auth_request(
                 "Sign in",
                 &session.csrf_secret,
                 Some(generic_error),
+                &return_to,
             )?;
             response.status = 401;
             return Ok(Some(response));
@@ -982,16 +1104,17 @@ fn handle_auth_request(
                 "Sign in",
                 &session.csrf_secret,
                 Some(generic_error),
+                &return_to,
             )?;
             response.status = 401;
             return Ok(Some(response));
         }
         delete_session(&mut conn, &session.token_hash);
         let (cookie_token, _) = create_session(&mut conn, &user.id, None)?;
-        let mut response = redirect_response("/dashboard");
+        let mut response = redirect_response(dashboard_or_return_to(&return_to));
         response.headers.insert(
             "Set-Cookie".to_string(),
-            build_cookie_header(&cookie_token, SESSION_TTL_SECS),
+            build_cookie_header(req, &cookie_token, SESSION_TTL_SECS),
         );
         return Ok(Some(response));
     }
@@ -2269,11 +2392,11 @@ mod tests {
         fs::create_dir_all(root.join("storage/database")).unwrap();
         write_view(
             &views.join("auth/login.ags"),
-            r#"<!DOCTYPE html><html><body><h1>Login</h1><p>{{ error_message }}</p><form method="POST" action="/login"><input type="hidden" name="_csrf" value="{{ csrf_token }}"><input name="email"><input name="password"><button>Login</button></form></body></html>"#,
+            r#"<!DOCTYPE html><html><body><h1>Login</h1><p>{{ error_message }}</p><form method="POST" action="/login"><input type="hidden" name="_csrf" value="{{ csrf_token }}"><input type="hidden" name="return_to" value="{{ return_to }}"><input name="email"><input name="password"><button>Login</button></form><a href="/register{{ return_to_query }}">Register</a></body></html>"#,
         );
         write_view(
             &views.join("auth/register.ags"),
-            r#"<!DOCTYPE html><html><body><h1>Register</h1><p>{{ error_message }}</p><form method="POST" action="/register"><input type="hidden" name="_csrf" value="{{ csrf_token }}"><input name="name"><input name="email"><input name="password"><button>Register</button></form></body></html>"#,
+            r#"<!DOCTYPE html><html><body><h1>Register</h1><p>{{ error_message }}</p><form method="POST" action="/register"><input type="hidden" name="_csrf" value="{{ csrf_token }}"><input type="hidden" name="return_to" value="{{ return_to }}"><input name="name"><input name="email"><input name="password"><button>Register</button></form><a href="/login{{ return_to_query }}">Login</a></body></html>"#,
         );
         write_view(
             &views.join("dashboard/user.ags"),
@@ -2743,7 +2866,7 @@ fn register_api() -> void:
         assert_eq!(unauth.status, 302);
         assert_eq!(
             unauth.headers.get("Location").map(String::as_str),
-            Some("/login")
+            Some("/login?return_to=/dashboard")
         );
 
         let email = "lifecycle@example.com";
@@ -2789,7 +2912,7 @@ fn register_api() -> void:
         assert_eq!(tampered.status, 302);
         assert_eq!(
             tampered.headers.get("Location").map(String::as_str),
-            Some("/login")
+            Some("/login?return_to=/dashboard")
         );
 
         let logout = invoke(
@@ -3234,6 +3357,98 @@ fn register_api() -> void:
             .get("Set-Cookie")
             .unwrap()
             .contains("Max-Age=0"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn login_and_register_preserve_safe_return_to() {
+        let (root, engine) = setup_auth_project("return_to");
+
+        let login_page = invoke(
+            &root,
+            &engine,
+            query_request(
+                HttpMethod::Get,
+                "/login",
+                &[("return_to", "/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local")],
+                None,
+                41,
+            ),
+        );
+        assert_eq!(login_page.status, 200);
+        let login_html = response_text(&login_page);
+        assert!(login_html.contains(r#"name="return_to" value="/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local""#));
+        assert!(login_html.contains("/register?return_to=/%3Fmeeting%3D246945224%26host%3Dmeeting-246945224-video-alpha-queral-local"));
+
+        let register_page = invoke(
+            &root,
+            &engine,
+            query_request(
+                HttpMethod::Get,
+                "/register",
+                &[("return_to", "/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local")],
+                None,
+                42,
+            ),
+        );
+        let register_cookie = cookie_from(&register_page);
+        let register_csrf = csrf_from(&register_page);
+        let registered = invoke(
+            &root,
+            &engine,
+            request(
+                HttpMethod::Post,
+                "/register",
+                Some(&register_cookie),
+                Some(&form_body(&[
+                    ("_csrf", &register_csrf),
+                    ("return_to", "/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local"),
+                    ("name", "Meeting Guest"),
+                    ("email", "meeting-guest@example.com"),
+                    ("password", "Password123!"),
+                ])),
+                42,
+            ),
+        );
+        assert_eq!(registered.status, 302);
+        assert_eq!(
+            registered.headers.get("Location").map(String::as_str),
+            Some("/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local")
+        );
+
+        let invalid = invoke(
+            &root,
+            &engine,
+            query_request(
+                HttpMethod::Get,
+                "/dashboard",
+                &[("return_to", "https://evil.example/steal")],
+                None,
+                43,
+            ),
+        );
+        assert_eq!(invalid.status, 302);
+        assert_eq!(
+            invalid.headers.get("Location").map(String::as_str),
+            Some("/login?return_to=/dashboard")
+        );
+
+        let localhost_login = invoke(
+            &root,
+            &engine,
+            Request {
+                method: HttpMethod::Get,
+                path: "/login".to_string(),
+                query: HashMap::new(),
+                headers: HashMap::from([("host".to_string(), "localhost:8081".to_string())]),
+                body: Vec::new(),
+                remote_addr: Some(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 44))),
+            },
+        );
+        let localhost_cookie = localhost_login.headers.get("Set-Cookie").cloned().unwrap_or_default();
+        assert!(localhost_cookie.contains("SameSite=Lax"));
+        assert!(!localhost_cookie.contains("Secure"));
 
         fs::remove_dir_all(root).ok();
     }

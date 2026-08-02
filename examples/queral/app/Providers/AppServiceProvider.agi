@@ -1,0 +1,12 @@
+module App.Providers
+
+use Framework.Container.Container
+use Framework.Providers.ServiceProvider
+use App.Services.ApplicationService
+
+class AppServiceProvider extends ServiceProvider:
+    fn register(container: Container) -> void:
+        container.singleton(ApplicationService, ApplicationService)
+
+    fn boot() -> void:
+        print("Application services booted")

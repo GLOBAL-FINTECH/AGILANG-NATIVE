@@ -1,0 +1,20 @@
+use Framework.Application
+use App.Providers.AppServiceProvider
+use App.Providers.RouteServiceProvider
+use Native.Path
+
+fn bootstrap() -> Application:
+    let app = Application.create(Native.Path.cwd())
+
+    app.register(AppServiceProvider)
+    app.register(RouteServiceProvider)
+
+    app.load_config("config")
+    app.load_encrypted_environment(".env." + app.environment() + ".agi.enc", {
+        "fail_closed": app.environment() != "local",
+        "reject_plaintext_production_env": true
+    })
+    app.load_views("resources/views")
+    app.public_path("public")
+
+    return app

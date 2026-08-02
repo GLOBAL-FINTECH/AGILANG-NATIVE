@@ -1,0 +1,6 @@
+{
+  "application_id": "queral",
+  "environment": "development",
+  "public_identity_key": "GENERATE_DURING_INITIALIZATION",
+  "private_key_storage": "operating-system-protected"
+}

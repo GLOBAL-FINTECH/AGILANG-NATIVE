@@ -1,0 +1,33 @@
+@page title="Create account" robots="noindex,nofollow"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/app.js" defer></script>
+</head>
+<body>
+    <main class="auth-shell">
+        <section class="auth-panel">
+            <a class="auth-brand" href="/">
+                <img src="/assets/images/agilang-logo.png" alt="AGILANG">
+                <span>AGILANG</span>
+            </a>
+            <h1>Create account</h1>
+            <p>New users are stored in the local portable AGIDB database.</p>
+            {{ error_message }}
+            <form method="POST" action="/register" class="auth-form">
+                {{ csrf_field }}
+                <input type="hidden" name="return_to" value="{{ return_to }}">
+                <label>Name<input type="text" name="name" required autocomplete="name"></label>
+                <label>Email<input type="email" name="email" required autocomplete="email"></label>
+                <label>Password<input type="password" name="password" required autocomplete="new-password"></label>
+                <button class="btn primary" type="submit">Create account</button>
+            </form>
+            <p class="auth-alt">Already registered? <a href="/login{{ return_to_query }}">Sign in</a></p>
+        </section>
+    </main>
+</body>
+</html>

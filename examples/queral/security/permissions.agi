@@ -1,0 +1,5 @@
+use Framework.Security.Permissions
+
+return Permissions.deny_by_default()
+    .allow("application", "vault.read", "apps/queral/APP_ENV/*")
+    .allow("application", "database.connect", "primary")

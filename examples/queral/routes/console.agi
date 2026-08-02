@@ -1,0 +1,5 @@
+use Framework.Routing.Route
+use App.Console.Commands.HelloCommand
+
+fn register_console() -> void:
+    Route.command("hello", HelloCommand.handle)
