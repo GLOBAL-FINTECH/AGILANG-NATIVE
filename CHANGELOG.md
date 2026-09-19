@@ -1,3 +1,9 @@
+# Next
+
+- Added an explicit production-readiness gate covering formatting, Clippy, compatibility audit, native-only policy, full workspace tests, release build, runtime diagnostics, and an actual `.agi` compile-and-execute smoke test.
+- Added macOS x86_64 and Apple Silicon native toolchain target support in the build/runtime manifest layer.
+- Updated the native hello-world smoke example to the current 0.7.0 runtime version.
+
 # Changelog
 
 ## 0.6.0 — Native-only stack and permanent language identity
