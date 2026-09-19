@@ -43,6 +43,7 @@ members = [
   "crates/agilang-project-generator",
   "crates/agilang-build",
   "crates/agilang-package",
+  "crates/agilang-repl",
   "crates/agilang-framework-core",
   "crates/agilang-framework-config",
   "crates/agilang-framework-container",
