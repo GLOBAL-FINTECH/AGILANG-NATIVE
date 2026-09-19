@@ -1,5 +1,5 @@
 fn main() -> i32:
-    print("AGILANG Native Runtime v0.5.0")
+    print("AGILANG Native Runtime v0.7.0")
     print("Copyright 2026 Global FinTech")
     print("")
     print("AGI Backend → Native Rust Compiler & Runtime")
