@@ -5,7 +5,7 @@ cd "$ROOT"
 failures=0
 check_rejected() {
   local name="$1"; local source="$2"; local expected="$3"; local file
-  file="$(mktemp --suffix=.agi)"
+  file="$(mktemp /tmp/agilang-negative.XXXXXX.agi)"
   printf '%s\n' "$source" > "$file"
   if cargo run -q -p agilang-native-cli -- check "$file" >"$file.out" 2>&1; then
     echo "FAIL: $name was accepted"; failures=$((failures+1))
