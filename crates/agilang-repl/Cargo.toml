@@ -1,0 +1,15 @@
+[package]
+name = "agilang-repl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "agilang-repl"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+agilang-compiler = { path = "../agilang-compiler" }
+agilang-source = { path = "../agilang-source" }
