@@ -58,7 +58,7 @@ pub struct Lockfile {
 pub fn load_manifest(root: &Path) -> Result<(Manifest, String)> {
     let path = root.join("agilang.toml");
     let bytes = fs::read(&path).with_context(|| format!("failed to read {}", path.display()))?;
-    let manifest: Manifest = toml::from_slice(&bytes).with_context(|| format!("failed to parse {}", path.display()))?;
+    let manifest: Manifest = toml::from_str(std::str::from_utf8(&bytes)?).with_context(|| format!("failed to parse {}", path.display()))?;
     Ok((manifest, sha256_hex(&bytes)))
 }
 pub fn resolve_lockfile(root: &Path) -> Result<Lockfile> {
@@ -80,7 +80,7 @@ pub fn write_lockfile(root: &Path, lock: &Lockfile) -> Result<PathBuf> {
 pub fn verify_lockfile(root: &Path) -> Result<()> {
     let expected = resolve_lockfile(root)?;
     let path = root.join("agilang.lock");
-    let actual: Lockfile = toml::from_slice(&fs::read(&path).with_context(|| format!("missing {}", path.display()))?)?;
+    let actual: Lockfile = toml::from_str(std::str::from_utf8(&fs::read(&path).with_context(|| format!("missing {}", path.display()))?)?)?;
     anyhow::ensure!(actual == expected, "agilang.lock is stale; run agilang-pkg lock");
     Ok(())
 }
