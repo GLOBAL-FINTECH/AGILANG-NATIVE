@@ -47,6 +47,7 @@ members = [
   "crates/agilang-fmt",
   "crates/agilang-debugger",
   "crates/agilang-ownership",
+  "crates/agilang-module-resolver",
   "crates/agilang-framework-core",
   "crates/agilang-framework-config",
   "crates/agilang-framework-container",
