@@ -58,8 +58,8 @@ pub struct Lockfile {
 pub fn load_manifest(root: &Path) -> Result<(Manifest, String)> {
     let path = root.join("agilang.toml");
     let bytes = fs::read(&path).with_context(|| format!("failed to read {}", path.display()))?;
-    let manifest: Manifest = toml::from_str(std::str::from_utf8(&bytes)?).with_context(|| format!("failed to parse {}", path.display()))?;
-    Ok((manifest, sha256_hex(&bytes)))
+    let text = std::str::from_utf8(&bytes).context("agilang.toml is not UTF-8")?;
+    Ok((parse_manifest(text)?, sha256_hex(&bytes)))
 }
 pub fn resolve_lockfile(root: &Path) -> Result<Lockfile> {
     let (manifest, manifest_sha256) = load_manifest(root)?;
@@ -74,13 +74,18 @@ pub fn resolve_lockfile(root: &Path) -> Result<Lockfile> {
 }
 pub fn write_lockfile(root: &Path, lock: &Lockfile) -> Result<PathBuf> {
     let path = root.join("agilang.lock");
-    fs::write(&path, toml::to_string_pretty(lock)?)?;
+    let mut out = format!("format = {}\nmanifest_sha256 = \"{}\"\n\n", lock.format, lock.manifest_sha256);
+    for dep in &lock.dependencies {
+        out.push_str("[[dependencies]]\n");
+        out.push_str(&format!("name = \"{}\"\nsource = \"{}\"\nchecksum = \"{}\"\n\n", dep.name, dep.source, dep.checksum));
+    }
+    fs::write(&path, out)?;
     Ok(path)
 }
 pub fn verify_lockfile(root: &Path) -> Result<()> {
     let expected = resolve_lockfile(root)?;
     let path = root.join("agilang.lock");
-    let actual: Lockfile = toml::from_str(std::str::from_utf8(&fs::read(&path).with_context(|| format!("missing {}", path.display()))?)?)?;
+    let actual = parse_lockfile(&fs::read_to_string(&path).with_context(|| format!("missing {}", path.display()))?)?;
     anyhow::ensure!(actual == expected, "agilang.lock is stale; run agilang-pkg lock");
     Ok(())
 }
@@ -107,4 +112,15 @@ mod tests {
         deps.insert("a".into(), Dependency::Version("2".into()));
         assert_eq!(deps.keys().cloned().collect::<Vec<_>>(), vec!["a", "z"]);
     }
+}
+
+fn parse_manifest(text: &str) -> Result<Manifest> {
+    let mut section = String::new(); let mut project = BTreeMap::<String,String>::new(); let mut deps = BTreeMap::new();
+    for raw in text.lines() { let line = raw.split('#').next().unwrap_or("").trim(); if line.is_empty(){continue} if line.starts_with('[')&&line.ends_with(']'){section=line.trim_matches(&['[',']'][..]).to_string();continue} let Some((k,v))=line.split_once('=') else {continue}; let k=k.trim(); let v=v.trim().trim_matches('"').to_string(); if section=="project"{project.insert(k.into(),v)} else if section=="dependencies"{deps.insert(k.into(),Dependency::Version(v));} }
+    Ok(Manifest{project:Project{name:project.get("name").cloned().context("project.name is required")?,version:project.get("version").cloned().context("project.version is required")?,edition:project.get("edition").cloned().unwrap_or_else(||"2026".into()),toolchain:project.get("toolchain").cloned().unwrap_or_else(||"0.8.0".into())},dependencies:deps})
+}
+fn parse_lockfile(text: &str) -> Result<Lockfile> {
+    let mut format=None; let mut hash=None; let mut deps=Vec::new(); let mut cur=None;
+    for raw in text.lines(){let line=raw.trim(); if line=="[[dependencies]]"{if let Some(d)=cur.take(){deps.push(d)} cur=Some(LockedDependency{name:String::new(),source:String::new(),checksum:String::new()});continue} let Some((k,v))=line.split_once('=') else {continue}; let v=v.trim().trim_matches('"').to_string(); match k.trim(){"format"=>format=v.parse().ok(),"manifest_sha256"=>hash=Some(v),"name"=>if let Some(d)=cur.as_mut(){d.name=v},"source"=>if let Some(d)=cur.as_mut(){d.source=v},"checksum"=>if let Some(d)=cur.as_mut(){d.checksum=v},_=>{}}}
+    if let Some(d)=cur{deps.push(d)} Ok(Lockfile{format:format.context("lock format missing")?,manifest_sha256:hash.context("manifest hash missing")?,dependencies:deps})
 }
