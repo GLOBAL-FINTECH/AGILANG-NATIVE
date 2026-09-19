@@ -6,6 +6,14 @@
 
 # Changelog
 
+## 0.8.0 - Native production hardening
+
+- Added deterministic package manifest/lock tooling via agilang-pkg.
+- Added native REPL, negative compiler tests and reproducible-build gates.
+- Added debugger launch configuration and tagged multi-platform release workflow.
+- Expanded production CI gates for package and compiler rejection tests.
+
+
 ## 0.6.0 — Native-only stack and permanent language identity
 
 - Declared Python prohibited from the production runtime, backend, compiler host, model training, model inference, project generation and generated applications.
