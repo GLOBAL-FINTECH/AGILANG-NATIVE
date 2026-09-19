@@ -42,6 +42,8 @@ members = [
   "crates/agilang-linker",
   "crates/agilang-project-generator",
   "crates/agilang-build",
+  "crates/agilang-package",
+  "crates/agilang-repl",
   "crates/agilang-framework-core",
   "crates/agilang-framework-config",
   "crates/agilang-framework-container",
@@ -109,7 +111,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["AGILANG Project"]
