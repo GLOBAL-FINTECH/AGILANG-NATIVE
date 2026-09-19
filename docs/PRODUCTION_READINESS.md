@@ -4,6 +4,8 @@ This document defines the minimum engineering gates for treating AGILANG Native 
 
 ## Release gates
 
+The v0.8 hardening layer additionally runs package-manager unit tests and executable negative compiler tests.
+
 A release candidate must pass all of the following:
 
 1. cargo fmt --all --check
