@@ -22,6 +22,8 @@ echo "[4/8] Native-only policy"
 
 echo "[5/8] Full test suite"
 cargo test --workspace --all-features
+cargo test -p agilang-package --all-features
+./scripts/negative-tests.sh
 
 echo "[6/8] Release build"
 cargo build --workspace --release --all-features
