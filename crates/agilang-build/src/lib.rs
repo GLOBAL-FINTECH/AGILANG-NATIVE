@@ -7,10 +7,12 @@ use std::path::{Path, PathBuf};
 pub const RUNTIME_LIB_NAME: &str = "agilang_runtime_abi.lib";
 #[cfg(target_os = "windows")]
 pub const RUNTIME_DLL_NAME: &str = "agilang_runtime_abi.dll";
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 pub const RUNTIME_LIB_NAME: &str = "libagilang_runtime_abi.a";
 #[cfg(target_os = "linux")]
 pub const RUNTIME_DLL_NAME: &str = "libagilang_runtime_abi.so";
+#[cfg(target_os = "macos")]
+pub const RUNTIME_DLL_NAME: &str = "libagilang_runtime_abi.dylib";
 pub const TOOLCHAIN_MANIFEST_NAME: &str = "toolchain.json";
 pub const RUNTIME_MANIFEST_NAME: &str = "runtime-manifest.json";
 pub const AGILANG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -220,11 +222,21 @@ pub fn native_target_name() -> &'static str {
     {
         "aarch64-unknown-linux-gnu"
     }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    {
+        "x86_64-apple-darwin"
+    }
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
+        "aarch64-apple-darwin"
+    }
     #[cfg(not(any(
         all(target_os = "windows", target_arch = "x86_64"),
         all(target_os = "windows", target_arch = "aarch64"),
         all(target_os = "linux", target_arch = "x86_64"),
-        all(target_os = "linux", target_arch = "aarch64")
+        all(target_os = "linux", target_arch = "aarch64"),
+        all(target_os = "macos", target_arch = "x86_64"),
+        all(target_os = "macos", target_arch = "aarch64")
     )))]
     {
         "unsupported-native-target"
