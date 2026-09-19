@@ -39,8 +39,7 @@ jobs:
       - if: runner.os != 'Windows'
         shell: bash
         run: |
-          ./scripts/validate-native.sh .
-          ./scripts/verify-zero-python.sh
+          bash ./scripts/production-readiness.sh
 
   c-abi:
     runs-on: ubuntu-latest
