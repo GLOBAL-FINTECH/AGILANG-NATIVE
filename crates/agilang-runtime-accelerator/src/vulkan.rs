@@ -92,8 +92,10 @@ fn as_bytes(values: &[f32]) -> Vec<u8> {
 pub(super) fn matmul(
     lhs: &[f32], rhs: &[f32], m: usize, k: usize, n: usize,
 ) -> RuntimeResult<Vec<f32>> {
-    let adapter = adapters().into_iter().next().ok_or_else(|| unavailable("no hardware Vulkan adapter"))?;
-    let (device, queue) = open_device(&adapter)?;
+    let (device, queue) = adapters()
+        .into_iter()
+        .find_map(|adapter| open_device(&adapter).ok())
+        .ok_or_else(|| unavailable("no hardware Vulkan adapter with a working compute device"))?;
     let limits = device.limits();
 
     let m32 = u32::try_from(m).map_err(|_| unavailable("matrix dimension exceeds u32"))?;
