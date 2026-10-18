@@ -46,6 +46,8 @@ First confirmed GPU execution, 2026-10-18, on the reference workstation:
 | `AGILANG_TEST_VULKAN=1` strict `hardware_gpu_matmul_opt_in` | passed (`RequireAccelerator`, no CPU fallback) |
 | `cargo build -p agilang-runtime-abi --features vulkan --release` | built |
 | `examples/vulkan_matmul_smoke.c` via MSVC + release DLL, policy `2` | `58 64 139 154` — GPU verification PASSED |
+| `examples/native/gpu_matmul.agi` compiled by `agilang run`, policy `2` | `58 64 139 154` — `AGILANG GPU matmul: PASSED` |
+| Same program linked against a runtime built without `--features vulkan` | fails with `Unsupported: Vulkan backend was not compiled`, exit 13 (no CPU fallback) |
 
 This verifies correctness only; no performance measurement has been made yet.
 
@@ -74,10 +76,42 @@ assert_eq!(c, vec![58., 64., 139., 154.]);
   standard status code. Use `agi_runtime_last_error_json` on failure.
 - Physical GPU VRAM is not invented from wgpu's allocation limits.
 
-The intrinsic declaration is present in `runtime/intrinsics.json`, but that
-manifest alone does **not** make a `.agi` language-level function callable.
-The compiler frontend, symbol/type checking, C code generation, and
-application test must still be wired to the new C ABI signature.
+## `.agi` language builtin
+
+Ordinary AGILANG programs call the GPU through the compiler builtin
+`gpu_matmul`, with no Rust or C required:
+
+```text
+let c: array = gpu_matmul(a, b, m, k, n, policy)
+```
+
+- `a` and `b` are numeric lists holding row-major `A[m,k]` and `B[k,n]`;
+  the result is a new numeric list holding `C[m,n]`.
+- `m`, `k`, `n` and `policy` must be integers. A literal policy outside
+  `0..=2` is a compile-time error.
+- **Precision:** AGILANG lists hold f64. Inputs are narrowed to f32 for
+  the device and the result is widened back to f64, so values carry f32
+  precision (about 7 significant digits).
+- **Errors:** there is no recoverable error path yet. If the runtime
+  rejects the call (no Vulkan GPU under policy `2`, dimensions that do not
+  match the list lengths, buffers beyond device limits), the program prints
+  `gpu_matmul failed: <runtime error JSON>` to stderr and exits with the
+  runtime status code.
+- The C helper is only emitted for programs that call `gpu_matmul`, so
+  other programs still link against runtime libraries built before it existed.
+
+Run the example on a Vulkan GPU from the repository root:
+
+```powershell
+cargo build --release -p agilang-runtime-abi --features vulkan
+cargo build --release -p agilang-native-cli
+$env:AGILANG_RUNTIME_LIB = (Resolve-Path target\release\agilang_runtime_abi.lib).Path
+.\target\release\agilang.exe run examples\native\gpu_matmul.agi
+```
+
+On Windows, wgpu always builds its WGL/OpenGL fallback alongside Vulkan, so
+the AGILANG linker passes `user32`, `gdi32`, `opengl32` and `runtimeobject`
+when linking compiled programs.
 
 ## Known limitations
 

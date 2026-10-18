@@ -95,6 +95,18 @@ impl Analyser {
                 Type::Void,
             ),
             ("len", vec![Type::List(Box::new(Type::Unknown))], Type::I64),
+            (
+                "gpu_matmul",
+                vec![
+                    Type::List(Box::new(Type::F64)),
+                    Type::List(Box::new(Type::F64)),
+                    Type::I64,
+                    Type::I64,
+                    Type::I64,
+                    Type::I64,
+                ],
+                Type::List(Box::new(Type::F64)),
+            ),
             ("get", vec![Type::Unknown, Type::String], Type::String),
             (
                 "post",
@@ -164,7 +176,10 @@ impl Analyser {
         }
 
         for enum_decl in &program.enums {
-            if let Some(existing) = self.enum_defs.insert(enum_decl.name.clone(), enum_decl.clone()) {
+            if let Some(existing) = self
+                .enum_defs
+                .insert(enum_decl.name.clone(), enum_decl.clone())
+            {
                 self.errors.push(
                     Diagnostic::error(
                         "E1002",
@@ -180,7 +195,10 @@ impl Analyser {
         }
 
         for alias_decl in &program.aliases {
-            if let Some(existing) = self.alias_defs.insert(alias_decl.name.clone(), alias_decl.clone()) {
+            if let Some(existing) = self
+                .alias_defs
+                .insert(alias_decl.name.clone(), alias_decl.clone())
+            {
                 self.errors.push(
                     Diagnostic::error(
                         "E1002",
@@ -360,7 +378,11 @@ impl Analyser {
         }
     }
 
-    fn validate_alias_target(&mut self, alias_decl: &TypeAliasDecl, trail: &mut Vec<String>) -> Type {
+    fn validate_alias_target(
+        &mut self,
+        alias_decl: &TypeAliasDecl,
+        trail: &mut Vec<String>,
+    ) -> Type {
         if trail.iter().any(|segment| segment == &alias_decl.name) {
             self.errors.push(Diagnostic::error(
                 "E2210",
@@ -408,7 +430,10 @@ impl Analyser {
                 self.errors.push(
                     Diagnostic::error(
                         "E1002",
-                        format!("duplicate field `{}` in struct `{}`", field.name, struct_decl.name),
+                        format!(
+                            "duplicate field `{}` in struct `{}`",
+                            field.name, struct_decl.name
+                        ),
                         field.span,
                     )
                     .with_hint(format!(
@@ -545,9 +570,11 @@ impl Analyser {
                 then_body,
                 else_body,
                 ..
-            } => !else_body.is_empty()
-                && self.block_returns(then_body)
-                && self.block_returns(else_body),
+            } => {
+                !else_body.is_empty()
+                    && self.block_returns(then_body)
+                    && self.block_returns(else_body)
+            }
             HirStmt::Match {
                 arms, exhaustive, ..
             } => *exhaustive && arms.iter().all(|arm| self.block_returns(&arm.body)),
@@ -665,7 +692,12 @@ impl Analyser {
                             }
                         }
                     }
-                    HirExpr::MemberAccess { object, member, span, .. } => {
+                    HirExpr::MemberAccess {
+                        object,
+                        member,
+                        span,
+                        ..
+                    } => {
                         if let HirExpr::Identifier(name, _, target_span) = object.as_ref() {
                             if let Some(sym) = self.lookup(name) {
                                 if !sym.mutable {
@@ -805,7 +837,11 @@ impl Analyser {
                     span: *span,
                 })
             }
-            Stmt::Match { subject, arms, span } => {
+            Stmt::Match {
+                subject,
+                arms,
+                span,
+            } => {
                 let hir_subject = self.analyse_expr(subject, None)?;
                 let Type::Enum(subject_enum_name) = hir_subject.ty().clone() else {
                     self.errors.push(Diagnostic::error(
@@ -897,7 +933,9 @@ impl Analyser {
                                 );
                             }
                             wildcard_seen = Some(*pattern_span);
-                            HirMatchPattern::Wildcard { span: *pattern_span }
+                            HirMatchPattern::Wildcard {
+                                span: *pattern_span,
+                            }
                         }
                     };
 
@@ -1143,7 +1181,8 @@ impl Analyser {
                         for (name, value) in &hir_items {
                             match struct_decl.fields.iter().find(|field| field.name == *name) {
                                 Some(field) => {
-                                    let expected_field_ty = self.resolve_known_type_name(&field.ty.name);
+                                    let expected_field_ty =
+                                        self.resolve_known_type_name(&field.ty.name);
                                     if !expected_field_ty.is_compatible(value.ty()) {
                                         self.errors.push(Diagnostic::error(
                                             "E2001",
@@ -1188,7 +1227,11 @@ impl Analyser {
                 match hir_object.ty() {
                     Type::Enum(enum_name) => {
                         if let Some(enum_decl) = self.enum_defs.get(enum_name) {
-                            if enum_decl.variants.iter().any(|variant| variant.name == *member) {
+                            if enum_decl
+                                .variants
+                                .iter()
+                                .any(|variant| variant.name == *member)
+                            {
                                 return Some(HirExpr::EnumVariant {
                                     enum_name: enum_name.clone(),
                                     variant: member.clone(),
@@ -1198,10 +1241,7 @@ impl Analyser {
                             }
                             self.errors.push(Diagnostic::error(
                                 "E2106",
-                                format!(
-                                    "unknown variant `{}` for enum `{}`",
-                                    member, enum_name
-                                ),
+                                format!("unknown variant `{}` for enum `{}`", member, enum_name),
                                 *span,
                             ));
                             return Some(HirExpr::EnumVariant {
@@ -1223,8 +1263,10 @@ impl Analyser {
                 let result_ty = match hir_object.ty() {
                     Type::Struct(struct_name) => {
                         if let Some(struct_decl) = self.struct_defs.get(struct_name) {
-                            if let Some(field) =
-                                struct_decl.fields.iter().find(|field| field.name == *member)
+                            if let Some(field) = struct_decl
+                                .fields
+                                .iter()
+                                .find(|field| field.name == *member)
                             {
                                 self.resolve_known_type_name(&field.ty.name)
                             } else {
@@ -1735,6 +1777,9 @@ impl Analyser {
             "len" => {
                 exact_args = Some(1);
             }
+            "gpu_matmul" => {
+                exact_args = Some(6);
+            }
             "get" | "get_json" => {
                 exact_args = Some(2);
             }
@@ -1898,6 +1943,48 @@ impl Analyser {
             ));
         }
 
+        if name == "gpu_matmul" && hir_args.len() == 6 {
+            for (idx, label) in [(0, "first"), (1, "second")] {
+                if !Self::is_numeric_list_type(hir_args[idx].ty())
+                    && hir_args[idx].ty() != &Type::Error
+                {
+                    self.errors.push(Diagnostic::error(
+                        "E2003",
+                        format!(
+                            "argument type mismatch: function `gpu_matmul` expects {} argument as numeric list, found `{}`",
+                            label,
+                            hir_args[idx].ty()
+                        ),
+                        hir_args[idx].span(),
+                    ));
+                }
+            }
+            for (idx, label) in [(2, "m"), (3, "k"), (4, "n"), (5, "policy")] {
+                if !hir_args[idx].ty().is_integer() && hir_args[idx].ty() != &Type::Error {
+                    self.errors.push(Diagnostic::error(
+                        "E2003",
+                        format!(
+                            "argument type mismatch: function `gpu_matmul` expects integer `{}`, found `{}`",
+                            label,
+                            hir_args[idx].ty()
+                        ),
+                        hir_args[idx].span(),
+                    ));
+                }
+            }
+            if let HirExpr::Integer(policy, _, policy_span) = &hir_args[5] {
+                if !(0..=2).contains(policy) {
+                    self.errors.push(Diagnostic::error(
+                        "E2003",
+                        format!(
+                            "invalid dispatch policy {policy} for `gpu_matmul`: expected 0 (CPU), 1 (prefer GPU) or 2 (require GPU)"
+                        ),
+                        *policy_span,
+                    ));
+                }
+            }
+        }
+
         if (name == "get" || name == "get_json")
             && hir_args.len() == 2
             && hir_args[1].ty() != &Type::String
@@ -1938,6 +2025,7 @@ impl Analyser {
         let ret_ty = match name {
             "print" | "append" => Type::Void,
             "len" => Type::I64,
+            "gpu_matmul" => Type::List(Box::new(Type::F64)),
             "is_nan" | "is_finite" | "is_infinite" => Type::Bool,
             "get" | "post" | "get_json" | "post_json" => Type::String,
             // `mode` currently lowers to NaN when no mode exists.
@@ -2013,6 +2101,35 @@ mod tests {
     }
 
     #[test]
+    fn test_gpu_matmul_returns_numeric_list() {
+        let src = "fn main() -> i32:\n    let a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]\n    let b = [7.0, 8.0, 9.0, 10.0, 11.0, 12.0]\n    let c = gpu_matmul(a, b, 2, 3, 2, 2)\n    print(c[0], len(c))\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_gpu_matmul_rejects_bad_arguments() {
+        let wrong_count = "fn main() -> i32:\n    let a = [1.0]\n    let c = gpu_matmul(a, a, 1, 1, 1)\n    return 0\n";
+        let errs = check_source(wrong_count).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2002"));
+
+        let not_a_list = "fn main() -> i32:\n    let a = [1.0]\n    let c = gpu_matmul(1.0, a, 1, 1, 1, 2)\n    return 0\n";
+        let errs = check_source(not_a_list).unwrap_err();
+        assert!(errs
+            .iter()
+            .any(|e| e.message.contains("first argument as numeric list")));
+
+        let float_dim = "fn main() -> i32:\n    let a = [1.0]\n    let c = gpu_matmul(a, a, 1.5, 1, 1, 2)\n    return 0\n";
+        let errs = check_source(float_dim).unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("integer `m`")));
+
+        let bad_policy = "fn main() -> i32:\n    let a = [1.0]\n    let c = gpu_matmul(a, a, 1, 1, 1, 3)\n    return 0\n";
+        let errs = check_source(bad_policy).unwrap_err();
+        assert!(errs
+            .iter()
+            .any(|e| e.message.contains("invalid dispatch policy 3")));
+    }
+
+    #[test]
     fn test_stats_builtin_list_overload() {
         let src = "fn main() -> i32:\n    let m = mean([1.0, 2.0, 3.0, 4.0])\n    let q = quantile([1.0, 2.0, 3.0, 4.0], 0.5)\n    let p = percentile([1.0, 2.0, 3.0, 4.0], 50.0)\n    print(m, q, p)\n    return 0\n";
         assert!(check_source(src).is_ok());
@@ -2085,7 +2202,8 @@ mod tests {
 
     #[test]
     fn test_break_and_continue_are_lowered_inside_loop() {
-        let src = "fn main() -> i32:\n    while true:\n        continue\n        break\n    return 0\n";
+        let src =
+            "fn main() -> i32:\n    while true:\n        continue\n        break\n    return 0\n";
         let hir = check_source(src).unwrap();
         match &hir.functions[0].body[0] {
             HirStmt::While { body, .. } => {
@@ -2181,16 +2299,15 @@ mod tests {
 
     #[test]
     fn test_cyclic_type_alias_is_rejected() {
-        let src = "type UserId = AccountId\ntype AccountId = UserId\n\nfn main() -> i32:\n    return 0\n";
+        let src =
+            "type UserId = AccountId\ntype AccountId = UserId\n\nfn main() -> i32:\n    return 0\n";
         let errs = check_source(src).unwrap_err();
         assert!(errs.iter().any(|e| e.code == "E2210"));
     }
 }
 
 fn is_framework_type_name(name: &str) -> bool {
-    name == "map"
-        || name == "bytes"
-        || name.chars().next().map(char::is_uppercase).unwrap_or(false)
+    name == "map" || name == "bytes" || name.chars().next().map(char::is_uppercase).unwrap_or(false)
 }
 
 fn is_constructor_like_expr(expr: &Expr) -> bool {

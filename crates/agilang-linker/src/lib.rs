@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[cfg(target_os = "windows")]
-const WINDOWS_SYSTEM_LIBRARIES: &str = "ws2_32.lib userenv.lib ntdll.lib bcrypt.lib advapi32.lib pdh.lib powrprof.lib iphlpapi.lib netapi32.lib secur32.lib ole32.lib oleaut32.lib propsys.lib psapi.lib shell32.lib wbemuuid.lib";
+const WINDOWS_SYSTEM_LIBRARIES: &str = "ws2_32.lib userenv.lib ntdll.lib bcrypt.lib advapi32.lib pdh.lib powrprof.lib iphlpapi.lib netapi32.lib secur32.lib ole32.lib oleaut32.lib propsys.lib psapi.lib shell32.lib wbemuuid.lib user32.lib gdi32.lib opengl32.lib runtimeobject.lib";
 #[cfg(target_os = "linux")]
 const LINUX_SYSTEM_LIBRARIES: &[&str] = &["-lpthread", "-ldl", "-lm"];
 
@@ -214,6 +214,16 @@ mod tests {
             "shell32.lib",
             "wbemuuid.lib",
         ] {
+            assert!(WINDOWS_SYSTEM_LIBRARIES.contains(library));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn links_vulkan_runtime_windows_dependencies() {
+        // wgpu always builds its WGL fallback on Windows, so a Vulkan-enabled
+        // runtime library needs these even when only Vulkan is used.
+        for library in ["user32.lib", "gdi32.lib", "opengl32.lib", "runtimeobject.lib"] {
             assert!(WINDOWS_SYSTEM_LIBRARIES.contains(library));
         }
     }

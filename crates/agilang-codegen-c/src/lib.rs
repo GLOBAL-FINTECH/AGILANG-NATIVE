@@ -83,7 +83,9 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("    out[i] = '\\0';\n");
     out.push_str("    return out;\n");
     out.push_str("}\n\n");
-    out.push_str("static char* agi_json_object(const char** keys, const char** values, size_t count) {\n");
+    out.push_str(
+        "static char* agi_json_object(const char** keys, const char** values, size_t count) {\n",
+    );
     out.push_str("    size_t len = 2;\n");
     out.push_str("    for (size_t i = 0; i < count; ++i) {\n");
     out.push_str("        len += strlen(keys[i]) + strlen(values[i]) + 4;\n");
@@ -403,6 +405,8 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("    return best_count > 1 ? best_value : NAN;\n");
     out.push_str("}\n\n");
 
+    let functions_start = out.len();
+
     // Forward declarations of custom functions
     for func in &program.functions {
         out.push_str(&format!("{} {}_agi(", c_type(&func.return_type), func.name));
@@ -457,8 +461,65 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("    return (int)agilang_main();\n");
     out.push_str("}\n");
 
+    // Only programs that call the GPU builtin reference the accelerator ABI,
+    // so older runtime libraries keep linking everything else.
+    if out[functions_start..].contains("agi_gpu_matmul_f64(") {
+        out.insert_str(functions_start, GPU_MATMUL_HELPER);
+    }
+
     out
 }
+
+const GPU_MATMUL_HELPER: &str = r#"typedef struct { uint8_t* data; size_t len; size_t capacity; } agi_runtime_buffer;
+extern uint32_t agi_accelerator_matmul_f32(const float* left, size_t left_len, const float* right, size_t right_len, size_t m, size_t k, size_t n, uint32_t policy, float* out, size_t out_capacity);
+extern uint32_t agi_runtime_last_error_json(agi_runtime_buffer* out);
+extern void agi_buffer_free(agi_runtime_buffer* buffer);
+
+static void agi_gpu_matmul_fail(const char* message, uint32_t status) {
+    agi_runtime_buffer error = {0};
+    if (status != 0 && agi_runtime_last_error_json(&error) == 0 && error.data) {
+        fprintf(stderr, "gpu_matmul failed: %.*s\n", (int)error.len, (const char*)error.data);
+        agi_buffer_free(&error);
+    } else {
+        fprintf(stderr, "gpu_matmul failed: %s\n", message);
+    }
+    exit(status != 0 ? (int)status : 1);
+}
+
+static float* agi_gpu_matmul_to_f32(const agi_list_f64* xs) {
+    float* data = (float*)malloc(sizeof(float) * (xs->length > 0 ? xs->length : 1));
+    if (!data) agi_gpu_matmul_fail("out of memory", 0);
+    for (size_t i = 0; i < xs->length; ++i) data[i] = (float)xs->data[i];
+    return data;
+}
+
+// Row-major A[m,k] x B[k,n]. policy: 0 = CPU, 1 = prefer GPU, 2 = require GPU.
+// Values are computed in f32 on the device and widened back to f64.
+static agi_list_f64 agi_gpu_matmul_f64(agi_list_f64 a, agi_list_f64 b, int64_t m, int64_t k, int64_t n, int64_t policy) {
+    if (m <= 0 || k <= 0 || n <= 0) agi_gpu_matmul_fail("matrix dimensions must be positive", 0);
+    if (policy < 0 || policy > 2) agi_gpu_matmul_fail("policy must be 0 (CPU), 1 (prefer GPU) or 2 (require GPU)", 0);
+    if ((uint64_t)m > SIZE_MAX / (uint64_t)n) agi_gpu_matmul_fail("output size overflow", 0);
+    size_t out_len = (size_t)m * (size_t)n;
+    float* left = agi_gpu_matmul_to_f32(&a);
+    float* right = agi_gpu_matmul_to_f32(&b);
+    float* result = (float*)malloc(sizeof(float) * out_len);
+    if (!result) agi_gpu_matmul_fail("out of memory", 0);
+    uint32_t status = agi_accelerator_matmul_f32(left, a.length, right, b.length, (size_t)m, (size_t)k, (size_t)n, (uint32_t)policy, result, out_len);
+    free(left);
+    free(right);
+    if (status != 0) agi_gpu_matmul_fail("accelerator call failed", status);
+    agi_list_f64 out = {0};
+    out.data = (double*)malloc(sizeof(double) * out_len);
+    if (!out.data) agi_gpu_matmul_fail("out of memory", 0);
+    for (size_t i = 0; i < out_len; ++i) out.data[i] = (double)result[i];
+    free(result);
+    out.length = out_len;
+    out.capacity = out_len;
+    out.owns_data = true;
+    return out;
+}
+
+"#;
 
 fn c_type(ty: &Type) -> String {
     match ty {
@@ -634,14 +695,9 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
             for arm in arms {
                 match &arm.pattern {
                     agilang_ir::HirMatchPattern::EnumVariant {
-                        enum_name,
-                        variant,
-                        ..
+                        enum_name, variant, ..
                     } => {
-                        out.push_str(&format!(
-                            "{}    case {}_{}:\n",
-                            ind, enum_name, variant
-                        ));
+                        out.push_str(&format!("{}    case {}_{}:\n", ind, enum_name, variant));
                     }
                     agilang_ir::HirMatchPattern::Wildcard { .. } => {
                         out.push_str(&format!("{}    default:\n", ind));
@@ -711,9 +767,7 @@ fn generate_expr(expr: &HirExpr) -> String {
             _ => generate_json_object_expr(items),
         },
         HirExpr::EnumVariant {
-            enum_name,
-            variant,
-            ..
+            enum_name, variant, ..
         } => format!("{}_{}", enum_name, variant),
         HirExpr::MemberAccess { object, member, .. } => {
             format!("{}.{}", generate_expr(object), member)
@@ -753,7 +807,13 @@ fn generate_expr(expr: &HirExpr) -> String {
                     let mut out = String::new();
                     for arg in args {
                         let value = generate_expr(arg);
+                        // Numeric list elements always lower to `double`, even when
+                        // the list was declared as an untyped `array`.
+                        let indexes_numeric_list = matches!(arg, HirExpr::Index { object, .. } if matches!(object.ty(), Type::List(inner) if inner.is_numeric() || inner.as_ref() == &Type::Unknown));
                         let call = match arg.ty() {
+                            _ if indexes_numeric_list => {
+                                format!("agi_print_f64((double)({value}))")
+                            }
                             Type::I32 | Type::I64 => format!("agi_print_i64((int64_t)({value}))"),
                             Type::U32 | Type::U64 => format!("agi_print_u64((uint64_t)({value}))"),
                             Type::F32 | Type::F64 => format!("agi_print_f64((double)({value}))"),
@@ -821,6 +881,12 @@ fn generate_intrinsic_call(name: &str, args: &[HirExpr]) -> Option<String> {
     }
     if name == "request" && arg_strs.len() == 2 {
         return Some(format!("agi_http_request_json({})", arg_strs[1]));
+    }
+    if name == "gpu_matmul" && arg_strs.len() == 6 {
+        return Some(format!(
+            "agi_gpu_matmul_f64({}, {}, (int64_t)({}), (int64_t)({}), (int64_t)({}), (int64_t)({}))",
+            arg_strs[0], arg_strs[1], arg_strs[2], arg_strs[3], arg_strs[4], arg_strs[5]
+        ));
     }
 
     let list_elems = args.first().and_then(list_literal_numeric_elements);
@@ -1189,7 +1255,10 @@ mod tests {
 
     #[test]
     fn test_codegen_inferred_void_main_bridge_returns_zero() {
-        let source = SourceFile::new("inferred_void_main.agi", "fn main():\n    print(\"hello\")\n");
+        let source = SourceFile::new(
+            "inferred_void_main.agi",
+            "fn main():\n    print(\"hello\")\n",
+        );
         let hir = agilang_compiler::hir(&source).unwrap();
         let c_code = generate(&hir);
 
@@ -1226,6 +1295,44 @@ mod tests {
         assert!(c_code.contains("agi_stats_mean(xs.data, xs.length)"));
         assert!(c_code.contains("agi_stats_quantile(xs.data, xs.length, 0.5)"));
         assert!(c_code.contains("agi_stats_percentile(xs.data, xs.length, 50)"));
+    }
+
+    #[test]
+    fn test_codegen_gpu_matmul_calls_accelerator_abi() {
+        let source = SourceFile::new(
+            "test.agi",
+            "fn main() -> i32:\n    let a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]\n    let b = [7.0, 8.0, 9.0, 10.0, 11.0, 12.0]\n    let c = gpu_matmul(a, b, 2, 3, 2, 2)\n    print(c[0])\n    return 0\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("extern uint32_t agi_accelerator_matmul_f32("));
+        assert!(c_code.contains("agi_list_f64 c = agi_gpu_matmul_f64(a, b, (int64_t)(2), (int64_t)(3), (int64_t)(2), (int64_t)(2));"));
+        assert!(c_code.contains("agi_list_get_f64(&c, (int64_t)(0))"));
+    }
+
+    #[test]
+    fn test_codegen_omits_gpu_helper_when_unused() {
+        let source = SourceFile::new(
+            "test.agi",
+            "fn main() -> i32:\n    print(sqrt(4.0))\n    return 0\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(!c_code.contains("agi_accelerator_matmul_f32"));
+    }
+
+    #[test]
+    fn test_codegen_prints_untyped_array_element_as_number() {
+        let source = SourceFile::new(
+            "test.agi",
+            "fn main() -> i32:\n    let xs: array = [1.0, 2.0]\n    print(xs[1])\n    return 0\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("agi_print_f64((double)(agi_list_get_f64(&xs, (int64_t)(1))))"));
     }
 
     #[test]
@@ -1384,7 +1491,10 @@ mod tests {
         fs::remove_dir_all(&dir).ok();
     }
 
-    fn compile_and_run_with_runtime_stub(source_name: &str, source_text: &str) -> Option<(i32, String)> {
+    fn compile_and_run_with_runtime_stub(
+        source_name: &str,
+        source_text: &str,
+    ) -> Option<(i32, String)> {
         if !cfg!(windows) {
             return None;
         }
@@ -1459,9 +1569,10 @@ mod tests {
 
     #[test]
     fn test_codegen_exec_void_main_binary() {
-        let Some((code, _stdout)) =
-            compile_and_run_with_runtime_stub("void_exec.agi", "fn main() -> void:\n    print(\"hello\")\n")
-        else {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "void_exec.agi",
+            "fn main() -> void:\n    print(\"hello\")\n",
+        ) else {
             return;
         };
         assert_eq!(code, 0);
@@ -1469,9 +1580,10 @@ mod tests {
 
     #[test]
     fn test_codegen_exec_inferred_void_main_binary() {
-        let Some((code, _stdout)) =
-            compile_and_run_with_runtime_stub("inferred_void_exec.agi", "fn main():\n    print(\"hello\")\n")
-        else {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "inferred_void_exec.agi",
+            "fn main():\n    print(\"hello\")\n",
+        ) else {
             return;
         };
         assert_eq!(code, 0);
@@ -1490,10 +1602,9 @@ mod tests {
 
     #[test]
     fn test_codegen_exec_i32_main_binary_preserves_exit_code() {
-        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
-            "i32_exec.agi",
-            "fn main() -> i32:\n    return 7\n",
-        ) else {
+        let Some((code, _stdout)) =
+            compile_and_run_with_runtime_stub("i32_exec.agi", "fn main() -> i32:\n    return 7\n")
+        else {
             return;
         };
         assert_eq!(code, 7);
