@@ -22,6 +22,8 @@ AGI_API void agi_buffer_free(AgiBuffer* buffer);
 
 AGI_API uint32_t agi_compute_capabilities_json(AgiBuffer* out);
 AGI_API uint32_t agi_accelerator_capabilities_json(AgiBuffer* out);
+// Dispatch policy: 0 = CPU, 1 = prefer GPU, 2 = require GPU.
+AGI_API uint32_t agi_accelerator_matmul_f32(const float* left, size_t left_len, const float* right, size_t right_len, size_t m, size_t k, size_t n, uint32_t policy, float* out, size_t out_capacity);
 AGI_API uint32_t agi_resource_capabilities_json(AgiBuffer* out);
 AGI_API uint32_t agi_webrtc_capabilities_json(AgiBuffer* out);
 AGI_API uint32_t agi_crypto_sha256(const uint8_t* data, size_t len, uint8_t* out, size_t out_len);
