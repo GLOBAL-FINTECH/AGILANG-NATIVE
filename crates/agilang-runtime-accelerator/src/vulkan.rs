@@ -33,10 +33,16 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 "#;
 
 fn unavailable(detail: impl std::fmt::Display) -> AgilangError {
-    AgilangError::new(ErrorCode::Unsupported, format!("Vulkan GPU unavailable: {detail}"))
+    AgilangError::new(
+        ErrorCode::Unsupported,
+        format!("Vulkan GPU unavailable: {detail}"),
+    )
 }
 fn failed(detail: impl std::fmt::Display) -> AgilangError {
-    AgilangError::new(ErrorCode::Internal, format!("Vulkan compute failed: {detail}"))
+    AgilangError::new(
+        ErrorCode::Internal,
+        format!("Vulkan compute failed: {detail}"),
+    )
 }
 
 fn adapters() -> Vec<wgpu::Adapter> {
@@ -48,7 +54,10 @@ fn adapters() -> Vec<wgpu::Adapter> {
     found.retain(|adapter| {
         let info = adapter.get_info();
         info.backend == wgpu::Backend::Vulkan
-            && matches!(info.device_type, wgpu::DeviceType::DiscreteGpu | wgpu::DeviceType::IntegratedGpu)
+            && matches!(
+                info.device_type,
+                wgpu::DeviceType::DiscreteGpu | wgpu::DeviceType::IntegratedGpu
+            )
     });
     // Prefer the RX 6800 XT/discrete GPUs over integrated hardware.
     found.sort_by_key(|adapter| adapter.get_info().device_type != wgpu::DeviceType::DiscreteGpu);
@@ -64,25 +73,29 @@ fn open_device(adapter: &wgpu::Adapter) -> RuntimeResult<(wgpu::Device, wgpu::Qu
             memory_hints: wgpu::MemoryHints::Performance,
         },
         None,
-    )).map_err(unavailable)
+    ))
+    .map_err(unavailable)
 }
 
 pub(super) fn discover() -> Vec<DeviceInfo> {
-    adapters().into_iter().map(|adapter| {
-        let info = adapter.get_info();
-        let result = open_device(&adapter);
-        DeviceInfo {
-            id: format!("vulkan:{:04x}:{:04x}", info.vendor, info.device),
-            kind: DeviceKind::Vulkan,
-            name: info.name,
-            available: result.is_ok(),
-            native: true,
-            // wgpu's adapter limits do not reliably expose physical VRAM.
-            memory_bytes: None,
-            features: vec!["compute-f32".into(), "matmul-f32".into()],
-            reason_unavailable: result.err().map(|e| e.message),
-        }
-    }).collect()
+    adapters()
+        .into_iter()
+        .map(|adapter| {
+            let info = adapter.get_info();
+            let result = open_device(&adapter);
+            DeviceInfo {
+                id: format!("vulkan:{:04x}:{:04x}", info.vendor, info.device),
+                kind: DeviceKind::Vulkan,
+                name: info.name,
+                available: result.is_ok(),
+                native: true,
+                // wgpu's adapter limits do not reliably expose physical VRAM.
+                memory_bytes: None,
+                features: vec!["compute-f32".into(), "matmul-f32".into()],
+                reason_unavailable: result.err().map(|e| e.message),
+            }
+        })
+        .collect()
 }
 
 fn as_bytes(values: &[f32]) -> Vec<u8> {
@@ -90,7 +103,11 @@ fn as_bytes(values: &[f32]) -> Vec<u8> {
 }
 
 pub(super) fn matmul(
-    lhs: &[f32], rhs: &[f32], m: usize, k: usize, n: usize,
+    lhs: &[f32],
+    rhs: &[f32],
+    m: usize,
+    k: usize,
+    n: usize,
 ) -> RuntimeResult<Vec<f32>> {
     let (device, queue) = adapters()
         .into_iter()
@@ -103,23 +120,34 @@ pub(super) fn matmul(
     let n32 = u32::try_from(n).map_err(|_| unavailable("matrix dimension exceeds u32"))?;
     let input_a = as_bytes(lhs);
     let input_b = as_bytes(rhs);
-    let output_len = m.checked_mul(n)
+    let output_len = m
+        .checked_mul(n)
         .and_then(|len| len.checked_mul(4))
         .ok_or_else(|| unavailable("output size overflow"))?;
     let bytes_a = u64::try_from(input_a.len()).map_err(|_| unavailable("input too large"))?;
     let bytes_b = u64::try_from(input_b.len()).map_err(|_| unavailable("input too large"))?;
     let bytes_out = u64::try_from(output_len).map_err(|_| unavailable("output too large"))?;
     if [bytes_a, bytes_b, bytes_out].iter().any(|&len| {
-        len > u64::from(limits.max_storage_buffer_binding_size)
-            || len > limits.max_buffer_size
+        len > u64::from(limits.max_storage_buffer_binding_size) || len > limits.max_buffer_size
     }) {
-        return Err(unavailable("matrix exceeds one storage-buffer allocation limit; tiling is not yet implemented"));
+        return Err(unavailable(
+            "matrix exceeds one storage-buffer allocation limit; tiling is not yet implemented",
+        ));
     }
-    let grid_x = n32.checked_add(7).ok_or_else(|| unavailable("column dimension overflow"))? / 8;
-    let grid_y = m32.checked_add(7).ok_or_else(|| unavailable("row dimension overflow"))? / 8;
+    let grid_x = n32
+        .checked_add(7)
+        .ok_or_else(|| unavailable("column dimension overflow"))?
+        / 8;
+    let grid_y = m32
+        .checked_add(7)
+        .ok_or_else(|| unavailable("row dimension overflow"))?
+        / 8;
     if grid_x > limits.max_compute_workgroups_per_dimension
-        || grid_y > limits.max_compute_workgroups_per_dimension {
-        return Err(unavailable("compute workgroup dimensions exceed adapter limits"));
+        || grid_y > limits.max_compute_workgroups_per_dimension
+    {
+        return Err(unavailable(
+            "compute workgroup dimensions exceed adapter limits",
+        ));
     }
 
     let a = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -160,7 +188,8 @@ pub(super) fn matmul(
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false, min_binding_size: None,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
                 },
                 count: None,
             },
@@ -169,7 +198,8 @@ pub(super) fn matmul(
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false, min_binding_size: None,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
                 },
                 count: None,
             },
@@ -178,7 +208,8 @@ pub(super) fn matmul(
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Storage { read_only: false },
-                    has_dynamic_offset: false, min_binding_size: None,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
                 },
                 count: None,
             },
@@ -187,7 +218,8 @@ pub(super) fn matmul(
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false, min_binding_size: None,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
                 },
                 count: None,
             },
@@ -198,10 +230,22 @@ pub(super) fn matmul(
         label: Some("AGILANG Vulkan matmul resources"),
         layout: &bindings,
         entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: a.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: b.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 2, resource: output.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 3, resource: parameters.as_entire_binding() },
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: a.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: b.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: output.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: parameters.as_entire_binding(),
+            },
         ],
     });
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -244,7 +288,8 @@ pub(super) fn matmul(
     device.poll(wgpu::Maintain::Wait);
     receiver.recv().map_err(failed)?.map_err(failed)?;
     let mapped = slice.get_mapped_range();
-    let result = mapped.chunks_exact(4)
+    let result = mapped
+        .chunks_exact(4)
         .map(|part| f32::from_le_bytes([part[0], part[1], part[2], part[3]]))
         .collect::<Vec<_>>();
     drop(mapped);

@@ -41,12 +41,24 @@ pub fn discover_devices() -> Vec<DeviceInfo> {
     let mut features = Vec::new();
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if std::is_x86_feature_detected!("sse2") { features.push("sse2".into()); }
-        if std::is_x86_feature_detected!("avx") { features.push("avx".into()); }
-        if std::is_x86_feature_detected!("avx2") { features.push("avx2".into()); }
-        if std::is_x86_feature_detected!("fma") { features.push("fma".into()); }
-        if std::is_x86_feature_detected!("aes") { features.push("aes-ni".into()); }
-        if std::is_x86_feature_detected!("sha") { features.push("sha-ni".into()); }
+        if std::is_x86_feature_detected!("sse2") {
+            features.push("sse2".into());
+        }
+        if std::is_x86_feature_detected!("avx") {
+            features.push("avx".into());
+        }
+        if std::is_x86_feature_detected!("avx2") {
+            features.push("avx2".into());
+        }
+        if std::is_x86_feature_detected!("fma") {
+            features.push("fma".into());
+        }
+        if std::is_x86_feature_detected!("aes") {
+            features.push("aes-ni".into());
+        }
+        if std::is_x86_feature_detected!("sha") {
+            features.push("sha-ni".into());
+        }
     }
     #[cfg(target_arch = "aarch64")]
     {
@@ -70,19 +82,29 @@ pub fn discover_devices() -> Vec<DeviceInfo> {
 
 pub fn select_device(policy: DispatchPolicy) -> RuntimeResult<DeviceInfo> {
     let devices = discover_devices();
-    let cpu = devices.iter().find(|d| d.kind == DeviceKind::Cpu).cloned()
-        .ok_or_else(|| AgilangError::new(ErrorCode::Unsupported, "native CPU backend unavailable"))?;
+    let cpu = devices
+        .iter()
+        .find(|d| d.kind == DeviceKind::Cpu)
+        .cloned()
+        .ok_or_else(|| {
+            AgilangError::new(ErrorCode::Unsupported, "native CPU backend unavailable")
+        })?;
     match policy {
         DispatchPolicy::CpuOnly => Ok(cpu),
-        DispatchPolicy::PreferAccelerator => Ok(devices.iter()
+        DispatchPolicy::PreferAccelerator => Ok(devices
+            .iter()
             .find(|d| d.kind == DeviceKind::Vulkan && d.available)
-            .cloned().unwrap_or(cpu)),
-        DispatchPolicy::RequireAccelerator => devices.into_iter()
+            .cloned()
+            .unwrap_or(cpu)),
+        DispatchPolicy::RequireAccelerator => devices
+            .into_iter()
             .find(|d| d.kind == DeviceKind::Vulkan && d.available)
-            .ok_or_else(|| AgilangError::new(
+            .ok_or_else(|| {
+                AgilangError::new(
                 ErrorCode::Unsupported,
                 "no usable Vulkan GPU; enable feature vulkan and install a working Vulkan driver",
-            )),
+            )
+            }),
     }
 }
 
@@ -90,19 +112,36 @@ pub fn select_device(policy: DispatchPolicy) -> RuntimeResult<DeviceInfo> {
 /// CpuOnly is deterministic CPU execution. PreferAccelerator may fall back to
 /// CPU if GPU initialization or dispatch fails. RequireAccelerator never falls back.
 pub fn matmul_f32(
-    lhs: &[f32], rhs: &[f32], m: usize, k: usize, n: usize, policy: DispatchPolicy,
+    lhs: &[f32],
+    rhs: &[f32],
+    m: usize,
+    k: usize,
+    n: usize,
+    policy: DispatchPolicy,
 ) -> RuntimeResult<Vec<f32>> {
     if m == 0 || k == 0 || n == 0 {
-        return Err(AgilangError::invalid_argument("matrix dimensions must be nonzero"));
+        return Err(AgilangError::invalid_argument(
+            "matrix dimensions must be nonzero",
+        ));
     }
-    let left_len = m.checked_mul(k).ok_or_else(|| AgilangError::new(ErrorCode::Overflow, "matrix size overflow"))?;
-    let right_len = k.checked_mul(n).ok_or_else(|| AgilangError::new(ErrorCode::Overflow, "matrix size overflow"))?;
-    let output_len = m.checked_mul(n).ok_or_else(|| AgilangError::new(ErrorCode::Overflow, "matrix size overflow"))?;
+    let left_len = m
+        .checked_mul(k)
+        .ok_or_else(|| AgilangError::new(ErrorCode::Overflow, "matrix size overflow"))?;
+    let right_len = k
+        .checked_mul(n)
+        .ok_or_else(|| AgilangError::new(ErrorCode::Overflow, "matrix size overflow"))?;
+    let output_len = m
+        .checked_mul(n)
+        .ok_or_else(|| AgilangError::new(ErrorCode::Overflow, "matrix size overflow"))?;
     if lhs.len() != left_len || rhs.len() != right_len {
-        return Err(AgilangError::invalid_argument("matrix data length does not match dimensions"));
+        return Err(AgilangError::invalid_argument(
+            "matrix data length does not match dimensions",
+        ));
     }
     if lhs.iter().chain(rhs.iter()).any(|v| !v.is_finite()) {
-        return Err(AgilangError::invalid_argument("matrix entries must be finite"));
+        return Err(AgilangError::invalid_argument(
+            "matrix entries must be finite",
+        ));
     }
     if policy != DispatchPolicy::CpuOnly {
         #[cfg(feature = "vulkan")]
@@ -115,7 +154,10 @@ pub fn matmul_f32(
         }
         #[cfg(not(feature = "vulkan"))]
         if policy == DispatchPolicy::RequireAccelerator {
-            return Err(AgilangError::new(ErrorCode::Unsupported, "Vulkan backend was not compiled; enable --features vulkan"));
+            return Err(AgilangError::new(
+                ErrorCode::Unsupported,
+                "Vulkan backend was not compiled; enable --features vulkan",
+            ));
         }
     }
     let mut out = vec![0.0f32; output_len];
@@ -141,9 +183,14 @@ mod tests {
     #[test]
     fn cpu_matmul_matches_expected() {
         let out = matmul_f32(
-            &[1., 2., 3., 4., 5., 6.], &[7., 8., 9., 10., 11., 12.],
-            2, 3, 2, DispatchPolicy::CpuOnly,
-        ).unwrap();
+            &[1., 2., 3., 4., 5., 6.],
+            &[7., 8., 9., 10., 11., 12.],
+            2,
+            3,
+            2,
+            DispatchPolicy::CpuOnly,
+        )
+        .unwrap();
         assert_eq!(out, vec![58., 64., 139., 154.]);
     }
 
@@ -156,7 +203,10 @@ mod tests {
 
     #[test]
     fn cpu_always_discoverable() {
-        assert_eq!(select_device(DispatchPolicy::CpuOnly).unwrap().kind, DeviceKind::Cpu);
+        assert_eq!(
+            select_device(DispatchPolicy::CpuOnly).unwrap().kind,
+            DeviceKind::Cpu
+        );
     }
 
     #[cfg(not(feature = "vulkan"))]
@@ -172,12 +222,20 @@ mod tests {
         if std::env::var("AGILANG_TEST_VULKAN").ok().as_deref() != Some("1") {
             return;
         }
-        assert_eq!(select_device(DispatchPolicy::RequireAccelerator).unwrap().kind, DeviceKind::Vulkan);
+        assert_eq!(
+            select_device(DispatchPolicy::RequireAccelerator)
+                .unwrap()
+                .kind,
+            DeviceKind::Vulkan
+        );
         let lhs = [1., 2., 3., 4., 5., 6.];
         let rhs = [7., 8., 9., 10., 11., 12.];
         let out = matmul_f32(&lhs, &rhs, 2, 3, 2, DispatchPolicy::RequireAccelerator).unwrap();
         for (got, expected) in out.iter().zip([58., 64., 139., 154.]) {
-            assert!((got - expected).abs() < 0.001, "GPU result {got} != {expected}");
+            assert!(
+                (got - expected).abs() < 0.001,
+                "GPU result {got} != {expected}"
+            );
         }
     }
 }
