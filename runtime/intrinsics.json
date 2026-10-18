@@ -13,6 +13,11 @@
       "effect": "system-read"
     },
     {
+      "name": "accelerator.matmul_f32",
+      "abi": "agi_accelerator_matmul_f32",
+      "effect": "compute"
+    },
+    {
       "name": "tensor.create_f64",
       "abi": "agi_tensor_create_f64",
       "effect": "allocate"
