@@ -11,8 +11,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
-pub const ZERO_HASH: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000000";
+pub const ZERO_HASH: &str = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
 /// Canonical Genesis-compatible chain configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -507,7 +506,10 @@ fn normalize_hex_data(value: String) -> String {
 }
 
 fn invalid<T>(message: impl Into<String>) -> RuntimeResult<T> {
-    Err(AgilangError::new(ErrorCode::InvalidArgument, message.into()))
+    Err(AgilangError::new(
+        ErrorCode::InvalidArgument,
+        message.into(),
+    ))
 }
 
 #[cfg(test)]
@@ -516,12 +518,18 @@ mod tests {
 
     #[test]
     fn consensus_aliases_match_genesis() {
-        assert_eq!(ConsensusMode::parse("pos").unwrap(), ConsensusMode::ProofOfStake);
+        assert_eq!(
+            ConsensusMode::parse("pos").unwrap(),
+            ConsensusMode::ProofOfStake
+        );
         assert_eq!(
             ConsensusMode::parse("delegated-proof-of-stake").unwrap(),
             ConsensusMode::DelegatedProofOfStake
         );
-        assert_eq!(ConsensusMode::parse("developer").unwrap(), ConsensusMode::Development);
+        assert_eq!(
+            ConsensusMode::parse("developer").unwrap(),
+            ConsensusMode::Development
+        );
     }
 
     #[test]
@@ -534,10 +542,7 @@ mod tests {
 
     #[test]
     fn empty_merkle_root_matches_genesis_algorithm() {
-        assert_eq!(
-            merkle_root::<Transaction>(&[]).unwrap(),
-            sha256_hex(b"")
-        );
+        assert_eq!(merkle_root::<Transaction>(&[]).unwrap(), sha256_hex(b""));
     }
 
     #[test]

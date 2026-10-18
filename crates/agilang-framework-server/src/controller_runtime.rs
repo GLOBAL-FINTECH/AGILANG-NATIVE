@@ -1,7 +1,8 @@
 use crate::{
-    build_json_response, build_text_response, handle_auth_request, load_session_by_cookie,
+    build_json_response, build_text_response,
     framework_manifest::{load_framework_manifest, ModelManifest, RequestManifest},
-    load_user_by_id, parse_form_body, redirect_response, AuthSessionRecord, AuthUserRecord,
+    handle_auth_request, load_session_by_cookie, load_user_by_id, parse_form_body,
+    redirect_response, AuthSessionRecord, AuthUserRecord,
 };
 use agilang_database_driver::{DatabaseConnection, DatabaseDriverKind, DatabaseValue};
 use agilang_framework_database::{DatabaseConfig, FrameworkConnection, FrameworkDriver};
@@ -47,7 +48,9 @@ pub fn execute_request(
         }
     }
 
-    let public_path = project_root.join("public").join(path.trim_start_matches('/'));
+    let public_path = project_root
+        .join("public")
+        .join(path.trim_start_matches('/'));
     let is_ags_source = public_path.extension().and_then(|value| value.to_str()) == Some("ags");
     if public_path.is_file() && !path.ends_with('/') && !is_ags_source {
         return match fs::read(&public_path) {
@@ -154,15 +157,16 @@ fn dispatch_generated_resource(
     let manifest = load_framework_manifest(project_root)
         .map_err(|error| DispatchError::new(500, error.to_string()))?;
     let descriptor = if let Some(manifest) = manifest.as_ref() {
-        manifest
-            .models
-            .get(resource_name)
-            .cloned()
-            .ok_or_else(|| {
-                DispatchError::new(500, format!("Model manifest for `{resource_name}` not found"))
-            })?
+        manifest.models.get(resource_name).cloned().ok_or_else(|| {
+            DispatchError::new(
+                500,
+                format!("Model manifest for `{resource_name}` not found"),
+            )
+        })?
     } else {
-        let model_path = project_root.join("app/Models").join(format!("{resource_name}.agi"));
+        let model_path = project_root
+            .join("app/Models")
+            .join(format!("{resource_name}.agi"));
         if !model_path.exists() {
             return Err(DispatchError::new(
                 500,
@@ -187,7 +191,9 @@ fn dispatch_generated_resource(
                     .cloned()
                     .ok_or_else(|| anyhow!("Request manifest for `{name}` not found"))
             } else {
-                let path = project_root.join("app/Requests").join(format!("{name}.agi"));
+                let path = project_root
+                    .join("app/Requests")
+                    .join(format!("{name}.agi"));
                 parse_request_descriptor(&path)
             }
         })
@@ -196,7 +202,10 @@ fn dispatch_generated_resource(
 
     let auth_state = load_auth_state(project_root, req)
         .map_err(|error| DispatchError::new(500, error.to_string()))?;
-    let requires_mutation_auth = matches!(route.action.as_str(), "store" | "update" | "destroy" | "restore");
+    let requires_mutation_auth = matches!(
+        route.action.as_str(),
+        "store" | "update" | "destroy" | "restore"
+    );
     if requires_mutation_auth {
         let Some((session, user)) = auth_state.as_ref() else {
             return Err(DispatchError::new(403, "Forbidden"));
@@ -277,8 +286,8 @@ fn dispatch_generated_resource(
                     bail!("404");
                 }
                 update_row(&mut conn, &descriptor, id, updatable)?;
-                let row = find_row(&mut conn, &descriptor, id, false)?
-                    .ok_or_else(|| anyhow!("404"))?;
+                let row =
+                    find_row(&mut conn, &descriptor, id, false)?.ok_or_else(|| anyhow!("404"))?;
                 conn.commit()?;
                 Ok(build_json_response(
                     200,
@@ -308,7 +317,10 @@ fn dispatch_generated_resource(
                 }
                 soft_delete_row(&mut conn, &descriptor, id)?;
                 conn.commit()?;
-                Ok(build_json_response(200, json!({ "deleted": true }).to_string()))
+                Ok(build_json_response(
+                    200,
+                    json!({ "deleted": true }).to_string(),
+                ))
             })();
             match result {
                 Ok(response) => Ok(response),
@@ -332,8 +344,8 @@ fn dispatch_generated_resource(
                     bail!("404");
                 }
                 restore_row(&mut conn, &descriptor, id)?;
-                let row = find_row(&mut conn, &descriptor, id, false)?
-                    .ok_or_else(|| anyhow!("404"))?;
+                let row =
+                    find_row(&mut conn, &descriptor, id, false)?.ok_or_else(|| anyhow!("404"))?;
                 conn.commit()?;
                 Ok(build_json_response(
                     200,
@@ -376,10 +388,13 @@ fn load_auth_state(
     req: &Request,
 ) -> Result<Option<(AuthSessionRecord, AuthUserRecord)>> {
     let mut conn = crate::open_auth_db(project_root).map_err(|error| anyhow!(error))?;
-    let Some(session) = load_session_by_cookie(&mut conn, req).map_err(|error| anyhow!(error))? else {
+    let Some(session) = load_session_by_cookie(&mut conn, req).map_err(|error| anyhow!(error))?
+    else {
         return Ok(None);
     };
-    let Some(user) = load_user_by_id(&mut conn, &session.user_id).map_err(|error| anyhow!(error))? else {
+    let Some(user) =
+        load_user_by_id(&mut conn, &session.user_id).map_err(|error| anyhow!(error))?
+    else {
         return Ok(None);
     };
     Ok(Some((session, user)))
@@ -442,8 +457,8 @@ fn parse_request_descriptor(path: &Path) -> Result<RequestDescriptor> {
 fn load_database_config(project_root: &Path) -> Result<DatabaseConfig> {
     let config_path = project_root.join("config/database.agi");
     let content = fs::read_to_string(config_path)?;
-    let default_driver = parse_string_in_map(&content, "\"default\"")
-        .unwrap_or_else(|| "agidb".to_string());
+    let default_driver =
+        parse_string_in_map(&content, "\"default\"").unwrap_or_else(|| "agidb".to_string());
     let block = extract_connection_block(&content, &default_driver)
         .ok_or_else(|| anyhow!("database connection `{default_driver}` not found"))?;
     let driver_name =
@@ -452,8 +467,11 @@ fn load_database_config(project_root: &Path) -> Result<DatabaseConfig> {
     match driver_name.as_str() {
         "agidb" => Ok(DatabaseConfig {
             driver: FrameworkDriver::Agidb,
-            database: resolve_database_path(project_root, &parse_string_in_map(&block, "\"database\"")
-                .unwrap_or_else(|| "storage/database/main.agidb".to_string())),
+            database: resolve_database_path(
+                project_root,
+                &parse_string_in_map(&block, "\"database\"")
+                    .unwrap_or_else(|| "storage/database/main.agidb".to_string()),
+            ),
             host: None,
             port: None,
             username: None,
@@ -462,8 +480,11 @@ fn load_database_config(project_root: &Path) -> Result<DatabaseConfig> {
         }),
         "sqlite" => Ok(DatabaseConfig {
             driver: FrameworkDriver::Sqlite,
-            database: resolve_database_path(project_root, &parse_string_in_map(&block, "\"database\"")
-                .unwrap_or_else(|| "storage/database/main.sqlite".to_string())),
+            database: resolve_database_path(
+                project_root,
+                &parse_string_in_map(&block, "\"database\"")
+                    .unwrap_or_else(|| "storage/database/main.sqlite".to_string()),
+            ),
             host: None,
             port: None,
             username: None,
@@ -474,20 +495,28 @@ fn load_database_config(project_root: &Path) -> Result<DatabaseConfig> {
             driver: FrameworkDriver::Mysql,
             database: resolve_env_value(
                 project_root,
-                parse_string_in_map(&block, "\"database\"").unwrap_or_default().as_str(),
+                parse_string_in_map(&block, "\"database\"")
+                    .unwrap_or_default()
+                    .as_str(),
             ),
             host: Some(resolve_env_value(
                 project_root,
-                parse_string_in_map(&block, "\"host\"").unwrap_or_default().as_str(),
+                parse_string_in_map(&block, "\"host\"")
+                    .unwrap_or_default()
+                    .as_str(),
             )),
             port: parse_number_in_map(&block, "\"port\"").map(|value| value as u16),
             username: Some(resolve_env_value(
                 project_root,
-                parse_string_in_map(&block, "\"username\"").unwrap_or_default().as_str(),
+                parse_string_in_map(&block, "\"username\"")
+                    .unwrap_or_default()
+                    .as_str(),
             )),
             password: Some(resolve_env_value(
                 project_root,
-                parse_string_in_map(&block, "\"password\"").unwrap_or_default().as_str(),
+                parse_string_in_map(&block, "\"password\"")
+                    .unwrap_or_default()
+                    .as_str(),
             )),
             strict_driver_selection: strict,
         }),
@@ -519,10 +548,21 @@ fn parse_env_expression(raw: &str) -> Option<(String, String)> {
     }
     let inner = trimmed.trim_start_matches("env(").trim_end_matches(')');
     let parts = split_top_level(inner, ',');
-    let key = parts.first()?.trim().trim_matches('"').trim_matches('\'').to_string();
+    let key = parts
+        .first()?
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_string();
     let fallback = parts
         .get(1)
-        .map(|value| value.trim().trim_matches('"').trim_matches('\'').to_string())
+        .map(|value| {
+            value
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string()
+        })
         .unwrap_or_default();
     Some((key, fallback))
 }
@@ -628,7 +668,10 @@ fn create_row(
     ))
 }
 
-fn next_primary_key(conn: &mut FrameworkConnection, descriptor: &ResourceDescriptor) -> Result<i64> {
+fn next_primary_key(
+    conn: &mut FrameworkConnection,
+    descriptor: &ResourceDescriptor,
+) -> Result<i64> {
     let rows = conn.query(&format!("SELECT * FROM {}", descriptor.table), &[])?;
     let next = rows
         .into_iter()
@@ -672,14 +715,21 @@ fn update_row(
     Ok(())
 }
 
-fn soft_delete_row(conn: &mut FrameworkConnection, descriptor: &ResourceDescriptor, id: i64) -> Result<()> {
+fn soft_delete_row(
+    conn: &mut FrameworkConnection,
+    descriptor: &ResourceDescriptor,
+    id: i64,
+) -> Result<()> {
     if descriptor.soft_deletes {
         conn.execute(
             &format!(
                 "UPDATE {} SET deleted_at = ? WHERE {} = ?",
                 descriptor.table, descriptor.primary_key
             ),
-            &[DatabaseValue::Text(chrono::Utc::now().to_rfc3339()), DatabaseValue::Integer(id)],
+            &[
+                DatabaseValue::Text(chrono::Utc::now().to_rfc3339()),
+                DatabaseValue::Integer(id),
+            ],
         )?;
     } else {
         conn.execute(
@@ -693,7 +743,11 @@ fn soft_delete_row(conn: &mut FrameworkConnection, descriptor: &ResourceDescript
     Ok(())
 }
 
-fn restore_row(conn: &mut FrameworkConnection, descriptor: &ResourceDescriptor, id: i64) -> Result<()> {
+fn restore_row(
+    conn: &mut FrameworkConnection,
+    descriptor: &ResourceDescriptor,
+    id: i64,
+) -> Result<()> {
     conn.execute(
         &format!(
             "UPDATE {} SET deleted_at = ? WHERE {} = ?",
@@ -769,7 +823,10 @@ fn sanitize_row(row: HashMap<String, DatabaseValue>, descriptor: &ResourceDescri
         if descriptor.hidden.iter().any(|hidden| hidden == &key) {
             continue;
         }
-        map.insert(key.clone(), cast_value(&key, db_value_to_json(value), descriptor));
+        map.insert(
+            key.clone(),
+            cast_value(&key, db_value_to_json(value), descriptor),
+        );
     }
     Value::Object(map)
 }
@@ -779,7 +836,12 @@ fn cast_value(key: &str, value: Value, descriptor: &ResourceDescriptor) -> Value
         Some("integer") => value
             .as_i64()
             .map(Value::from)
-            .or_else(|| value.as_str().and_then(|text| text.parse::<i64>().ok()).map(Value::from))
+            .or_else(|| {
+                value
+                    .as_str()
+                    .and_then(|text| text.parse::<i64>().ok())
+                    .map(Value::from)
+            })
             .unwrap_or(value),
         Some("boolean") => value
             .as_bool()
@@ -805,7 +867,11 @@ fn parse_request_payload(req: &Request) -> Result<HashMap<String, Value>> {
     Ok(parse_form_body(req)
         .into_iter()
         .map(|(key, values)| {
-            let value = values.into_iter().next().map(Value::from).unwrap_or(Value::Null);
+            let value = values
+                .into_iter()
+                .next()
+                .map(Value::from)
+                .unwrap_or(Value::Null);
             (key, value)
         })
         .collect())
@@ -935,7 +1001,11 @@ fn parse_map_assignment(content: &str, name: &str) -> HashMap<String, String> {
             let (key, value) = entry.split_once(':')?;
             Some((
                 key.trim().trim_matches('"').trim_matches('\'').to_string(),
-                value.trim().trim_matches('"').trim_matches('\'').to_string(),
+                value
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string(),
             ))
         })
         .collect()
@@ -986,7 +1056,13 @@ fn parse_inline_list(content: &str) -> Vec<String> {
     let trimmed = content.trim().trim_start_matches('[').trim_end_matches(']');
     split_top_level(trimmed, ',')
         .into_iter()
-        .map(|value| value.trim().trim_matches('"').trim_matches('\'').to_string())
+        .map(|value| {
+            value
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string()
+        })
         .filter(|value| !value.is_empty())
         .collect()
 }

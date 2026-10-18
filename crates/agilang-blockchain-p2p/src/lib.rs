@@ -22,7 +22,11 @@ pub struct Handshake {
 }
 
 impl Handshake {
-    pub fn validate_against(&self, local: &Handshake, max_clock_drift_ms: u64) -> RuntimeResult<()> {
+    pub fn validate_against(
+        &self,
+        local: &Handshake,
+        max_clock_drift_ms: u64,
+    ) -> RuntimeResult<()> {
         if self.protocol_version != PROTOCOL_VERSION {
             return invalid("unsupported blockchain P2P protocol version");
         }
@@ -138,8 +142,14 @@ impl SnapshotChunk {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyncMode {
     UpToDate,
-    HeaderAndBlockSync { from_height: u64, to_height: u64 },
-    CheckpointSnapshot { checkpoint_hash: String, checkpoint_height: u64 },
+    HeaderAndBlockSync {
+        from_height: u64,
+        to_height: u64,
+    },
+    CheckpointSnapshot {
+        checkpoint_hash: String,
+        checkpoint_height: u64,
+    },
     RejectFinalityConflict,
 }
 
@@ -207,7 +217,9 @@ impl PeerBook {
     }
 
     pub fn penalize(&mut self, node_id: &str, amount: i64) -> bool {
-        let Some(peer) = self.peers.get_mut(node_id) else { return false; };
+        let Some(peer) = self.peers.get_mut(node_id) else {
+            return false;
+        };
         peer.score = peer.score.saturating_sub(amount.abs());
         peer.score <= -100
     }
@@ -242,7 +254,8 @@ pub fn encode_message(message: &Message, max_bytes: usize) -> RuntimeResult<Vec<
     if encoded.len() > max_bytes {
         return invalid("P2P message exceeds configured size limit");
     }
-    let length = u32::try_from(encoded.len()).map_err(|_| invalid_error("P2P message is too large"))?;
+    let length =
+        u32::try_from(encoded.len()).map_err(|_| invalid_error("P2P message is too large"))?;
     let mut frame = Vec::with_capacity(4 + encoded.len());
     frame.extend_from_slice(&length.to_be_bytes());
     frame.extend_from_slice(&encoded);
@@ -301,7 +314,10 @@ mod tests {
     fn selects_snapshot_for_large_gap() {
         let local = handshake("local", 10);
         let remote = handshake("remote", 10_000);
-        assert!(matches!(plan_sync(&local, &remote, 1_000), SyncMode::CheckpointSnapshot { .. }));
+        assert!(matches!(
+            plan_sync(&local, &remote, 1_000),
+            SyncMode::CheckpointSnapshot { .. }
+        ));
     }
 
     #[test]

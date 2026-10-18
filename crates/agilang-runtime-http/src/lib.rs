@@ -109,7 +109,10 @@ impl HttpClient {
     }
 }
 
-pub fn build_request_url(base_url: &str, query: &BTreeMap<String, Vec<String>>) -> RuntimeResult<Url> {
+pub fn build_request_url(
+    base_url: &str,
+    query: &BTreeMap<String, Vec<String>>,
+) -> RuntimeResult<Url> {
     let mut url = Url::parse(base_url).map_err(|e| invalid_input(e.to_string()))?;
     if !query.is_empty() {
         let encoded = encode_query_pairs(query);

@@ -1,3 +1,8 @@
+use agilang_build::{
+    compiler_binary_name, default_runtime_manifest, default_toolchain_manifest,
+    discover_toolchain_from_exe, executable_suffix, write_runtime_manifest,
+    write_toolchain_manifest, RUNTIME_DLL_NAME, RUNTIME_LIB_NAME,
+};
 use agilang_compiler::{check, hir, parse, tokenize, SourceFile};
 use agilang_database_identity::{ApplicationIdentity, DatabaseIdentity};
 use agilang_database_mysql_gateway::{
@@ -6,11 +11,6 @@ use agilang_database_mysql_gateway::{
 };
 use agilang_database_security_kernel::Capability;
 use agilang_database_tcp::{fetch_status, perform_handshake, start_server, TransportServerConfig};
-use agilang_build::{
-    compiler_binary_name, executable_suffix,
-    default_runtime_manifest, default_toolchain_manifest, discover_toolchain_from_exe,
-    write_runtime_manifest, write_toolchain_manifest, RUNTIME_DLL_NAME, RUNTIME_LIB_NAME,
-};
 use agilang_framework_database::DatabaseConfig;
 use agilang_framework_migrations::{MigrationExecutor, MigrationFile};
 use agilang_framework_seeding::{ProjectSeedConfig, SeederExecutor};
@@ -272,7 +272,9 @@ fn main() -> Result<()> {
                                             if *exhaustive { " exhaustive" } else { "" }
                                         );
                                     }
-                                    agilang_ir::HirStmt::While { condition, body, .. } => {
+                                    agilang_ir::HirStmt::While {
+                                        condition, body, ..
+                                    } => {
                                         println!(
                                             "{}{}While {} do {} stmt(s)",
                                             child_prefix,
@@ -350,9 +352,9 @@ fn main() -> Result<()> {
                             .file_name()
                             .map(|n| n.to_string_lossy().into_owned())
                             .unwrap_or_else(|| "app".into());
-                        out_exe = dir
-                            .join("build")
-                            .join(format!("{}{}", name, executable_suffix()));
+                        out_exe =
+                            dir.join("build")
+                                .join(format!("{}{}", name, executable_suffix()));
                         break;
                     }
                     if !dir.pop() {
@@ -403,9 +405,9 @@ fn main() -> Result<()> {
                             .file_name()
                             .map(|n| n.to_string_lossy().into_owned())
                             .unwrap_or_else(|| "app".into());
-                        out_exe = dir
-                            .join("build")
-                            .join(format!("{}{}", name, executable_suffix()));
+                        out_exe =
+                            dir.join("build")
+                                .join(format!("{}{}", name, executable_suffix()));
                         found_project = true;
                         break;
                     }
@@ -1428,7 +1430,9 @@ fn load_optional(path: Option<String>) -> Result<SourceFile> {
 
 fn default_install_root() -> PathBuf {
     if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
-        return PathBuf::from(local_app_data).join("Programs").join("AGILANG");
+        return PathBuf::from(local_app_data)
+            .join("Programs")
+            .join("AGILANG");
     }
     PathBuf::from(r"C:\AGILANG")
 }
@@ -1523,13 +1527,19 @@ fn command_install(args: Vec<String>) -> Result<()> {
     println!("  root: {}", install_root.display());
     println!(
         "  compiler: {}",
-        install_root.join("bin").join(compiler_binary_name()).display()
+        install_root
+            .join("bin")
+            .join(compiler_binary_name())
+            .display()
     );
     println!(
         "  runtime library: {}",
         install_root.join("lib").join(RUNTIME_LIB_NAME).display()
     );
-    println!("  manifest: {}", install_root.join("toolchain.json").display());
+    println!(
+        "  manifest: {}",
+        install_root.join("toolchain.json").display()
+    );
     Ok(())
 }
 
@@ -1563,12 +1573,19 @@ fn command_paths() -> Result<()> {
     );
     println!(
         "  manifest status: {}",
-        if toolchain.is_some() { "present" } else { "missing" }
+        if toolchain.is_some() {
+            "present"
+        } else {
+            "missing"
+        }
     );
     Ok(())
 }
 
-fn describe_install_layout(active_exe: &Path, toolchain: Option<&agilang_build::ToolchainInstallation>) -> &'static str {
+fn describe_install_layout(
+    active_exe: &Path,
+    toolchain: Option<&agilang_build::ToolchainInstallation>,
+) -> &'static str {
     if toolchain.is_some() {
         "manifest-backed"
     } else if active_exe
@@ -1611,7 +1628,10 @@ fn run_doctor() -> Result<()> {
         env::var("AGILANG_RUNTIME_LIB").unwrap_or_else(|_| "<unset>".to_string())
     );
     if let Some(toolchain) = &toolchain {
-        println!("  toolchain manifest: {}", toolchain.manifest_path.display());
+        println!(
+            "  toolchain manifest: {}",
+            toolchain.manifest_path.display()
+        );
         println!("  manifest version: {}", toolchain.manifest.version);
         println!("  manifest target: {}", toolchain.manifest.target);
     } else {
@@ -1639,7 +1659,11 @@ fn run_doctor() -> Result<()> {
         let runtime_version_match = runtime_path.exists();
         println!(
             "  runtime resolution status: {}",
-            if runtime_version_match { "ok" } else { "missing" }
+            if runtime_version_match {
+                "ok"
+            } else {
+                "missing"
+            }
         );
     } else {
         println!("  runtime resolution status: failed");
@@ -1679,7 +1703,11 @@ fn run_doctor() -> Result<()> {
 }
 
 fn print_tool_status(name: &str, available: bool) {
-    println!("  {}: {}", name, if available { "found" } else { "missing" });
+    println!(
+        "  {}: {}",
+        name,
+        if available { "found" } else { "missing" }
+    );
 }
 
 fn command_available(command: &str) -> bool {

@@ -503,20 +503,14 @@ mod tests {
 
     #[test]
     fn lexes_struct_keyword() {
-        let s = SourceFile::new(
-            "x.agi",
-            "struct Point:\n    x: i32\n    y: i32\n",
-        );
+        let s = SourceFile::new("x.agi", "struct Point:\n    x: i32\n    y: i32\n");
         let t = lex(&s).unwrap();
         assert!(t.iter().any(|x| x.kind == TokenKind::Struct));
     }
 
     #[test]
     fn lexes_enum_keyword() {
-        let s = SourceFile::new(
-            "x.agi",
-            "enum Status:\n    Pending\n    Active\n",
-        );
+        let s = SourceFile::new("x.agi", "enum Status:\n    Pending\n    Active\n");
         let t = lex(&s).unwrap();
         assert!(t.iter().any(|x| x.kind == TokenKind::Enum));
     }

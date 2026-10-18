@@ -75,7 +75,9 @@ impl Mempool {
             if transaction.gas_price <= existing.transaction.gas_price {
                 return invalid("replacement transaction gas price must be higher");
             }
-            self.by_hash.remove(&existing_hash).map(|entry| entry.transaction)
+            self.by_hash
+                .remove(&existing_hash)
+                .map(|entry| entry.transaction)
         } else {
             None
         };
@@ -115,11 +117,7 @@ impl Mempool {
         next
     }
 
-    pub fn select(
-        &self,
-        config: &BlockchainConfig,
-        state: &ChainState,
-    ) -> Vec<Transaction> {
+    pub fn select(&self, config: &BlockchainConfig, state: &ChainState) -> Vec<Transaction> {
         let mut candidates: Vec<&MempoolEntry> = self.by_hash.values().collect();
         candidates.sort_by(|left, right| {
             right
@@ -265,10 +263,8 @@ impl BlockchainNode {
         self.database
             .set_canonical_chain(&best.hash, self.config.finality_depth)?;
         self.database.put_state("chain_state", &candidate_state)?;
-        self.database.put_state(
-            &format!("receipts:{}", block.hash),
-            &receipts,
-        )?;
+        self.database
+            .put_state(&format!("receipts:{}", block.hash), &receipts)?;
         self.state = candidate_state;
         self.mempool
             .remove_many(block.transactions.iter().map(|tx| tx.hash.as_str()));
@@ -313,7 +309,10 @@ impl BlockchainNode {
             "eth_getTransactionByHash" => {
                 let hash = param_string(&params, 0)?;
                 if let Some(stored) = self.database.transaction(hash)? {
-                    Ok(transaction_json(&stored.transaction, stored.block_hash.as_deref()))
+                    Ok(transaction_json(
+                        &stored.transaction,
+                        stored.block_hash.as_deref(),
+                    ))
                 } else if let Some(transaction) = self.mempool.transaction(hash) {
                     Ok(transaction_json(transaction, None))
                 } else {
@@ -328,9 +327,8 @@ impl BlockchainNode {
                 let Some(block_hash) = stored.block_hash else {
                     return Ok(Value::Null);
                 };
-                let receipts: Option<Vec<Receipt>> = self
-                    .database
-                    .state(&format!("receipts:{block_hash}"))?;
+                let receipts: Option<Vec<Receipt>> =
+                    self.database.state(&format!("receipts:{block_hash}"))?;
                 let receipt = receipts
                     .unwrap_or_default()
                     .into_iter()
@@ -512,11 +510,29 @@ mod tests {
     fn mempool_replaces_same_sender_nonce_with_higher_price() {
         let mut node = node();
         let first = Transaction::new(
-            "alice", "bob", 1, "0x", 0, 21_000, 1, "transfer", None, BTreeMap::new(),
+            "alice",
+            "bob",
+            1,
+            "0x",
+            0,
+            21_000,
+            1,
+            "transfer",
+            None,
+            BTreeMap::new(),
         )
         .unwrap();
         let second = Transaction::new(
-            "alice", "bob", 1, "0x", 0, 21_000, 2, "transfer", None, BTreeMap::new(),
+            "alice",
+            "bob",
+            1,
+            "0x",
+            0,
+            21_000,
+            2,
+            "transfer",
+            None,
+            BTreeMap::new(),
         )
         .unwrap();
         node.submit_transaction(first.clone(), 1).unwrap();
@@ -529,7 +545,16 @@ mod tests {
     fn produces_persists_and_removes_transactions() {
         let mut node = node();
         let transaction = Transaction::new(
-            "alice", "bob", 100, "0x", 0, 21_000, 1, "transfer", None, BTreeMap::new(),
+            "alice",
+            "bob",
+            100,
+            "0x",
+            0,
+            21_000,
+            1,
+            "transfer",
+            None,
+            BTreeMap::new(),
         )
         .unwrap();
         let hash = transaction.hash.clone();
@@ -547,7 +572,10 @@ mod tests {
     fn exposes_basic_json_rpc() {
         let node = node();
         assert_eq!(node.rpc("eth_chainId", json!([])).unwrap(), json!("0x1e61"));
-        assert_eq!(node.rpc("eth_blockNumber", json!([])).unwrap(), json!("0x0"));
+        assert_eq!(
+            node.rpc("eth_blockNumber", json!([])).unwrap(),
+            json!("0x0")
+        );
         assert_eq!(
             node.rpc("eth_getTransactionCount", json!(["alice", "latest"]))
                 .unwrap(),

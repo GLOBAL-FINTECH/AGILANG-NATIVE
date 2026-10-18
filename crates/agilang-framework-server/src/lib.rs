@@ -28,7 +28,8 @@ pub enum ControllerResult {
 static AUTH_RATE_LIMITER: OnceLock<Mutex<HashMap<String, Vec<u64>>>> = OnceLock::new();
 static ACTIVE_REGISTRATIONS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 static WEBRTC_SIGNALING_HUB: OnceLock<SignalingHub> = OnceLock::new();
-static WEBRTC_PEER_REGISTRY: OnceLock<Mutex<HashMap<String, WebRtcPeerRegistration>>> = OnceLock::new();
+static WEBRTC_PEER_REGISTRY: OnceLock<Mutex<HashMap<String, WebRtcPeerRegistration>>> =
+    OnceLock::new();
 static WEBRTC_MEETING_REGISTRY: OnceLock<Mutex<HashMap<String, WebRtcMeetingRegistration>>> =
     OnceLock::new();
 
@@ -426,10 +427,7 @@ fn load_users_by_email(
             &[DatabaseValue::Text(email.to_string())],
         )
         .map_err(|err| err.to_string())?;
-    let mut users = rows
-        .iter()
-        .map(auth_user_from_row)
-        .collect::<Vec<_>>();
+    let mut users = rows.iter().map(auth_user_from_row).collect::<Vec<_>>();
     users.sort_by_key(|user| user.numeric_id.unwrap_or_default());
     Ok(users)
 }
@@ -463,9 +461,7 @@ fn build_logout_cookie_header(req: &Request) -> String {
     } else {
         "; Secure"
     };
-    format!(
-        "{SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly{secure}"
-    )
+    format!("{SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly{secure}")
 }
 
 fn escape_html_attribute(value: &str) -> String {
@@ -1143,7 +1139,7 @@ fn handle_auth_request(
         .and_then(|values| values.first())
         .cloned()
         .unwrap_or_default();
-        let Some(session) = existing_session else {
+    let Some(session) = existing_session else {
         if is_logout {
             let mut response = redirect_response("/login");
             response
@@ -1439,9 +1435,13 @@ pub(crate) fn handle_webrtc_request(
                     serde_json::json!({ "error": "peer_id is required" }).to_string(),
                 )));
             }
-            if let Err(response) =
-                register_webrtc_peer(&peer_id, meeting_id.as_deref(), role.as_deref(), &session, &user)
-            {
+            if let Err(response) = register_webrtc_peer(
+                &peer_id,
+                meeting_id.as_deref(),
+                role.as_deref(),
+                &session,
+                &user,
+            ) {
                 return Ok(Some(response));
             }
             let meeting = meeting_id
@@ -1630,13 +1630,16 @@ pub(crate) fn handle_webrtc_request(
                     serde_json::json!({ "error": "peer_id is not registered" }).to_string(),
                 )));
             };
-            if registration.session_token_hash != session.token_hash || registration.user_id != user.id {
+            if registration.session_token_hash != session.token_hash
+                || registration.user_id != user.id
+            {
                 return Ok(Some(build_json_response(
                     403,
                     serde_json::json!({ "error": "peer ownership mismatch" }).to_string(),
                 )));
             }
-            let message = block_on_runtime(async { webrtc_signaling_hub().receive(&peer_id).await })?;
+            let message =
+                block_on_runtime(async { webrtc_signaling_hub().receive(&peer_id).await })?;
             if let Some(ref message) = message {
                 log_webrtc_trace(
                     "signal_deliver",
@@ -2929,7 +2932,11 @@ fn register_api() -> void:
 
         let model_path = root.join("app/Models/Post.agi");
         let model = fs::read_to_string(&model_path).unwrap();
-        fs::write(&model_path, model.replace("hidden = []", "hidden = [\"deleted_at\"]")).unwrap();
+        fs::write(
+            &model_path,
+            model.replace("hidden = []", "hidden = [\"deleted_at\"]"),
+        )
+        .unwrap();
 
         if driver == FrameworkDriver::Sqlite {
             let config_path = root.join("config/database.agi");
@@ -2994,11 +3001,20 @@ fn register_api() -> void:
         let root = setup_generated_post_project(name, driver.clone());
         let config = post_database_config(&root, driver);
         let mut executor = MigrationExecutor::connect(&config).unwrap();
-        executor.run_migrations(&[post_migration_file()], false).unwrap();
+        executor
+            .run_migrations(&[post_migration_file()], false)
+            .unwrap();
 
         let unauthorized = invoke_app(
             &root,
-            json_request(HttpMethod::Post, "/api/posts", None, None, r#"{"name":"Nope"}"#, 60),
+            json_request(
+                HttpMethod::Post,
+                "/api/posts",
+                None,
+                None,
+                r#"{"name":"Nope"}"#,
+                60,
+            ),
         );
         assert_eq!(unauthorized.status, 403, "{}", response_text(&unauthorized));
 
@@ -3029,7 +3045,14 @@ fn register_api() -> void:
 
         let invalid = invoke_app(
             &root,
-            json_request(HttpMethod::Post, "/api/posts", Some(&auth_cookie), Some(&csrf), "{}", 61),
+            json_request(
+                HttpMethod::Post,
+                "/api/posts",
+                Some(&auth_cookie),
+                Some(&csrf),
+                "{}",
+                61,
+            ),
         );
         assert_eq!(invalid.status, 422, "{}", response_text(&invalid));
 
@@ -3050,19 +3073,31 @@ fn register_api() -> void:
         assert_eq!(created["data"]["name"], "First Post");
         assert!(created["data"].get("deleted_at").is_none());
 
-        let list = invoke_app(&root, request(HttpMethod::Get, "/api/posts", None, None, 62));
+        let list = invoke_app(
+            &root,
+            request(HttpMethod::Get, "/api/posts", None, None, 62),
+        );
         assert_eq!(list.status, 200);
         assert!(response_text(&list).contains("First Post"));
 
         let show = invoke_app(
             &root,
-            request(HttpMethod::Get, &format!("/api/posts/{post_id}"), None, None, 62),
+            request(
+                HttpMethod::Get,
+                &format!("/api/posts/{post_id}"),
+                None,
+                None,
+                62,
+            ),
         );
         assert_eq!(show.status, 200);
         assert!(response_text(&show).contains("First Post"));
         assert!(!response_text(&show).contains("deleted_at"));
 
-        let missing = invoke_app(&root, request(HttpMethod::Get, "/api/posts/999999", None, None, 62));
+        let missing = invoke_app(
+            &root,
+            request(HttpMethod::Get, "/api/posts/999999", None, None, 62),
+        );
         assert_eq!(missing.status, 404);
 
         let update = invoke_app(
@@ -3095,7 +3130,13 @@ fn register_api() -> void:
 
         let after_delete = invoke_app(
             &root,
-            request(HttpMethod::Get, &format!("/api/posts/{post_id}"), None, None, 62),
+            request(
+                HttpMethod::Get,
+                &format!("/api/posts/{post_id}"),
+                None,
+                None,
+                62,
+            ),
         );
         assert_eq!(after_delete.status, 404);
 
@@ -3114,14 +3155,26 @@ fn register_api() -> void:
 
         let after_restore = invoke_app(
             &root,
-            request(HttpMethod::Get, &format!("/api/posts/{post_id}"), None, None, 62),
+            request(
+                HttpMethod::Get,
+                &format!("/api/posts/{post_id}"),
+                None,
+                None,
+                62,
+            ),
         );
         assert_eq!(after_restore.status, 200);
         assert!(response_text(&after_restore).contains("Updated Post"));
 
         let after_restart = invoke_app(
             &root,
-            request(HttpMethod::Get, &format!("/api/posts/{post_id}"), None, None, 62),
+            request(
+                HttpMethod::Get,
+                &format!("/api/posts/{post_id}"),
+                None,
+                None,
+                62,
+            ),
         );
         assert_eq!(after_restart.status, 200);
 
@@ -3648,7 +3701,10 @@ fn register_api() -> void:
             query_request(
                 HttpMethod::Get,
                 "/login",
-                &[("return_to", "/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local")],
+                &[(
+                    "return_to",
+                    "/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local",
+                )],
                 None,
                 41,
             ),
@@ -3664,7 +3720,10 @@ fn register_api() -> void:
             query_request(
                 HttpMethod::Get,
                 "/register",
-                &[("return_to", "/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local")],
+                &[(
+                    "return_to",
+                    "/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local",
+                )],
                 None,
                 42,
             ),
@@ -3680,7 +3739,10 @@ fn register_api() -> void:
                 Some(&register_cookie),
                 Some(&form_body(&[
                     ("_csrf", &register_csrf),
-                    ("return_to", "/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local"),
+                    (
+                        "return_to",
+                        "/?meeting=246945224&host=meeting-246945224-video-alpha-queral-local",
+                    ),
                     ("name", "Meeting Guest"),
                     ("email", "meeting-guest@example.com"),
                     ("password", "Password123!"),
@@ -3723,7 +3785,11 @@ fn register_api() -> void:
                 remote_addr: Some(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 44))),
             },
         );
-        let localhost_cookie = localhost_login.headers.get("Set-Cookie").cloned().unwrap_or_default();
+        let localhost_cookie = localhost_login
+            .headers
+            .get("Set-Cookie")
+            .cloned()
+            .unwrap_or_default();
         assert!(localhost_cookie.contains("SameSite=Lax"));
         assert!(!localhost_cookie.contains("Secure"));
 
@@ -3788,7 +3854,13 @@ fn register_api() -> void:
         let me = invoke(
             &root,
             &engine,
-            request(HttpMethod::Get, "/api/auth/me", Some(&login_cookie), None, 52),
+            request(
+                HttpMethod::Get,
+                "/api/auth/me",
+                Some(&login_cookie),
+                None,
+                52,
+            ),
         );
         assert_eq!(me.status, 200);
         assert!(response_text(&me).contains("duplicate.session@example.com"));
@@ -3812,7 +3884,13 @@ fn register_api() -> void:
         let me_after_register = invoke(
             &root,
             &engine,
-            request(HttpMethod::Get, "/api/auth/me", Some(&auth_cookie), None, 53),
+            request(
+                HttpMethod::Get,
+                "/api/auth/me",
+                Some(&auth_cookie),
+                None,
+                53,
+            ),
         );
         assert_eq!(me_after_register.status, 200);
         assert!(response_text(&me_after_register).contains("meeting.flow@example.com"));
@@ -3865,7 +3943,13 @@ fn register_api() -> void:
         let me_after_login = invoke(
             &root,
             &engine,
-            request(HttpMethod::Get, "/api/auth/me", Some(&login_cookie), None, 54),
+            request(
+                HttpMethod::Get,
+                "/api/auth/me",
+                Some(&login_cookie),
+                None,
+                54,
+            ),
         );
         assert_eq!(me_after_login.status, 200);
         assert!(response_text(&me_after_login).contains("meeting.flow@example.com"));
@@ -3877,7 +3961,11 @@ fn register_api() -> void:
     fn resolved_auth_db_path_uses_project_relative_env_file() {
         let root = unique_test_root("auth_db_relative_env");
         fs::create_dir_all(&root).unwrap();
-        fs::write(root.join(".env"), "AGIDB_DATABASE=storage/database/main.agidb\n").unwrap();
+        fs::write(
+            root.join(".env"),
+            "AGIDB_DATABASE=storage/database/main.agidb\n",
+        )
+        .unwrap();
 
         let resolved = resolved_auth_db_path(&root);
         assert_eq!(
@@ -4307,7 +4395,9 @@ fn register_api() -> void:
             ),
         );
         assert_eq!(meeting_after_logout.status, 200);
-        assert!(response_text(&meeting_after_logout).contains("\"host_peer_id\":\"meeting-123-guest\""));
+        assert!(
+            response_text(&meeting_after_logout).contains("\"host_peer_id\":\"meeting-123-guest\"")
+        );
         assert!(response_text(&meeting_after_logout).contains("\"member_count\":1"));
 
         fs::remove_dir_all(root).ok();
@@ -4363,8 +4453,7 @@ fn try_handle_websocket_request(
             400
         }
         Err(error) => {
-            let response =
-                build_text_response(500, "text/plain; charset=utf-8", error.to_string());
+            let response = build_text_response(500, "text/plain; charset=utf-8", error.to_string());
             let _ = write_framework_response(stream, response);
             500
         }
