@@ -30,6 +30,25 @@ GPU test and must fail, rather than fake success, when no physical Vulkan GPU
 is available. The Cargo.lock file needs to be updated and committed using a
 Rust-equipped development machine when pulling new optional dependencies.
 
+## Hardware verification
+
+First confirmed GPU execution, 2026-10-18, on the reference workstation:
+
+| Item | Value |
+| --- | --- |
+| GPU | AMD Radeon RX 6800 XT (discrete), Vulkan API 1.4.315 |
+| Driver | AMD proprietary 26.8.1 (Windows driver 32.0.21045.5002) |
+| OS / toolchain | Windows 11 Pro 10.0.26200, cargo 1.97.1, MSVC 2022 Build Tools |
+
+| Check | Result |
+| --- | --- |
+| `cargo test -p agilang-runtime-accelerator --features vulkan` | 4 passed |
+| `AGILANG_TEST_VULKAN=1` strict `hardware_gpu_matmul_opt_in` | passed (`RequireAccelerator`, no CPU fallback) |
+| `cargo build -p agilang-runtime-abi --features vulkan --release` | built |
+| `examples/vulkan_matmul_smoke.c` via MSVC + release DLL, policy `2` | `58 64 139 154` — GPU verification PASSED |
+
+This verifies correctness only; no performance measurement has been made yet.
+
 ## Exposed Rust API
 
 ```rust
@@ -67,6 +86,6 @@ application test must still be wired to the new C ABI signature.
   and asynchronous multi-dispatch scheduling are future improvements.
 - Buffers larger than device binding limits return an explicit error.
 - CPU tensor operations and autograd currently use f64 and are unaffected.
-- The AMD GPU must be physically tested on Windows; CI without Vulkan hardware
-  can only validate compilation and CPU tests.
+- CI without Vulkan hardware can only validate compilation and CPU tests;
+  GPU runs must be repeated on physical hardware (see Hardware verification).
 - No guarantee of speedup until measured on the RX 6800 XT.
