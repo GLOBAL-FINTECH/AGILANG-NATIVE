@@ -12,7 +12,11 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use agilang_runtime_accelerator::capabilities_json as accelerator_capabilities_json;
+use agilang_runtime_accelerator::{
+    capabilities_json as accelerator_capabilities_json,
+    matmul_f32 as accelerator_matmul_f32,
+    DispatchPolicy,
+};
 use agilang_runtime_compute::{capabilities as compute_capabilities, LinearModel, Tensor};
 use agilang_runtime_core::{
     AgilangError, AgilangType, AgilangValue, ErrorCode, HandleId, HandleRegistry, RuntimeResult,
@@ -723,6 +727,54 @@ pub unsafe extern "C" fn agi_linear_model_train_batch(
 #[no_mangle]
 pub unsafe extern "C" fn agi_accelerator_capabilities_json(out: *mut AgiBuffer) -> u32 {
     ffi_status(|| write_buffer(out, accelerator_capabilities_json()?))
+}
+
+/// Multiply row-major f32 matrices A[m,k] and B[k,n] using an explicit device policy.
+/// policy: 0=CPU only, 1=prefer Vulkan with CPU fallback, 2=require Vulkan GPU.
+/// Output must hold at least m*n f32 values. All pointers must refer to valid arrays.
+#[no_mangle]
+pub unsafe extern "C" fn agi_accelerator_matmul_f32(
+    left: *const f32,
+    left_len: usize,
+    right: *const f32,
+    right_len: usize,
+    m: usize,
+    k: usize,
+    n: usize,
+    policy: u32,
+    out: *mut f32,
+    out_capacity: usize,
+) -> u32 {
+    ffi_status(|| {
+        let policy = match policy {
+            0 => DispatchPolicy::CpuOnly,
+            1 => DispatchPolicy::PreferAccelerator,
+            2 => DispatchPolicy::RequireAccelerator,
+            _ => return Err(AgilangError::invalid_argument("invalid accelerator dispatch policy")),
+        };
+        let required = m.checked_mul(n).ok_or_else(|| {
+            AgilangError::new(ErrorCode::Overflow, "output element count overflow")
+        })?;
+        if out.is_null() || out_capacity < required {
+            return Err(AgilangError::invalid_argument("matmul output pointer is null or capacity too small"));
+        }
+        // Copy inputs to owned arrays before writing to out; callers may reuse buffers.
+        let left = input_f32_slice(left, left_len)?.to_vec();
+        let right = input_f32_slice(right, right_len)?.to_vec();
+        let values = accelerator_matmul_f32(&left, &right, m, k, n, policy)?;
+        ptr::copy(values.as_ptr(), out, values.len());
+        Ok(())
+    })
+}
+
+unsafe fn input_f32_slice<'a>(data: *const f32, len: usize) -> RuntimeResult<&'a [f32]> {
+    if len == 0 {
+        return Ok(&[]);
+    }
+    if data.is_null() {
+        return Err(AgilangError::invalid_argument("f32 input pointer is null"));
+    }
+    Ok(slice::from_raw_parts(data, len))
 }
 
 #[no_mangle]
