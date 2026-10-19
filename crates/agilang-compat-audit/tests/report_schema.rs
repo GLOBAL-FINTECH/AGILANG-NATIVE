@@ -1,6 +1,6 @@
 use serde_json::Value;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -25,7 +25,7 @@ fn echo_cmd(text: &str) -> String {
     format!("sh -lc 'printf %s {text}'")
 }
 
-fn write_manifest(root: &PathBuf) {
+fn write_manifest(root: &Path) {
     let native_cmd = echo_cmd("same");
     let canonical_cmd = echo_cmd("same");
     let manifest = format!(
@@ -45,7 +45,10 @@ fn parity_report_contains_wave1_summary_and_category_blocks() {
         .arg(&root)
         .status()
         .expect("run parity command");
-    assert!(status.success(), "parity command should pass for schema validation fixture");
+    assert!(
+        status.success(),
+        "parity command should pass for schema validation fixture"
+    );
 
     let report_path = root.join("compat/reports/python314-parity-report.json");
     let report_text = fs::read_to_string(&report_path).expect("read parity report");
@@ -56,7 +59,10 @@ fn parity_report_contains_wave1_summary_and_category_blocks() {
         summary.get("fixture_parity_percent").is_some(),
         "summary.fixture_parity_percent present"
     );
-    assert!(summary.get("coverage_percent").is_some(), "summary.coverage_percent present");
+    assert!(
+        summary.get("coverage_percent").is_some(),
+        "summary.coverage_percent present"
+    );
     assert!(
         summary.get("capability_coverage_percent").is_some(),
         "summary.capability_coverage_percent present"
@@ -65,16 +71,37 @@ fn parity_report_contains_wave1_summary_and_category_blocks() {
         summary.get("capability_status_counts").is_some(),
         "summary.capability_status_counts present"
     );
-    assert!(summary.get("report_integrity").is_some(), "summary.report_integrity present");
-    assert!(summary.get("report_write_mode").is_some(), "summary.report_write_mode present");
-    assert!(summary.get("coverage_scope").is_some(), "summary.coverage_scope present");
+    assert!(
+        summary.get("report_integrity").is_some(),
+        "summary.report_integrity present"
+    );
+    assert!(
+        summary.get("report_write_mode").is_some(),
+        "summary.report_write_mode present"
+    );
+    assert!(
+        summary.get("coverage_scope").is_some(),
+        "summary.coverage_scope present"
+    );
 
-    assert!(report.get("capability_registry").is_some(), "capability_registry present");
-    assert!(report.get("covered_capabilities").is_some(), "covered_capabilities present");
-    assert!(report.get("capability_status").is_some(), "capability_status present");
+    assert!(
+        report.get("capability_registry").is_some(),
+        "capability_registry present"
+    );
+    assert!(
+        report.get("covered_capabilities").is_some(),
+        "covered_capabilities present"
+    );
+    assert!(
+        report.get("capability_status").is_some(),
+        "capability_status present"
+    );
 
     let categories = report.get("categories").expect("categories block present");
-    assert!(categories.get("syntax").is_some(), "categories.syntax present");
+    assert!(
+        categories.get("syntax").is_some(),
+        "categories.syntax present"
+    );
 
     let results = report
         .get("results")
@@ -83,8 +110,20 @@ fn parity_report_contains_wave1_summary_and_category_blocks() {
     assert!(!results.is_empty(), "results array should not be empty");
 
     let first = &results[0];
-    assert!(first.get("capabilities").is_some(), "result.capabilities present");
-    assert!(first.get("comparison_mode").is_some(), "comparison_mode present");
-    assert!(first.get("normalization_applied").is_some(), "normalization_applied present");
-    assert!(first.get("classification").is_some(), "classification present");
+    assert!(
+        first.get("capabilities").is_some(),
+        "result.capabilities present"
+    );
+    assert!(
+        first.get("comparison_mode").is_some(),
+        "comparison_mode present"
+    );
+    assert!(
+        first.get("normalization_applied").is_some(),
+        "normalization_applied present"
+    );
+    assert!(
+        first.get("classification").is_some(),
+        "classification present"
+    );
 }

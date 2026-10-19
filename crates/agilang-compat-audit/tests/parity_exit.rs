@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -24,7 +24,7 @@ fn echo_cmd(text: &str) -> String {
     format!("sh -lc 'printf %s {text}'")
 }
 
-fn write_manifest(root: &PathBuf, native_cmd: &str, canonical_cmd: &str) {
+fn write_manifest(root: &Path, native_cmd: &str, canonical_cmd: &str) {
     let manifest = format!(
         "{{\n  \"schema\": \"AGI-PARITY-1\",\n  \"expected_fixture_count\": 1,\n  \"expected_parity_fixture_count\": 1,\n  \"fixtures\": [\n    {{\n      \"id\": \"exit-check\",\n      \"category\": \"semantic\",\n      \"path\": \"compat/python314/dummy.agi\",\n      \"native_cmd\": \"{}\",\n      \"canonical_cmd\": \"{}\",\n      \"expected\": {{ \"exit_code\": 0 }}\n    }}\n  ]\n}}\n",
         native_cmd.replace('\\', "\\\\").replace('"', "\\\""),

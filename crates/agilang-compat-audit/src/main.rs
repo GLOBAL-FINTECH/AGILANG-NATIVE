@@ -2,11 +2,12 @@ use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::{
-    env, fs,
+    env,
     ffi::OsString,
+    fs,
     io::Write,
-    process::Command,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 #[derive(Debug, Clone)]
@@ -62,7 +63,9 @@ fn read_optional_file(path: &Path) -> Option<String> {
     if !path.exists() {
         return None;
     }
-    fs::read_to_string(path).ok().map(|s| normalize_newlines(&s))
+    fs::read_to_string(path)
+        .ok()
+        .map(|s| normalize_newlines(&s))
 }
 
 fn run_shell(command: &str, cwd: &Path) -> Result<(i32, String, String)> {
@@ -193,12 +196,7 @@ fn run_fixture_engine(
     let rendered = resolve_cargo_command(&rendered);
     let (exit_code, stdout, stderr, execution_error) = match run_shell(&rendered, cwd) {
         Ok((code, out, err)) => (code, out, err, None),
-        Err(err) => (
-            -1,
-            String::new(),
-            String::new(),
-            Some(err.to_string()),
-        ),
+        Err(err) => (-1, String::new(), String::new(), Some(err.to_string())),
     };
     let artifact_values = artifacts
         .iter()
@@ -223,18 +221,16 @@ fn resolve_cargo_command(command: &str) -> String {
         return command.to_string();
     }
 
-    let cargo_bin = env::var("AGILANG_CARGO_BIN")
-        .ok()
-        .or_else(|| {
-            env::var("USERPROFILE").ok().and_then(|home| {
-                let candidate = PathBuf::from(home).join(".cargo/bin/cargo.exe");
-                if candidate.exists() {
-                    Some(candidate.to_string_lossy().to_string())
-                } else {
-                    None
-                }
-            })
-        });
+    let cargo_bin = env::var("AGILANG_CARGO_BIN").ok().or_else(|| {
+        env::var("USERPROFILE").ok().and_then(|home| {
+            let candidate = PathBuf::from(home).join(".cargo/bin/cargo.exe");
+            if candidate.exists() {
+                Some(candidate.to_string_lossy().to_string())
+            } else {
+                None
+            }
+        })
+    });
 
     if let Some(bin) = cargo_bin {
         let suffix = trimmed.strip_prefix(cargo_prefix).unwrap_or_default();
@@ -560,9 +556,11 @@ fn run_parity(root: &Path) -> Result<()> {
 
             let mut parity_ok = true;
             let native_stdout_cmp = normalized_for_compare(&native.stdout, &native_cmd, false);
-            let canonical_stdout_cmp = normalized_for_compare(&canonical.stdout, &canonical_cmd, false);
+            let canonical_stdout_cmp =
+                normalized_for_compare(&canonical.stdout, &canonical_cmd, false);
             let native_stderr_cmp = normalized_for_compare(&native.stderr, &native_cmd, true);
-            let canonical_stderr_cmp = normalized_for_compare(&canonical.stderr, &canonical_cmd, true);
+            let canonical_stderr_cmp =
+                normalized_for_compare(&canonical.stderr, &canonical_cmd, true);
 
             if canonical.execution_error.is_some() {
                 parity_ok = false;
@@ -697,9 +695,7 @@ fn run_parity(root: &Path) -> Result<()> {
 
     let mut category_scores: BTreeMap<String, CategoryScore> = BTreeMap::new();
     for result in &fixture_results {
-        let entry = category_scores
-            .entry(result.category.clone())
-            .or_default();
+        let entry = category_scores.entry(result.category.clone()).or_default();
         entry.total += 1;
         let passed = result.native_status == "pass" && result.parity_status == "pass";
         if passed {
@@ -838,7 +834,11 @@ fn run_parity(root: &Path) -> Result<()> {
         .with_context(|| format!("failed to write report: {}", report_path.display()))?;
 
     println!("AGILANG parity report: {}", report_path.display());
-    println!("Fixtures: {}/{} native expectations passed", native_passed, fixtures.len());
+    println!(
+        "Fixtures: {}/{} native expectations passed",
+        native_passed,
+        fixtures.len()
+    );
     println!("Compared canonical-vs-native: {}", compared);
     println!("Mismatches: {}", mismatches.len());
 
@@ -1003,7 +1003,10 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_cargo_test_stderr, normalize_cargo_test_stdout, normalized_for_compare, resolve_cargo_command};
+    use super::{
+        normalize_cargo_test_stderr, normalize_cargo_test_stdout, normalized_for_compare,
+        resolve_cargo_command,
+    };
 
     #[test]
     fn cargo_test_stdout_order_is_normalized() {
@@ -1043,8 +1046,16 @@ mod tests {
         let canonical = "running 7 tests\ntest tests::live_state_machine_rejects_impossible_states_and_preserves_data ... ok\ntest tests::compiles_full_html_template_through_directive_pipeline ... ok\ntest tests::hydration_does_not_duplicate_initial_fetch ... ok\ntest tests::rejects_unknown_sibaq_field ... ok\ntest tests::missing_initial_state_loads_immediately_without_discarding_runtime_errors ... ok\ntest tests::lowers_reactive_state_blocks ... ok\ntest tests::compiles_sibaq_dashboard_end_to_end ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s";
 
         assert_eq!(
-            normalized_for_compare(native, "cargo test -p agilang-ags-compiler --release --locked", false),
-            normalized_for_compare(canonical, "cargo test -p agilang-ags-compiler --release --locked", false)
+            normalized_for_compare(
+                native,
+                "cargo test -p agilang-ags-compiler --release --locked",
+                false
+            ),
+            normalized_for_compare(
+                canonical,
+                "cargo test -p agilang-ags-compiler --release --locked",
+                false
+            )
         );
     }
 
@@ -1076,8 +1087,16 @@ mod tests {
         let canonical = "running 4 tests\ntest tests::a ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s";
 
         assert_eq!(
-            normalized_for_compare(native, "cargo test -p agilang-database-agidb --release --locked", false),
-            normalized_for_compare(canonical, "cargo test -p agilang-database-agidb --release --locked", false)
+            normalized_for_compare(
+                native,
+                "cargo test -p agilang-database-agidb --release --locked",
+                false
+            ),
+            normalized_for_compare(
+                canonical,
+                "cargo test -p agilang-database-agidb --release --locked",
+                false
+            )
         );
     }
 
@@ -1087,8 +1106,16 @@ mod tests {
         let canonical = "running 4 tests\ntest tests::test_single_writer_process_lock ... ok\ntest tests::persists_inserted_rows ... ok\ntest tests::rolls_back_transaction_snapshot ... ok\ntest tests::concurrent_writes_keep_valid_json_and_preserve_rows ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s";
 
         assert_eq!(
-            normalized_for_compare(native, "cargo test -p agilang-database-agidb --release --locked", false),
-            normalized_for_compare(canonical, "cargo test -p agilang-database-agidb --release --locked", false)
+            normalized_for_compare(
+                native,
+                "cargo test -p agilang-database-agidb --release --locked",
+                false
+            ),
+            normalized_for_compare(
+                canonical,
+                "cargo test -p agilang-database-agidb --release --locked",
+                false
+            )
         );
     }
 

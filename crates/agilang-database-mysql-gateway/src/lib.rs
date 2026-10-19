@@ -872,7 +872,9 @@ mod tests {
     #[test]
     fn pymysql_can_authenticate_and_query_agidb() {
         if !python_with_pymysql_available() {
-            eprintln!("skipping pymysql_can_authenticate_and_query_agidb: python/pymysql unavailable");
+            eprintln!(
+                "skipping pymysql_can_authenticate_and_query_agidb: python/pymysql unavailable"
+            );
             return;
         }
         let db_path = temp_path("db", "agidb");
