@@ -95,6 +95,18 @@ impl Analyser {
                 Type::Void,
             ),
             ("len", vec![Type::List(Box::new(Type::Unknown))], Type::I64),
+            (
+                "gpu_matmul",
+                vec![
+                    Type::List(Box::new(Type::F64)),
+                    Type::List(Box::new(Type::F64)),
+                    Type::I64,
+                    Type::I64,
+                    Type::I64,
+                    Type::I64,
+                ],
+                Type::List(Box::new(Type::F64)),
+            ),
             ("get", vec![Type::Unknown, Type::String], Type::String),
             (
                 "post",
@@ -1765,6 +1777,9 @@ impl Analyser {
             "len" => {
                 exact_args = Some(1);
             }
+            "gpu_matmul" => {
+                exact_args = Some(6);
+            }
             "get" | "get_json" => {
                 exact_args = Some(2);
             }
@@ -1928,6 +1943,48 @@ impl Analyser {
             ));
         }
 
+        if name == "gpu_matmul" && hir_args.len() == 6 {
+            for (idx, label) in [(0, "first"), (1, "second")] {
+                if !Self::is_numeric_list_type(hir_args[idx].ty())
+                    && hir_args[idx].ty() != &Type::Error
+                {
+                    self.errors.push(Diagnostic::error(
+                        "E2003",
+                        format!(
+                            "argument type mismatch: function `gpu_matmul` expects {} argument as numeric list, found `{}`",
+                            label,
+                            hir_args[idx].ty()
+                        ),
+                        hir_args[idx].span(),
+                    ));
+                }
+            }
+            for (idx, label) in [(2, "m"), (3, "k"), (4, "n"), (5, "policy")] {
+                if !hir_args[idx].ty().is_integer() && hir_args[idx].ty() != &Type::Error {
+                    self.errors.push(Diagnostic::error(
+                        "E2003",
+                        format!(
+                            "argument type mismatch: function `gpu_matmul` expects integer `{}`, found `{}`",
+                            label,
+                            hir_args[idx].ty()
+                        ),
+                        hir_args[idx].span(),
+                    ));
+                }
+            }
+            if let HirExpr::Integer(policy, _, policy_span) = &hir_args[5] {
+                if !(0..=2).contains(policy) {
+                    self.errors.push(Diagnostic::error(
+                        "E2003",
+                        format!(
+                            "invalid dispatch policy {policy} for `gpu_matmul`: expected 0 (CPU), 1 (prefer GPU) or 2 (require GPU)"
+                        ),
+                        *policy_span,
+                    ));
+                }
+            }
+        }
+
         if (name == "get" || name == "get_json")
             && hir_args.len() == 2
             && hir_args[1].ty() != &Type::String
@@ -1968,6 +2025,7 @@ impl Analyser {
         let ret_ty = match name {
             "print" | "append" => Type::Void,
             "len" => Type::I64,
+            "gpu_matmul" => Type::List(Box::new(Type::F64)),
             "is_nan" | "is_finite" | "is_infinite" => Type::Bool,
             "get" | "post" | "get_json" | "post_json" => Type::String,
             // `mode` currently lowers to NaN when no mode exists.
@@ -2040,6 +2098,35 @@ mod tests {
         let src = "fn main() -> i32:\n    let x = sqrt(\"nope\")\n    return 0\n";
         let errs = check_source(src).unwrap_err();
         assert!(errs.iter().any(|e| e.code == "E2003"));
+    }
+
+    #[test]
+    fn test_gpu_matmul_returns_numeric_list() {
+        let src = "fn main() -> i32:\n    let a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]\n    let b = [7.0, 8.0, 9.0, 10.0, 11.0, 12.0]\n    let c = gpu_matmul(a, b, 2, 3, 2, 2)\n    print(c[0], len(c))\n    return 0\n";
+        assert!(check_source(src).is_ok());
+    }
+
+    #[test]
+    fn test_gpu_matmul_rejects_bad_arguments() {
+        let wrong_count = "fn main() -> i32:\n    let a = [1.0]\n    let c = gpu_matmul(a, a, 1, 1, 1)\n    return 0\n";
+        let errs = check_source(wrong_count).unwrap_err();
+        assert!(errs.iter().any(|e| e.code == "E2002"));
+
+        let not_a_list = "fn main() -> i32:\n    let a = [1.0]\n    let c = gpu_matmul(1.0, a, 1, 1, 1, 2)\n    return 0\n";
+        let errs = check_source(not_a_list).unwrap_err();
+        assert!(errs
+            .iter()
+            .any(|e| e.message.contains("first argument as numeric list")));
+
+        let float_dim = "fn main() -> i32:\n    let a = [1.0]\n    let c = gpu_matmul(a, a, 1.5, 1, 1, 2)\n    return 0\n";
+        let errs = check_source(float_dim).unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("integer `m`")));
+
+        let bad_policy = "fn main() -> i32:\n    let a = [1.0]\n    let c = gpu_matmul(a, a, 1, 1, 1, 3)\n    return 0\n";
+        let errs = check_source(bad_policy).unwrap_err();
+        assert!(errs
+            .iter()
+            .any(|e| e.message.contains("invalid dispatch policy 3")));
     }
 
     #[test]
