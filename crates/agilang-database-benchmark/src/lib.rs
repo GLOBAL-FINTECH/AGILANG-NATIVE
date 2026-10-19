@@ -198,7 +198,10 @@ impl BenchmarkRunner {
             mysql_tps: mysql_res.as_ref().map(|res| res.tps).unwrap_or(0.0),
             agidb_batch_p50_ms: agidb_res.batch_p50_ms,
             sqlite_batch_p50_ms: sqlite_res.batch_p50_ms,
-            mysql_batch_p50_ms: mysql_res.as_ref().map(|res| res.batch_p50_ms).unwrap_or(0.0),
+            mysql_batch_p50_ms: mysql_res
+                .as_ref()
+                .map(|res| res.batch_p50_ms)
+                .unwrap_or(0.0),
         })
     }
 

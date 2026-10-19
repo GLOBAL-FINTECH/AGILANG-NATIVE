@@ -69,7 +69,10 @@ pub fn decode_raw_transaction(input: &[u8]) -> RuntimeResult<RawTransaction> {
     } else if input[0] >= 0xc0 {
         decode_legacy(input).map(RawTransaction::Legacy)
     } else {
-        invalid(format!("unsupported transaction envelope type 0x{:02x}", input[0]))
+        invalid(format!(
+            "unsupported transaction envelope type 0x{:02x}",
+            input[0]
+        ))
     }
 }
 
@@ -154,8 +157,8 @@ fn decode_eip1559(payload: &[u8]) -> RuntimeResult<Eip1559Transaction> {
     let value = uint(&fields[6])?;
     let data = bytes(&fields[7])?.to_vec();
     let access_list = decode_access_list(&fields[8])?;
-    let recovery_id = u8::try_from(uint(&fields[9])?)
-        .map_err(|_| invalid_error("invalid EIP-1559 y parity"))?;
+    let recovery_id =
+        u8::try_from(uint(&fields[9])?).map_err(|_| invalid_error("invalid EIP-1559 y parity"))?;
     if recovery_id > 1 {
         return invalid("EIP-1559 y parity must be 0 or 1");
     }
@@ -228,7 +231,10 @@ fn decode_access_list(value: &Rlp<'_>) -> RuntimeResult<Vec<AccessListEntry>> {
             storage_key.copy_from_slice(key_bytes);
             storage_keys.push(storage_key);
         }
-        result.push(AccessListEntry { address, storage_keys });
+        result.push(AccessListEntry {
+            address,
+            storage_keys,
+        });
     }
     Ok(result)
 }
@@ -280,12 +286,16 @@ fn decode_rlp(input: &[u8], depth: usize) -> RuntimeResult<(Rlp<'_>, usize)> {
     if depth > 64 {
         return invalid("RLP nesting exceeds 64 levels");
     }
-    let first = *input.first().ok_or_else(|| invalid_error("truncated RLP value"))?;
+    let first = *input
+        .first()
+        .ok_or_else(|| invalid_error("truncated RLP value"))?;
     match first {
         0x00..=0x7f => Ok((Rlp::Bytes(&input[..1]), 1)),
         0x80..=0xb7 => {
             let len = usize::from(first - 0x80);
-            let end = 1_usize.checked_add(len).ok_or_else(|| invalid_error("RLP length overflow"))?;
+            let end = 1_usize
+                .checked_add(len)
+                .ok_or_else(|| invalid_error("RLP length overflow"))?;
             if input.len() < end {
                 return invalid("truncated RLP byte string");
             }
@@ -301,7 +311,9 @@ fn decode_rlp(input: &[u8], depth: usize) -> RuntimeResult<(Rlp<'_>, usize)> {
                 return invalid("non-canonical long RLP byte string");
             }
             let start = 1 + length_of_length;
-            let end = start.checked_add(len).ok_or_else(|| invalid_error("RLP length overflow"))?;
+            let end = start
+                .checked_add(len)
+                .ok_or_else(|| invalid_error("RLP length overflow"))?;
             if input.len() < end {
                 return invalid("truncated long RLP byte string");
             }
@@ -319,8 +331,15 @@ fn decode_rlp(input: &[u8], depth: usize) -> RuntimeResult<(Rlp<'_>, usize)> {
     }
 }
 
-fn decode_list(input: &[u8], start: usize, len: usize, depth: usize) -> RuntimeResult<(Rlp<'_>, usize)> {
-    let end = start.checked_add(len).ok_or_else(|| invalid_error("RLP list length overflow"))?;
+fn decode_list(
+    input: &[u8],
+    start: usize,
+    len: usize,
+    depth: usize,
+) -> RuntimeResult<(Rlp<'_>, usize)> {
+    let end = start
+        .checked_add(len)
+        .ok_or_else(|| invalid_error("RLP list length overflow"))?;
     if input.len() < end {
         return invalid("truncated RLP list");
     }
@@ -354,10 +373,17 @@ fn decode_length(input: &[u8], offset: usize, count: usize) -> RuntimeResult<usi
     Ok(value)
 }
 
-fn expect_list<'a>(value: &'a Rlp<'a>, expected: usize, name: &str) -> RuntimeResult<&'a [Rlp<'a>]> {
+fn expect_list<'a>(
+    value: &'a Rlp<'a>,
+    expected: usize,
+    name: &str,
+) -> RuntimeResult<&'a [Rlp<'a>]> {
     match value {
         Rlp::List(values) if values.len() == expected => Ok(values),
-        Rlp::List(values) => invalid(format!("{name} must contain {expected} fields, received {}", values.len())),
+        Rlp::List(values) => invalid(format!(
+            "{name} must contain {expected} fields, received {}",
+            values.len()
+        )),
         Rlp::Bytes(_) => invalid(format!("{name} must be an RLP list")),
     }
 }
@@ -377,7 +403,9 @@ fn uint(value: &Rlp<'_>) -> RuntimeResult<u128> {
     if value.first() == Some(&0) {
         return invalid("RLP integer contains a leading zero");
     }
-    Ok(value.iter().fold(0_u128, |result, byte| (result << 8) | u128::from(*byte)))
+    Ok(value
+        .iter()
+        .fold(0_u128, |result, byte| (result << 8) | u128::from(*byte)))
 }
 
 fn scalar(value: &Rlp<'_>, name: &str) -> RuntimeResult<[u8; 32]> {
@@ -411,7 +439,10 @@ fn rlp_uint(value: u128) -> Vec<u8> {
         return rlp_bytes(&[]);
     }
     let bytes = value.to_be_bytes();
-    let first = bytes.iter().position(|byte| *byte != 0).unwrap_or(bytes.len() - 1);
+    let first = bytes
+        .iter()
+        .position(|byte| *byte != 0)
+        .unwrap_or(bytes.len() - 1);
     rlp_bytes(&bytes[first..])
 }
 
@@ -439,7 +470,10 @@ fn encode_length(short_base: u8, long_base: u8, payload: &[u8]) -> Vec<u8> {
         return encoded;
     }
     let length = payload.len().to_be_bytes();
-    let first = length.iter().position(|byte| *byte != 0).unwrap_or(length.len() - 1);
+    let first = length
+        .iter()
+        .position(|byte| *byte != 0)
+        .unwrap_or(length.len() - 1);
     let length = &length[first..];
     let mut encoded = Vec::with_capacity(payload.len() + length.len() + 1);
     encoded.push(long_base + length.len() as u8);

@@ -1070,33 +1070,35 @@ pub unsafe extern "C" fn agi_http_request_json(request_ptr: *const c_char) -> *c
 
     let request_json = match std::ffi::CStr::from_ptr(request_ptr).to_str() {
         Ok(s) => s,
-        Err(_) => return set_http_response("{\"error\":\"request payload must be UTF-8\"}".to_string()),
+        Err(_) => {
+            return set_http_response("{\"error\":\"request payload must be UTF-8\"}".to_string())
+        }
     };
 
     let request: agilang_runtime_http::HttpRequest = match serde_json::from_str(request_json) {
         Ok(value) => value,
         Err(err) => {
-            return set_http_response(
-                serde_json::json!({ "error": err.to_string() }).to_string(),
-            )
+            return set_http_response(serde_json::json!({ "error": err.to_string() }).to_string())
         }
     };
 
     let client = match http_client_default() {
         Ok(c) => c,
         Err(err) => {
-            return set_http_response(
-                serde_json::json!({ "error": err.to_string() }).to_string(),
-            )
+            return set_http_response(serde_json::json!({ "error": err.to_string() }).to_string())
         }
     };
 
     match agilang_runtime_async::block_on(client.execute(request)) {
         Ok(Ok(resp)) => match serde_json::to_string(&resp) {
             Ok(json) => set_http_response(json),
-            Err(err) => set_http_response(serde_json::json!({ "error": err.to_string() }).to_string()),
+            Err(err) => {
+                set_http_response(serde_json::json!({ "error": err.to_string() }).to_string())
+            }
         },
-        Ok(Err(err)) => set_http_response(serde_json::json!({ "error": err.to_string() }).to_string()),
+        Ok(Err(err)) => {
+            set_http_response(serde_json::json!({ "error": err.to_string() }).to_string())
+        }
         Err(err) => set_http_response(serde_json::json!({ "error": err.to_string() }).to_string()),
     }
 }

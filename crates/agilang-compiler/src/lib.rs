@@ -45,7 +45,8 @@ struct ModuleGraph {
 
 fn build_module_graph(entry: &SourceFile) -> Result<ModuleGraph, Vec<Diagnostic>> {
     let root = find_project_root(entry.path()).unwrap_or_else(|| {
-        entry.path()
+        entry
+            .path()
             .parent()
             .unwrap_or_else(|| Path::new("."))
             .to_path_buf()
@@ -149,8 +150,7 @@ fn load_module_recursive(
                     "E3007",
                     format!(
                         "module declaration `{}` does not match source path `{}`",
-                        module_decl.path,
-                        expected_module
+                        module_decl.path, expected_module
                     ),
                     module_decl.span,
                 ));
@@ -263,7 +263,10 @@ fn module_name_for_path(project_root: &Path, source_path: &Path) -> Option<Strin
             *last = stem.to_string_lossy().into_owned();
         }
     }
-    if parts.first().is_some_and(|part| part.eq_ignore_ascii_case("app")) {
+    if parts
+        .first()
+        .is_some_and(|part| part.eq_ignore_ascii_case("app"))
+    {
         parts[0] = "App".to_string();
     }
     Some(parts.join("."))

@@ -80,7 +80,9 @@ impl RpcServer {
     }
 
     pub async fn serve(self) -> RuntimeResult<()> {
-        let listener = TcpListener::bind(self.config.listen).await.map_err(io_error)?;
+        let listener = TcpListener::bind(self.config.listen)
+            .await
+            .map_err(io_error)?;
         let limiter = Arc::new(Semaphore::new(self.config.max_connections));
         loop {
             let (stream, peer) = listener.accept().await.map_err(io_error)?;
@@ -218,9 +220,9 @@ fn response_error(id: Value, code: i64, message: String) -> Value {
         result: None,
         error: Some(RpcError { code, message }),
     })
-    .unwrap_or_else(|_| {
-        json!({"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"internal error"}})
-    })
+    .unwrap_or_else(
+        |_| json!({"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"internal error"}}),
+    )
 }
 
 struct HttpRequest {

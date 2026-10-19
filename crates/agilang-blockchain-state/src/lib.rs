@@ -38,10 +38,9 @@ impl ChainState {
         for (address, value) in genesis {
             let account = match value {
                 Value::Number(number) => Account {
-                    balance: number
-                        .as_u64()
-                        .map(u128::from)
-                        .ok_or_else(|| invalid_error("genesis balance must be a non-negative integer"))?,
+                    balance: number.as_u64().map(u128::from).ok_or_else(|| {
+                        invalid_error("genesis balance must be a non-negative integer")
+                    })?,
                     ..Account::default()
                 },
                 Value::Object(_) => serde_json::from_value(value.clone())
@@ -58,11 +57,17 @@ impl ChainState {
     }
 
     pub fn balance(&self, address: &str) -> u128 {
-        self.accounts.get(address).map(|account| account.balance).unwrap_or(0)
+        self.accounts
+            .get(address)
+            .map(|account| account.balance)
+            .unwrap_or(0)
     }
 
     pub fn nonce(&self, address: &str) -> u64 {
-        self.accounts.get(address).map(|account| account.nonce).unwrap_or(0)
+        self.accounts
+            .get(address)
+            .map(|account| account.nonce)
+            .unwrap_or(0)
     }
 
     pub fn set_account(&mut self, address: impl Into<String>, account: Account) {
@@ -74,7 +79,11 @@ impl ChainState {
     }
 
     /// Apply a transaction atomically. Any failure leaves the original state unchanged.
-    pub fn apply(&mut self, config: &BlockchainConfig, transaction: &Transaction) -> RuntimeResult<Receipt> {
+    pub fn apply(
+        &mut self,
+        config: &BlockchainConfig,
+        transaction: &Transaction,
+    ) -> RuntimeResult<Receipt> {
         transaction.validate()?;
         let mut candidate = self.clone();
         let receipt = candidate.apply_inner(config, transaction)?;
@@ -96,7 +105,11 @@ impl ChainState {
         Ok(receipts)
     }
 
-    fn apply_inner(&mut self, config: &BlockchainConfig, transaction: &Transaction) -> RuntimeResult<Receipt> {
+    fn apply_inner(
+        &mut self,
+        config: &BlockchainConfig,
+        transaction: &Transaction,
+    ) -> RuntimeResult<Receipt> {
         if transaction.gas_price < config.mempool_min_gas_price {
             return invalid("transaction gas price is below chain minimum");
         }
@@ -154,7 +167,10 @@ impl ChainState {
 }
 
 pub fn intrinsic_gas(transaction: &Transaction) -> RuntimeResult<u64> {
-    let data = transaction.data.strip_prefix("0x").unwrap_or(&transaction.data);
+    let data = transaction
+        .data
+        .strip_prefix("0x")
+        .unwrap_or(&transaction.data);
     if data.len() % 2 != 0 {
         return invalid("transaction data must contain complete hexadecimal bytes");
     }

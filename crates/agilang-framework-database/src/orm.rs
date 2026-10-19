@@ -153,7 +153,11 @@ impl<M: OrmModel> ModelRepository<M> {
         let per_page = per_page.max(1);
         let all = self.all()?;
         let total = all.len();
-        let last_page = if total == 0 { 1 } else { total.div_ceil(per_page) };
+        let last_page = if total == 0 {
+            1
+        } else {
+            total.div_ceil(per_page)
+        };
         let start = ((page - 1) * per_page).min(total);
         let end = (start + per_page).min(total);
         Ok(Page {
@@ -182,8 +186,12 @@ impl<M: OrmModel> ModelRepository<M> {
 
     pub fn save(&mut self, model: &mut M) -> Result<()> {
         let mut attributes = model.attributes();
-        let id = extract_i64(attributes.get(M::primary_key()))
-            .ok_or_else(|| anyhow!("E6213 cannot save `{}` without primary key", M::table_name()))?;
+        let id = extract_i64(attributes.get(M::primary_key())).ok_or_else(|| {
+            anyhow!(
+                "E6213 cannot save `{}` without primary key",
+                M::table_name()
+            )
+        })?;
         apply_update_defaults::<M>(&mut attributes);
         self.update_row(M::table_name(), M::primary_key(), id, &attributes)?;
         let refreshed = self
@@ -210,7 +218,10 @@ impl<M: OrmModel> ModelRepository<M> {
 
     pub fn soft_delete(&mut self, id: i64) -> Result<()> {
         if !M::uses_soft_deletes() {
-            bail!("E6215 model `{}` does not support soft deletes", M::table_name());
+            bail!(
+                "E6215 model `{}` does not support soft deletes",
+                M::table_name()
+            );
         }
         self.conn.execute(
             &format!(
@@ -256,7 +267,11 @@ impl<M: OrmModel> ModelRepository<M> {
             .transpose()
     }
 
-    fn insert_row(&mut self, table: &str, attributes: HashMap<String, Value>) -> Result<HashMap<String, Value>> {
+    fn insert_row(
+        &mut self,
+        table: &str,
+        attributes: HashMap<String, Value>,
+    ) -> Result<HashMap<String, Value>> {
         let mut columns = attributes.keys().cloned().collect::<Vec<_>>();
         columns.sort();
         let placeholders = vec!["?"; columns.len()].join(", ");
@@ -316,7 +331,10 @@ impl<M: OrmModel> ModelRepository<M> {
             .collect::<Result<Vec<_>>>()?;
         values.push(DatabaseValue::Integer(id));
         self.conn.execute(
-            &format!("UPDATE {} SET {} WHERE {} = ?", table, assignments, primary_key),
+            &format!(
+                "UPDATE {} SET {} WHERE {} = ?",
+                table, assignments, primary_key
+            ),
             &values,
         )?;
         Ok(())
@@ -358,17 +376,11 @@ fn apply_casts<M: OrmModel>(mut attributes: HashMap<String, Value>) -> HashMap<S
 fn apply_cast(cast: AttributeCast, value: Value) -> Value {
     match cast {
         AttributeCast::Integer => match value {
-            Value::String(inner) => inner
-                .parse::<i64>()
-                .map(Value::from)
-                .unwrap_or(Value::Null),
+            Value::String(inner) => inner.parse::<i64>().map(Value::from).unwrap_or(Value::Null),
             other => other,
         },
         AttributeCast::Float => match value {
-            Value::String(inner) => inner
-                .parse::<f64>()
-                .map(Value::from)
-                .unwrap_or(Value::Null),
+            Value::String(inner) => inner.parse::<f64>().map(Value::from).unwrap_or(Value::Null),
             other => other,
         },
         AttributeCast::Boolean => match value {
@@ -399,15 +411,13 @@ fn db_row_to_json(row: HashMap<String, DatabaseValue>) -> HashMap<String, Value>
                 DatabaseValue::Boolean(v) => Value::Bool(v),
                 DatabaseValue::Integer(v) => Value::from(v),
                 DatabaseValue::Float(v) => Value::from(v),
-                DatabaseValue::Decimal(v)
-                | DatabaseValue::Text(v)
-                | DatabaseValue::DateTime(v) => Value::String(v),
+                DatabaseValue::Decimal(v) | DatabaseValue::Text(v) | DatabaseValue::DateTime(v) => {
+                    Value::String(v)
+                }
                 DatabaseValue::Binary(v) => {
                     Value::Array(v.into_iter().map(Value::from).collect::<Vec<_>>())
                 }
-                DatabaseValue::Json(v) => {
-                    serde_json::from_str(&v).unwrap_or(Value::String(v))
-                }
+                DatabaseValue::Json(v) => serde_json::from_str(&v).unwrap_or(Value::String(v)),
             };
             (key, json)
         })
@@ -569,7 +579,7 @@ mod tests {
             }
         };
         conn.execute(create_sql, &[])
-        .with_context(|| format!("failed to create users table for {:?}", config.driver))?;
+            .with_context(|| format!("failed to create users table for {:?}", config.driver))?;
         Ok(())
     }
 
@@ -597,8 +607,14 @@ mod tests {
         assert!(created.attributes().contains_key("updated_at"));
 
         let found = repo.find(id)?.context("created user not found")?;
-        assert_eq!(found.attributes().get("name"), Some(&Value::String("Alice".to_string())));
-        assert_eq!(found.attributes().get("is_active"), Some(&Value::Bool(true)));
+        assert_eq!(
+            found.attributes().get("name"),
+            Some(&Value::String("Alice".to_string()))
+        );
+        assert_eq!(
+            found.attributes().get("is_active"),
+            Some(&Value::Bool(true))
+        );
         assert!(found
             .attributes()
             .get("profile")
@@ -608,7 +624,10 @@ mod tests {
         assert_eq!(by_email.len(), 1);
 
         let mut update = HashMap::new();
-        update.insert("name".to_string(), Value::String("Alice Updated".to_string()));
+        update.insert(
+            "name".to_string(),
+            Value::String("Alice Updated".to_string()),
+        );
         let updated = repo.update(id, update)?;
         assert_eq!(
             updated.attributes().get("name"),

@@ -79,7 +79,9 @@ impl BlockchainService {
     }
 
     pub fn native_hash_for_raw(&self, ethereum_hash: &str) -> Option<&str> {
-        self.raw_to_native_hash.get(ethereum_hash).map(String::as_str)
+        self.raw_to_native_hash
+            .get(ethereum_hash)
+            .map(String::as_str)
     }
 
     fn persist_aliases(&self) -> RuntimeResult<()> {
@@ -98,22 +100,17 @@ impl BlockchainService {
     ) -> RuntimeResult<(Transaction, String)> {
         match decoded {
             RawTransaction::Legacy(tx) => {
-                let chain_id = tx.chain_id.ok_or_else(|| {
-                    invalid_error("unprotected legacy transactions are disabled")
-                })?;
+                let chain_id = tx
+                    .chain_id
+                    .ok_or_else(|| invalid_error("unprotected legacy transactions are disabled"))?;
                 self.validate_chain_id(chain_id)?;
                 let nonce = to_u64(tx.nonce, "nonce")?;
                 let gas_limit = to_u64(tx.gas_limit, "gas limit")?;
                 let sender = hex_address(&tx.sender);
                 let to = tx.to.map(|value| hex_address(&value)).unwrap_or_default();
                 let ethereum_hash = hex_bytes(&tx.hash);
-                let metadata = transaction_metadata(
-                    &ethereum_hash,
-                    raw_hex,
-                    "legacy",
-                    chain_id,
-                    None,
-                );
+                let metadata =
+                    transaction_metadata(&ethereum_hash, raw_hex, "legacy", chain_id, None);
                 let transaction = Transaction::new(
                     sender,
                     to,
@@ -122,7 +119,11 @@ impl BlockchainService {
                     nonce,
                     gas_limit,
                     tx.gas_price,
-                    if tx.to.is_some() { "evm_call" } else { "evm_create" },
+                    if tx.to.is_some() {
+                        "evm_call"
+                    } else {
+                        "evm_create"
+                    },
                     Some(raw_hex.to_string()),
                     metadata,
                 )?;
@@ -151,7 +152,11 @@ impl BlockchainService {
                     nonce,
                     gas_limit,
                     gas_price,
-                    if tx.to.is_some() { "evm_call" } else { "evm_create" },
+                    if tx.to.is_some() {
+                        "evm_call"
+                    } else {
+                        "evm_create"
+                    },
                     Some(raw_hex.to_string()),
                     metadata,
                 )?;
@@ -185,7 +190,10 @@ fn transaction_metadata(
         ("chain_id".to_string(), json!(chain_id)),
     ]);
     if let Some((priority, maximum)) = dynamic_fees {
-        metadata.insert("max_priority_fee_per_gas".to_string(), json!(priority.to_string()));
+        metadata.insert(
+            "max_priority_fee_per_gas".to_string(),
+            json!(priority.to_string()),
+        );
         metadata.insert("max_fee_per_gas".to_string(), json!(maximum.to_string()));
     }
     metadata
@@ -269,7 +277,10 @@ mod tests {
     #[test]
     fn rewrites_native_hash_aliases() {
         let mut value = json!({"hash":"native"});
-        rewrite_hashes(&mut value, &BTreeMap::from([("native".into(), "raw".into())]));
+        rewrite_hashes(
+            &mut value,
+            &BTreeMap::from([("native".into(), "raw".into())]),
+        );
         assert_eq!(value["hash"], "raw");
     }
 }
