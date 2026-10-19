@@ -225,7 +225,12 @@ mod tests {
     fn links_vulkan_runtime_windows_dependencies() {
         // wgpu always builds its WGL fallback on Windows, so a Vulkan-enabled
         // runtime library needs these even when only Vulkan is used.
-        for library in ["user32.lib", "gdi32.lib", "opengl32.lib", "runtimeobject.lib"] {
+        for library in [
+            "user32.lib",
+            "gdi32.lib",
+            "opengl32.lib",
+            "runtimeobject.lib",
+        ] {
             assert!(WINDOWS_SYSTEM_LIBRARIES.contains(library));
         }
     }

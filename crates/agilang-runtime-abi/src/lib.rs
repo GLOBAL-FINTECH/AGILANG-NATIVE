@@ -13,8 +13,7 @@ use std::{
 };
 
 use agilang_runtime_accelerator::{
-    capabilities_json as accelerator_capabilities_json,
-    matmul_f32 as accelerator_matmul_f32,
+    capabilities_json as accelerator_capabilities_json, matmul_f32 as accelerator_matmul_f32,
     DispatchPolicy,
 };
 use agilang_runtime_compute::{capabilities as compute_capabilities, LinearModel, Tensor};
@@ -750,13 +749,19 @@ pub unsafe extern "C" fn agi_accelerator_matmul_f32(
             0 => DispatchPolicy::CpuOnly,
             1 => DispatchPolicy::PreferAccelerator,
             2 => DispatchPolicy::RequireAccelerator,
-            _ => return Err(AgilangError::invalid_argument("invalid accelerator dispatch policy")),
+            _ => {
+                return Err(AgilangError::invalid_argument(
+                    "invalid accelerator dispatch policy",
+                ))
+            }
         };
         let required = m.checked_mul(n).ok_or_else(|| {
             AgilangError::new(ErrorCode::Overflow, "output element count overflow")
         })?;
         if out.is_null() || out_capacity < required {
-            return Err(AgilangError::invalid_argument("matmul output pointer is null or capacity too small"));
+            return Err(AgilangError::invalid_argument(
+                "matmul output pointer is null or capacity too small",
+            ));
         }
         // Copy inputs to owned arrays before writing to out; callers may reuse buffers.
         let left = input_f32_slice(left, left_len)?.to_vec();
