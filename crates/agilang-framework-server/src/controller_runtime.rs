@@ -135,7 +135,57 @@ fn dispatch_controller(
         _ => {}
     }
 
+    if let Some(response) = dispatch_agi_controller(project_root, route)? {
+        return Ok(response);
+    }
+
     dispatch_generated_resource(project_root, req, route, &route_match.params)
+}
+
+/// Executes a hand-written `.agi` controller action whose body returns
+/// `View.render(...)`, `Response.html(...)` or `Response.json(...)`.
+/// Controllers that are missing or use unsupported return expressions fall
+/// through to the generated-resource dispatcher, preserving existing behaviour.
+fn dispatch_agi_controller(
+    project_root: &Path,
+    route: &Route,
+) -> Result<Option<Response>, DispatchError> {
+    let Some(controller_path) = find_controller_file(
+        &project_root.join("app/Controllers"),
+        &format!("{}.agi", route.controller),
+    ) else {
+        return Ok(None);
+    };
+    match crate::evaluate_controller_action(&controller_path, &route.action) {
+        Ok(crate::ControllerResult::Render(view, data)) => {
+            render_view(project_root, &view, data).map(Some)
+        }
+        Ok(crate::ControllerResult::Html(html)) => Ok(Some(build_text_response(
+            200,
+            "text/html; charset=utf-8",
+            html,
+        ))),
+        Ok(crate::ControllerResult::Json(status, body)) => {
+            Ok(Some(build_json_response(status, body)))
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+fn find_controller_file(directory: &Path, file_name: &str) -> Option<PathBuf> {
+    let candidate = directory.join(file_name);
+    if candidate.is_file() {
+        return Some(candidate);
+    }
+    let mut subdirectories: Vec<PathBuf> = fs::read_dir(directory)
+        .ok()?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.is_dir())
+        .collect();
+    subdirectories.sort();
+    subdirectories
+        .iter()
+        .find_map(|path| find_controller_file(path, file_name))
 }
 
 fn dispatch_generated_resource(

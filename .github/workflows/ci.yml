@@ -19,6 +19,13 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo run -p agilang-compat-audit --
+      - run: cargo build -p agilang-compat-audit
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: .\target\debug\agilang-compat-audit.exe parity .
+      - if: runner.os != 'Windows'
+        shell: bash
+        run: ./target/debug/agilang-compat-audit parity .
       - run: cargo test --workspace --all-features
       - run: cargo build --workspace --release --all-features
       - run: cargo run -p agilang-runtime-cli -- doctor
