@@ -83,7 +83,10 @@ impl<'a> Parser<'a> {
         self.function().map(|f| Item::Functions(vec![f]))
     }
     fn module_item(&mut self) -> Option<Item> {
-        let start = self.expect(&TokenKind::Module, "E158", "expected `module`")?.span.start;
+        let start = self
+            .expect(&TokenKind::Module, "E158", "expected `module`")?
+            .span
+            .start;
         let (path, end) = self.module_path("expected module path")?;
         self.line_end();
         Some(Item::Module(ModuleDecl {
@@ -101,7 +104,10 @@ impl<'a> Parser<'a> {
         }))
     }
     fn struct_item(&mut self) -> Option<Item> {
-        let start = self.expect(&TokenKind::Struct, "E159", "expected `struct`")?.span.start;
+        let start = self
+            .expect(&TokenKind::Struct, "E159", "expected `struct`")?
+            .span
+            .start;
         let (name, _) = self.identifier("expected struct name")?;
         self.expect(&TokenKind::Colon, "E160", "expected `:`")?;
         self.expect(&TokenKind::Newline, "E161", "expected newline")?;
@@ -132,7 +138,10 @@ impl<'a> Parser<'a> {
         }))
     }
     fn enum_item(&mut self) -> Option<Item> {
-        let start = self.expect(&TokenKind::Enum, "E165", "expected `enum`")?.span.start;
+        let start = self
+            .expect(&TokenKind::Enum, "E165", "expected `enum`")?
+            .span
+            .start;
         let (name, _) = self.identifier("expected enum name")?;
         self.expect(&TokenKind::Colon, "E166", "expected `:`")?;
         self.expect(&TokenKind::Newline, "E167", "expected newline")?;
@@ -160,7 +169,10 @@ impl<'a> Parser<'a> {
         }))
     }
     fn type_alias_item(&mut self) -> Option<Item> {
-        let start = self.expect(&TokenKind::Type, "E179", "expected `type`")?.span.start;
+        let start = self
+            .expect(&TokenKind::Type, "E179", "expected `type`")?
+            .span
+            .start;
         let (name, _) = self.identifier("expected alias name")?;
         self.expect(&TokenKind::Equal, "E180", "expected `=` after alias name")?;
         let target = self.type_ref()?;
@@ -307,7 +319,10 @@ impl<'a> Parser<'a> {
             let span = Span::new(start, value.span().end);
             self.line_end();
             return Some(Stmt::Expr(Expr::Call {
-                callee: Box::new(Expr::Identifier("throw".to_string(), Span::new(start, start + 5))),
+                callee: Box::new(Expr::Identifier(
+                    "throw".to_string(),
+                    Span::new(start, start + 5),
+                )),
                 args: vec![value],
                 span,
             }));
@@ -391,7 +406,10 @@ impl<'a> Parser<'a> {
         Some(Stmt::Expr(expr))
     }
     fn if_statement(&mut self) -> Option<Stmt> {
-        let start = self.expect(&TokenKind::If, "E133", "expected `if`")?.span.start;
+        let start = self
+            .expect(&TokenKind::If, "E133", "expected `if`")?
+            .span
+            .start;
         let condition = self.expression()?;
         self.expect(&TokenKind::Colon, "E134", "expected `:`")?;
         self.expect(&TokenKind::Newline, "E135", "expected newline")?;
@@ -409,10 +427,7 @@ impl<'a> Parser<'a> {
             self.expect(&TokenKind::Newline, "E138", "expected newline")?;
             self.expect(&TokenKind::Indent, "E139", "expected indented else body")?;
             else_body = self.block_statements()?;
-            end = else_body
-                .last()
-                .map(stmt_span_end)
-                .unwrap_or(end);
+            end = else_body.last().map(stmt_span_end).unwrap_or(end);
         } else {
             end = then_body.last().map(stmt_span_end).unwrap_or(end);
         }
@@ -424,7 +439,10 @@ impl<'a> Parser<'a> {
         })
     }
     fn match_statement(&mut self) -> Option<Stmt> {
-        let start = self.expect(&TokenKind::Match, "E170", "expected `match`")?.span.start;
+        let start = self
+            .expect(&TokenKind::Match, "E170", "expected `match`")?
+            .span
+            .start;
         let subject = self.expression()?;
         self.expect(&TokenKind::Colon, "E171", "expected `:`")?;
         self.expect(&TokenKind::Newline, "E172", "expected newline")?;
@@ -438,9 +456,17 @@ impl<'a> Parser<'a> {
             let pattern_span = match &pattern {
                 MatchPattern::EnumVariant { span, .. } | MatchPattern::Wildcard { span } => *span,
             };
-            self.expect(&TokenKind::Colon, "E174", "expected `:` after match pattern")?;
+            self.expect(
+                &TokenKind::Colon,
+                "E174",
+                "expected `:` after match pattern",
+            )?;
             self.expect(&TokenKind::Newline, "E175", "expected newline")?;
-            self.expect(&TokenKind::Indent, "E176", "expected indented match arm body")?;
+            self.expect(
+                &TokenKind::Indent,
+                "E176",
+                "expected indented match arm body",
+            )?;
             let body = self.block_statements()?;
             let end = body.last().map(stmt_span_end).unwrap_or(pattern_span.end);
             arms.push(MatchArm {
@@ -464,7 +490,11 @@ impl<'a> Parser<'a> {
         if name == "_" {
             return Some(MatchPattern::Wildcard { span: first_span });
         }
-        self.expect(&TokenKind::Dot, "E178", "expected `.` in enum match pattern")?;
+        self.expect(
+            &TokenKind::Dot,
+            "E178",
+            "expected `.` in enum match pattern",
+        )?;
         let (variant, variant_span) = self.identifier("expected enum variant")?;
         Some(MatchPattern::EnumVariant {
             enum_name: name,
@@ -473,7 +503,10 @@ impl<'a> Parser<'a> {
         })
     }
     fn for_in_statement(&mut self) -> Option<Stmt> {
-        let start = self.expect(&TokenKind::For, "E140", "expected `for`")?.span.start;
+        let start = self
+            .expect(&TokenKind::For, "E140", "expected `for`")?
+            .span
+            .start;
         let (first_name, _) = self.identifier("expected loop variable")?;
         let mut second_name = None;
         if self.eat(&TokenKind::Comma).is_some() {
@@ -486,7 +519,10 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::Newline, "E143", "expected newline")?;
         self.expect(&TokenKind::Indent, "E144", "expected indented loop body")?;
         let body = self.block_statements()?;
-        let end = body.last().map(stmt_span_end).unwrap_or(iterable.span().end);
+        let end = body
+            .last()
+            .map(stmt_span_end)
+            .unwrap_or(iterable.span().end);
         Some(Stmt::ForIn {
             key_name: first_name,
             value_name: second_name,
@@ -496,14 +532,20 @@ impl<'a> Parser<'a> {
         })
     }
     fn elif_clause(&mut self) -> Option<Stmt> {
-        let start = self.expect(&TokenKind::Elif, "E150", "expected `elif`")?.span.start;
+        let start = self
+            .expect(&TokenKind::Elif, "E150", "expected `elif`")?
+            .span
+            .start;
         let condition = self.expression()?;
         self.expect(&TokenKind::Colon, "E151", "expected `:`")?;
         self.expect(&TokenKind::Newline, "E152", "expected newline")?;
         self.expect(&TokenKind::Indent, "E153", "expected indented elif body")?;
         let then_body = self.block_statements()?;
         let mut else_body = vec![];
-        let mut end = then_body.last().map(stmt_span_end).unwrap_or(condition.span().end);
+        let mut end = then_body
+            .last()
+            .map(stmt_span_end)
+            .unwrap_or(condition.span().end);
         if self.at(&TokenKind::Elif) {
             let nested = self.elif_clause()?;
             end = stmt_span_end(&nested);
@@ -533,7 +575,10 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::Newline, "E148", "expected newline")?;
         self.expect(&TokenKind::Indent, "E149", "expected indented loop body")?;
         let body = self.block_statements()?;
-        let end = body.last().map(stmt_span_end).unwrap_or(condition.span().end);
+        let end = body
+            .last()
+            .map(stmt_span_end)
+            .unwrap_or(condition.span().end);
         Some(Stmt::While {
             condition,
             body,
@@ -845,8 +890,7 @@ impl<'a> Parser<'a> {
         }
     }
     fn synchronize(&mut self) {
-        while !self.at(&TokenKind::Eof) && !self.at(&TokenKind::Fn) && !self.at(&TokenKind::Class)
-        {
+        while !self.at(&TokenKind::Eof) && !self.at(&TokenKind::Fn) && !self.at(&TokenKind::Class) {
             self.advance();
         }
     }
@@ -970,7 +1014,10 @@ mod tests {
             "module App.Controllers.InvoiceController\nimport App.Services.TaxService\nimport App.Models.Invoice\n\nfn main() -> i32:\n    return 0\n",
         );
         let p = parse(&lex(&s).unwrap()).unwrap();
-        assert_eq!(p.module_name.as_ref().unwrap().path, "App.Controllers.InvoiceController");
+        assert_eq!(
+            p.module_name.as_ref().unwrap().path,
+            "App.Controllers.InvoiceController"
+        );
         assert_eq!(p.imports.len(), 2);
         assert_eq!(p.imports[0].path, "App.Services.TaxService");
         assert_eq!(p.imports[1].path, "App.Models.Invoice");

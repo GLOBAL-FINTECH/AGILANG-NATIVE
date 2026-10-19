@@ -129,8 +129,10 @@ mod tests {
     #[tokio::test]
     async fn signaling_hub_isolates_peer_queues() {
         let hub = SignalingHub::default();
-        hub.publish(sample_signal(SignalKind::Offer, "bob", "offer")).await;
-        hub.publish(sample_signal(SignalKind::Answer, "carol", "answer")).await;
+        hub.publish(sample_signal(SignalKind::Offer, "bob", "offer"))
+            .await;
+        hub.publish(sample_signal(SignalKind::Answer, "carol", "answer"))
+            .await;
 
         assert_eq!(hub.receive("carol").await.unwrap().payload, "answer");
         assert_eq!(hub.receive("bob").await.unwrap().payload, "offer");

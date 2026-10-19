@@ -1,5 +1,5 @@
-use agilang_framework_database::{AttributeCast, DatabaseConfig, ModelRepository, OrmModel};
 use agilang_database_driver::DatabaseConnection;
+use agilang_framework_database::{AttributeCast, DatabaseConfig, ModelRepository, OrmModel};
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -30,8 +30,7 @@ impl ProjectSeedConfig {
         let config = std::fs::read_to_string(&config_path)
             .with_context(|| format!("failed to read {}", config_path.display()))?;
 
-        let default_driver =
-            extract_default_driver(&config).unwrap_or_else(|| "agidb".to_string());
+        let default_driver = extract_default_driver(&config).unwrap_or_else(|| "agidb".to_string());
         let database = match default_driver.as_str() {
             "agidb" => DatabaseConfig::agidb(resolve_database_path(
                 project_root,
@@ -150,7 +149,11 @@ impl SeederExecutor {
         }
     }
 
-    pub fn seed_default_users(config: &DatabaseConfig, count: usize, deterministic: bool) -> Result<Vec<DatabaseRow>> {
+    pub fn seed_default_users(
+        config: &DatabaseConfig,
+        count: usize,
+        deterministic: bool,
+    ) -> Result<Vec<DatabaseRow>> {
         UserFactory::new()
             .count(count)
             .deterministic(deterministic)
@@ -202,7 +205,10 @@ impl UserFactory {
                 );
                 let mut values = HashMap::new();
                 values.insert("name".to_string(), json!(format!("User {}", i)));
-                values.insert("password_hash".to_string(), json!("$agilang$seed$placeholder"));
+                values.insert(
+                    "password_hash".to_string(),
+                    json!("$agilang$seed$placeholder"),
+                );
                 values.insert("role".to_string(), json!("user"));
                 let row = SeederExecutor::first_or_create(&mut repo, attributes, values, policy)?;
                 created.push(row);
@@ -327,7 +333,11 @@ fn extract_string_literal(input: &str) -> Option<String> {
     Some(rest[..end].to_string())
 }
 
-fn resolve_database_path(project_root: &Path, env: &HashMap<String, String>, value: String) -> String {
+fn resolve_database_path(
+    project_root: &Path,
+    env: &HashMap<String, String>,
+    value: String,
+) -> String {
     let expanded = if let Some(name) = env.get("APP_NAME") {
         value.replace("{name}", name)
     } else {
@@ -521,7 +531,15 @@ mod tests {
 
         let cfg = ProjectSeedConfig::from_project_root(&root).unwrap();
         assert_eq!(cfg.database.driver, FrameworkDriver::Sqlite);
-        assert!(cfg.database.database.ends_with("storage\\database\\main.sqlite") || cfg.database.database.ends_with("storage/database/main.sqlite"));
+        assert!(
+            cfg.database
+                .database
+                .ends_with("storage\\database\\main.sqlite")
+                || cfg
+                    .database
+                    .database
+                    .ends_with("storage/database/main.sqlite")
+        );
 
         let _ = std::fs::remove_dir_all(root);
     }

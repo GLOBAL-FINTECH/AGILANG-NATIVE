@@ -449,16 +449,16 @@ mod tests {
     }
 
     fn mysql_config() -> Option<DatabaseConfig> {
-        let host = std::env::var("AGILANG_TEST_MYSQL_HOST")
-            .unwrap_or_else(|_| "127.0.0.1".to_string());
+        let host =
+            std::env::var("AGILANG_TEST_MYSQL_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
         let port = std::env::var("AGILANG_TEST_MYSQL_PORT")
             .ok()
             .and_then(|value| value.parse().ok())
             .unwrap_or(3306);
         let database = std::env::var("AGILANG_TEST_MYSQL_DATABASE")
             .unwrap_or_else(|_| "agilang_tranche42_test".to_string());
-        let username = std::env::var("AGILANG_TEST_MYSQL_USER")
-            .unwrap_or_else(|_| "root".to_string());
+        let username =
+            std::env::var("AGILANG_TEST_MYSQL_USER").unwrap_or_else(|_| "root".to_string());
         let password = std::env::var("AGILANG_TEST_MYSQL_PASSWORD").unwrap_or_default();
         let config = DatabaseConfig::mysql(host, port, database, username, password);
 
@@ -520,7 +520,10 @@ mod tests {
         let files2 = files.clone();
         let handle = thread::spawn(move || {
             let mut executor = MigrationExecutor::connect(&config2).unwrap();
-            executor.conn.acquire_migration_lock(MIGRATION_LOCK_NAME).unwrap();
+            executor
+                .conn
+                .acquire_migration_lock(MIGRATION_LOCK_NAME)
+                .unwrap();
             std::thread::sleep(std::time::Duration::from_millis(300));
             executor
                 .conn

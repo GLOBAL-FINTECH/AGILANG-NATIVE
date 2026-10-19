@@ -11,17 +11,28 @@ fn main() -> Result<()> {
         print!("agi> ");
         io::stdout().flush()?;
         let mut line = String::new();
-        if io::stdin().read_line(&mut line)? == 0 { break; }
+        if io::stdin().read_line(&mut line)? == 0 {
+            break;
+        }
         let command = line.trim();
         match command {
             ":quit" | ":q" => break,
-            ":help" => println!(":check validates the current buffer; :clear resets it; :quit exits."),
-            ":clear" => { buffer.clear(); println!("buffer cleared"); }
+            ":help" => {
+                println!(":check validates the current buffer; :clear resets it; :quit exits.")
+            }
+            ":clear" => {
+                buffer.clear();
+                println!("buffer cleared");
+            }
             ":check" => {
                 let source = SourceFile::new("<repl>", &buffer);
                 match check(&source) {
                     Ok(program) => println!("ok: {} function(s)", program.functions.len()),
-                    Err(errors) => for error in errors { println!("{}", error.render(&source)); },
+                    Err(errors) => {
+                        for error in errors {
+                            println!("{}", error.render(&source));
+                        }
+                    }
                 }
             }
             _ if command.is_empty() => {}

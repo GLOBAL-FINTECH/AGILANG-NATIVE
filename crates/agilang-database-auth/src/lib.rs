@@ -85,8 +85,8 @@ mod tests {
         let challenge = AuthHandshake::issue_challenge(&db).unwrap();
 
         let sig = AuthHandshake::sign_client_challenge(&app, &db, &challenge.challenge_nonce);
-        let resp = AuthHandshake::perform_handshake(&app, &db, &challenge.challenge_nonce, &sig)
-            .unwrap();
+        let resp =
+            AuthHandshake::perform_handshake(&app, &db, &challenge.challenge_nonce, &sig).unwrap();
         assert_eq!(resp.database_identity.name, "db_server");
         assert!(!resp.server_signature.is_empty());
 

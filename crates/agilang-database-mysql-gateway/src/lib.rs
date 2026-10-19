@@ -208,14 +208,7 @@ fn handle_client(
         write_status(&locked)?;
     }
 
-    let result = handle_client_inner(
-        &mut stream,
-        peer,
-        connection_id,
-        &config,
-        &state,
-        shutdown,
-    );
+    let result = handle_client_inner(&mut stream, peer, connection_id, &config, &state, shutdown);
 
     {
         let mut locked = state.lock().unwrap();
@@ -247,7 +240,11 @@ fn handle_client_inner(
             bail!(err);
         }
     };
-    let user = match config.users.iter().find(|entry| entry.username == auth.username) {
+    let user = match config
+        .users
+        .iter()
+        .find(|entry| entry.username == auth.username)
+    {
         Some(user) => user,
         None => {
             send_error_packet(stream, 2, 1045, "28000", "access denied for user")?;
@@ -365,7 +362,11 @@ fn parse_handshake_response(payload: &[u8]) -> Result<HandshakeResponse> {
     })
 }
 
-fn verify_mysql_native_password(user: &GatewayUser, scramble: &[u8; 20], auth_response: &[u8]) -> Result<()> {
+fn verify_mysql_native_password(
+    user: &GatewayUser,
+    scramble: &[u8; 20],
+    auth_response: &[u8],
+) -> Result<()> {
     let verifier = user.native_verifier()?;
     let mut sha = sha1_hash_with_prefix(scramble, &verifier);
     for (slot, byte) in sha.iter_mut().zip(auth_response.iter().copied()) {
@@ -398,7 +399,11 @@ fn execute_query(agidb_path: &str, sql: &str) -> Result<QueryOutcome> {
             .map(|row| {
                 columns
                     .iter()
-                    .map(|column| row.get(&column.name).cloned().unwrap_or(DatabaseValue::Null))
+                    .map(|column| {
+                        row.get(&column.name)
+                            .cloned()
+                            .unwrap_or(DatabaseValue::Null)
+                    })
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -475,10 +480,12 @@ fn mysql_type_for_value(value: &DatabaseValue) -> u8 {
     }
 }
 
-fn write_handshake_packet(stream: &mut TcpStream, connection_id: u32, scramble: &[u8; 20]) -> Result<()> {
-    let mut payload = vec![
-        MYSQL_PROTOCOL_VERSION,
-    ];
+fn write_handshake_packet(
+    stream: &mut TcpStream,
+    connection_id: u32,
+    scramble: &[u8; 20],
+) -> Result<()> {
+    let mut payload = vec![MYSQL_PROTOCOL_VERSION];
     payload.extend_from_slice(MYSQL_SERVER_VERSION.as_bytes());
     payload.push(0);
     payload.extend_from_slice(&connection_id.to_le_bytes());
@@ -496,7 +503,12 @@ fn write_handshake_packet(stream: &mut TcpStream, connection_id: u32, scramble: 
     write_packet(stream, 0, &payload)
 }
 
-fn send_ok_packet(stream: &mut TcpStream, sequence_id: u8, affected_rows: u64, last_insert_id: u64) -> Result<()> {
+fn send_ok_packet(
+    stream: &mut TcpStream,
+    sequence_id: u8,
+    affected_rows: u64,
+    last_insert_id: u64,
+) -> Result<()> {
     let mut payload = vec![0x00];
     write_lenenc_int(&mut payload, affected_rows);
     write_lenenc_int(&mut payload, last_insert_id);
@@ -505,7 +517,13 @@ fn send_ok_packet(stream: &mut TcpStream, sequence_id: u8, affected_rows: u64, l
     write_packet(stream, sequence_id, &payload)
 }
 
-fn send_error_packet(stream: &mut TcpStream, sequence_id: u8, code: u16, sql_state: &str, message: &str) -> Result<()> {
+fn send_error_packet(
+    stream: &mut TcpStream,
+    sequence_id: u8,
+    code: u16,
+    sql_state: &str,
+    message: &str,
+) -> Result<()> {
     let mut payload = vec![0xff];
     payload.extend_from_slice(&code.to_le_bytes());
     payload.push(b'#');
@@ -516,7 +534,11 @@ fn send_error_packet(stream: &mut TcpStream, sequence_id: u8, code: u16, sql_sta
     write_packet(stream, sequence_id, &payload)
 }
 
-fn send_result_set(stream: &mut TcpStream, columns: &[ColumnMeta], rows: &[Vec<DatabaseValue>]) -> Result<()> {
+fn send_result_set(
+    stream: &mut TcpStream,
+    columns: &[ColumnMeta],
+    rows: &[Vec<DatabaseValue>],
+) -> Result<()> {
     let mut sequence_id = 1u8;
     let mut header = vec![];
     write_lenenc_int(&mut header, columns.len() as u64);
@@ -547,7 +569,14 @@ fn send_result_set(stream: &mut TcpStream, columns: &[ColumnMeta], rows: &[Vec<D
 
 fn column_definition_payload(column: &ColumnMeta) -> Vec<u8> {
     let mut payload = vec![];
-    for value in ["def", "", "", "", column.name.as_str(), column.name.as_str()] {
+    for value in [
+        "def",
+        "",
+        "",
+        "",
+        column.name.as_str(),
+        column.name.as_str(),
+    ] {
         write_lenenc_string(&mut payload, value);
     }
     payload.extend_from_slice(&0x0c_u8.to_le_bytes());
@@ -856,7 +885,11 @@ conn.close()
             .arg(script)
             .output()
             .unwrap();
-        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(stdout.contains("ada@example.com"));
 
@@ -884,7 +917,11 @@ sys.exit(1)
 "#,
             port = addr.port()
         );
-        let output = Command::new("python").arg("-c").arg(script).output().unwrap();
+        let output = Command::new("python")
+            .arg("-c")
+            .arg(script)
+            .output()
+            .unwrap();
         assert!(output.status.success());
         drop(server);
     }
@@ -898,7 +935,9 @@ sys.exit(1)
         let addr = server.local_addr();
 
         let mut stream = TcpStream::connect(addr).unwrap();
-        stream.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .unwrap();
         let _handshake = read_packet(&mut stream, 1024 * 1024).unwrap();
         stream.write_all(&[0x10, 0x00, 0x10, 0x01]).unwrap();
         stream.flush().unwrap();
@@ -926,9 +965,13 @@ sys.exit(1)
         }
 
         let mut oversized = TcpStream::connect(addr).unwrap();
-        oversized.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+        oversized
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .unwrap();
         let _ = read_packet(&mut oversized, 1024 * 1024).unwrap();
-        oversized.write_all(&[0x01, 0x00, 0x20, 0x01, 0x00]).unwrap();
+        oversized
+            .write_all(&[0x01, 0x00, 0x20, 0x01, 0x00])
+            .unwrap();
         oversized.flush().unwrap();
         drop(server);
     }
@@ -943,7 +986,11 @@ except Exception:
     sys.exit(0)
 sys.exit(1)
 "#;
-        let output = Command::new("python").arg("-c").arg(script).output().unwrap();
+        let output = Command::new("python")
+            .arg("-c")
+            .arg(script)
+            .output()
+            .unwrap();
         assert!(output.status.success());
     }
 }

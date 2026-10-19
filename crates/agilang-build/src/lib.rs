@@ -313,7 +313,11 @@ fn installed_runtime_candidates(exe_path: &Path) -> Vec<PathBuf> {
             .join("target")
             .join("release")
             .join(RUNTIME_LIB_NAME),
-        bin_dir.join("..").join("target").join("debug").join(RUNTIME_LIB_NAME),
+        bin_dir
+            .join("..")
+            .join("target")
+            .join("debug")
+            .join(RUNTIME_LIB_NAME),
     ];
 
     #[cfg(target_os = "linux")]

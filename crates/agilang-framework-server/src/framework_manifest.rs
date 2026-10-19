@@ -181,14 +181,7 @@ fn parse_function_names(content: &str) -> Vec<String> {
         .filter_map(|line| {
             let line = line.trim();
             let remainder = line.strip_prefix("fn ")?;
-            Some(
-                remainder
-                    .split('(')
-                    .next()
-                    .unwrap_or("")
-                    .trim()
-                    .to_string(),
-            )
+            Some(remainder.split('(').next().unwrap_or("").trim().to_string())
         })
         .filter(|value| !value.is_empty())
         .collect()
@@ -243,7 +236,11 @@ fn parse_map_assignment(content: &str, name: &str) -> HashMap<String, String> {
             let (key, value) = entry.split_once(':')?;
             Some((
                 key.trim().trim_matches('"').trim_matches('\'').to_string(),
-                value.trim().trim_matches('"').trim_matches('\'').to_string(),
+                value
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string(),
             ))
         })
         .collect()
@@ -294,7 +291,13 @@ fn parse_inline_list(content: &str) -> Vec<String> {
     let trimmed = content.trim().trim_start_matches('[').trim_end_matches(']');
     split_top_level(trimmed, ',')
         .into_iter()
-        .map(|value| value.trim().trim_matches('"').trim_matches('\'').to_string())
+        .map(|value| {
+            value
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string()
+        })
         .filter(|value| !value.is_empty())
         .collect()
 }
@@ -319,8 +322,7 @@ fn split_top_level(content: &str, delimiter: char) -> Vec<String> {
             ')' if !in_single && !in_double => paren -= 1,
             _ => {}
         }
-        if ch == delimiter && !in_single && !in_double && curly == 0 && square == 0 && paren == 0
-        {
+        if ch == delimiter && !in_single && !in_double && curly == 0 && square == 0 && paren == 0 {
             result.push(current.trim().to_string());
             current.clear();
             continue;

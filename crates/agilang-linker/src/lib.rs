@@ -152,7 +152,9 @@ impl Linker {
             .args(LINUX_SYSTEM_LIBRARIES)
             .args(["-lrt", "-lutil"])
             .output()
-            .with_context(|| format!("failed to execute Linux linker through `{}`", self.compiler))?;
+            .with_context(|| {
+                format!("failed to execute Linux linker through `{}`", self.compiler)
+            })?;
         if !link.status.success() {
             bail!(
                 "native link failed with `{}`.\nStdout: {}\nStderr: {}",

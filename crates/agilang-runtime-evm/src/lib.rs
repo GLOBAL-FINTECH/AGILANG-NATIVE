@@ -43,7 +43,11 @@ impl EvmClient {
             .execute(HttpRequest {
                 method: "POST".into(),
                 url: self.endpoint.clone(),
-                query: std::collections::BTreeMap::new(), headers: std::collections::BTreeMap::from([("content-type".into(), "application/json".into())]),
+                query: std::collections::BTreeMap::new(),
+                headers: std::collections::BTreeMap::from([(
+                    "content-type".into(),
+                    "application/json".into(),
+                )]),
                 body: serde_json::to_vec(&body).map_err(json_error)?,
                 timeout_ms: Some(30_000),
             })
