@@ -168,6 +168,25 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("    agi_print(value ? \"true\" : \"false\");\n");
     out.push_str("}\n\n");
 
+    out.push_str("static const char* agi_to_string_i64(int64_t value) {\n");
+    out.push_str("    static char buffer[32];\n");
+    out.push_str("    snprintf(buffer, sizeof(buffer), \"%lld\", (long long)value);\n");
+    out.push_str("    return buffer;\n");
+    out.push_str("}\n\n");
+    out.push_str("static const char* agi_to_string_u64(uint64_t value) {\n");
+    out.push_str("    static char buffer[32];\n");
+    out.push_str("    snprintf(buffer, sizeof(buffer), \"%llu\", (unsigned long long)value);\n");
+    out.push_str("    return buffer;\n");
+    out.push_str("}\n\n");
+    out.push_str("static const char* agi_to_string_f64(double value) {\n");
+    out.push_str("    static char buffer[32];\n");
+    out.push_str("    snprintf(buffer, sizeof(buffer), \"%.17g\", value);\n");
+    out.push_str("    return buffer;\n");
+    out.push_str("}\n\n");
+    out.push_str("static const char* agi_to_string_bool(bool value) {\n");
+    out.push_str("    return value ? \"true\" : \"false\";\n");
+    out.push_str("}\n\n");
+
     out.push_str("static int agi_cmp_f64(const void* a, const void* b) {\n");
     out.push_str("    double da = *(const double*)a;\n");
     out.push_str("    double db = *(const double*)b;\n");
@@ -799,6 +818,17 @@ fn generate_expr(expr: &HirExpr) -> String {
 
 fn generate_intrinsic_call(name: &str, args: &[HirExpr]) -> Option<String> {
     let arg_strs: Vec<String> = args.iter().map(generate_expr).collect();
+    if name == "to_string" && args.len() == 1 {
+        return Some(match args[0].ty() {
+            Type::I32 | Type::I64 => format!("agi_to_string_i64((int64_t)({}))", arg_strs[0]),
+            Type::U32 | Type::U64 => {
+                format!("agi_to_string_u64((uint64_t)({}))", arg_strs[0])
+            }
+            Type::F32 | Type::F64 => format!("agi_to_string_f64((double)({}))", arg_strs[0]),
+            Type::Bool => format!("agi_to_string_bool((bool)({}))", arg_strs[0]),
+            _ => arg_strs[0].clone(),
+        });
+    }
     if name == "get_json" && arg_strs.len() == 2 {
         return Some(format!("agi_http_get_json({})", arg_strs[1]));
     }

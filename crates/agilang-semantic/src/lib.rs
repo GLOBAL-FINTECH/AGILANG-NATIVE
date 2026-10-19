@@ -591,7 +591,17 @@ impl Analyser {
                 };
 
                 let final_ty = if declared_ty != Type::Unknown {
-                    declared_ty
+                    match &declared_ty {
+                        // Preserve explicit array declarations while still inferring
+                        // concrete element types when the declaration is generic.
+                        Type::List(inner) if inner.as_ref() == &Type::Unknown => {
+                            match val_expr.ty() {
+                                Type::List(inferred_inner) => Type::List(inferred_inner.clone()),
+                                _ => declared_ty.clone(),
+                            }
+                        }
+                        _ => declared_ty.clone(),
+                    }
                 } else {
                     val_expr.ty().clone()
                 };

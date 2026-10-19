@@ -1,0 +1,761 @@
+{
+  "capability_registry": [
+    "numbers.bigint",
+    "numbers.mixed_arithmetic",
+    "numbers.precedence",
+    "strings.unicode",
+    "strings.slicing",
+    "collections.list",
+    "collections.map",
+    "collections.nesting",
+    "functions.defaults",
+    "functions.recursion",
+    "functions.closures",
+    "objects.methods",
+    "objects.inheritance",
+    "exceptions.finally",
+    "exceptions.propagation",
+    "modules.relative_import",
+    "modules.import_resolution",
+    "generators.yield",
+    "iterators.for_loop"
+  ],
+  "capability_status": {
+    "collections.list": "COVERED",
+    "collections.map": "PARTIAL",
+    "collections.nesting": "PARTIAL",
+    "exceptions.finally": "PARTIAL",
+    "exceptions.propagation": "COVERED",
+    "functions.closures": "PARTIAL",
+    "functions.defaults": "COVERED",
+    "functions.recursion": "UNTESTED",
+    "generators.yield": "UNTESTED",
+    "iterators.for_loop": "COVERED",
+    "modules.import_resolution": "COVERED",
+    "modules.relative_import": "COVERED",
+    "numbers.bigint": "PARTIAL",
+    "numbers.mixed_arithmetic": "DIFFERENT",
+    "numbers.precedence": "COVERED",
+    "objects.inheritance": "UNTESTED",
+    "objects.methods": "PARTIAL",
+    "strings.slicing": "UNTESTED",
+    "strings.unicode": "COVERED"
+  },
+  "categories": {
+    "ags": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "arrays_lists": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "collections": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "control_flow": {
+      "mismatches": 0,
+      "passed": 2,
+      "score": 100.0,
+      "total": 2
+    },
+    "database": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "diagnostics_negative": {
+      "mismatches": 0,
+      "passed": 2,
+      "score": 100.0,
+      "total": 2
+    },
+    "errors": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "framework": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "functions": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "functions_arguments": {
+      "mismatches": 0,
+      "passed": 2,
+      "score": 100.0,
+      "total": 2
+    },
+    "ml": {
+      "mismatches": 1,
+      "passed": 1,
+      "score": 50.0,
+      "total": 2
+    },
+    "modules": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "modules_imports": {
+      "mismatches": 0,
+      "passed": 2,
+      "score": 100.0,
+      "total": 2
+    },
+    "numbers_operators": {
+      "mismatches": 0,
+      "passed": 2,
+      "score": 100.0,
+      "total": 2
+    },
+    "objects": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "scientific": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    },
+    "strings_unicode": {
+      "mismatches": 0,
+      "passed": 2,
+      "score": 100.0,
+      "total": 2
+    },
+    "syntax": {
+      "mismatches": 0,
+      "passed": 1,
+      "score": 100.0,
+      "total": 1
+    }
+  },
+  "compared": 25,
+  "covered_capabilities": [
+    "collections.list",
+    "collections.map",
+    "collections.nesting",
+    "exceptions.finally",
+    "exceptions.propagation",
+    "functions.closures",
+    "functions.defaults",
+    "iterators.for_loop",
+    "modules.import_resolution",
+    "modules.relative_import",
+    "numbers.bigint",
+    "numbers.mixed_arithmetic",
+    "numbers.precedence",
+    "objects.methods",
+    "strings.unicode"
+  ],
+  "expected_fixture_count": 25,
+  "expected_parity_fixture_count": 25,
+  "fixture_count": 25,
+  "mismatch_count": 1,
+  "mismatches": [
+    {
+      "class": "DIAGNOSTIC",
+      "detail": "stderr mismatch native=`Compiling ring v0.17.14\n   Compiling rustls v0.23.42\n   Compiling rustls-webpki v0.103.13\n   Compiling tokio-rustls v0.26.4\n   Compiling hyper-rustls v0.27.9\n   Compiling reqwest v0.12.28\n   Compiling agilang-runtime-http v0.7.0 (C:\\Users\\pc\\AGILANG-NATIVE\\crates\\agilang-runtime-http)\n   Compiling agilang-runtime-abi v0.7.0 (C:\\Users\\pc\\AGILANG-NATIVE\\crates\\agilang-runtime-abi)\n    Finished `release` profile [optimized] target(s) in 36.91s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-c5a4cddfb8731372.exe)` canonical=`Finished `release` profile [optimized] target(s) in 0.69s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-c5a4cddfb8731372.exe)` normalized_native=`    Finished `release` profile [optimized] target(s) in <time>s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-c5a4cddfb8731372.exe)` normalized_canonical=`Finished `release` profile [optimized] target(s) in <time>s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-c5a4cddfb8731372.exe)`",
+      "fixture_id": "ml-runtime-abi"
+    }
+  ],
+  "native_passed": 25,
+  "results": [
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "AGILANG check passed: 1 function(s)",
+      "capabilities": [
+        "numbers.mixed_arithmetic"
+      ],
+      "category": "syntax",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-main-i32",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "AGILANG check passed: 1 function(s)",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "AGILANG check passed: 2 function(s)",
+      "capabilities": [
+        "functions.defaults"
+      ],
+      "category": "functions",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-functions",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "AGILANG check passed: 2 function(s)",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2001] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/collections.agi:5:16: list index must be integer, found `string`\n      print(user[\"name\"])\n                 ^^^^^^\nError: compilation failed with 1 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "collections.list"
+      ],
+      "category": "collections",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-array-index-error",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2001] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/collections.agi:5:16: list index must be integer, found `string`\n      print(user[\"name\"])\n                 ^^^^^^\nError: compilation failed with 1 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2008] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/negative/main_i32_missing_return.agi:1:1: missing return statement in function returning `i32`\n  fn main() -> i32:\n  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nError: compilation failed with 1 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "exceptions.propagation"
+      ],
+      "category": "errors",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-missing-return-error",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2008] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/negative/main_i32_missing_return.agi:1:1: missing return statement in function returning `i32`\n  fn main() -> i32:\n  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nError: compilation failed with 1 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "Finished release build\nOutput: build/out.exe\n\nExecuting build/out.exe...\n3",
+      "capabilities": [
+        "objects.methods"
+      ],
+      "category": "objects",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-objects-struct",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "Finished release build\nOutput: build/out.exe\n\nExecuting build/out.exe...\n3",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E1001] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/include_entrypoint.agi:2:12: undefined symbol `include`\n      return include(\"src/application.agi\")\n             ^^^^^^^\nError: compilation failed with 1 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "modules.import_resolution"
+      ],
+      "category": "modules",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-modules-imports",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E1001] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/include_entrypoint.agi:2:12: undefined symbol `include`\n      return include(\"src/application.agi\")\n             ^^^^^^^\nError: compilation failed with 1 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2005] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/web_routes.agi:2:12: extraneous return value in void function\n      return [\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nError: compilation failed with 1 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "modules.relative_import"
+      ],
+      "category": "framework",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "framework-routing-fixture",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2005] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/web_routes.agi:2:12: extraneous return value in void function\n      return [\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nError: compilation failed with 1 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.33s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_ags_compiler-d173fae17b11f6c1.exe)\n   Doc-tests agilang_ags_compiler",
+      "canonical_stdout": "running 7 tests\ntest tests::live_state_machine_rejects_impossible_states_and_preserves_data ... ok\ntest tests::rejects_unknown_sibaq_field ... ok\ntest tests::missing_initial_state_loads_immediately_without_discarding_runtime_errors ... ok\ntest tests::compiles_full_html_template_through_directive_pipeline ... ok\ntest tests::hydration_does_not_duplicate_initial_fetch ... ok\ntest tests::compiles_sibaq_dashboard_end_to_end ... ok\ntest tests::lowers_reactive_state_blocks ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "capabilities": [
+        "iterators.for_loop"
+      ],
+      "category": "ags",
+      "classification": [],
+      "comparison_mode": "cargo-test-normalized",
+      "id": "ags-compiler-suite",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "Finished `release` profile [optimized] target(s) in 0.31s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_ags_compiler-d173fae17b11f6c1.exe)\n   Doc-tests agilang_ags_compiler",
+      "native_stdout": "running 7 tests\ntest tests::live_state_machine_rejects_impossible_states_and_preserves_data ... ok\ntest tests::compiles_full_html_template_through_directive_pipeline ... ok\ntest tests::rejects_unknown_sibaq_field ... ok\ntest tests::hydration_does_not_duplicate_initial_fetch ... ok\ntest tests::missing_initial_state_loads_immediately_without_discarding_runtime_errors ... ok\ntest tests::lowers_reactive_state_blocks ... ok\ntest tests::compiles_sibaq_dashboard_end_to_end ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "normalization_applied": true,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.35s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_database_agidb-a88f3eaf1fdb0eb2.exe)\n   Doc-tests agilang_database_agidb",
+      "canonical_stdout": "running 4 tests\ntest tests::test_single_writer_process_lock ... ok\ntest tests::rolls_back_transaction_snapshot ... ok\ntest tests::persists_inserted_rows ... ok\ntest tests::concurrent_writes_keep_valid_json_and_preserve_rows ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "capabilities": [
+        "collections.map"
+      ],
+      "category": "database",
+      "classification": [],
+      "comparison_mode": "cargo-test-normalized",
+      "id": "database-agidb-suite",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "Finished `release` profile [optimized] target(s) in 0.40s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_database_agidb-a88f3eaf1fdb0eb2.exe)\n   Doc-tests agilang_database_agidb",
+      "native_stdout": "running 4 tests\ntest tests::test_single_writer_process_lock ... ok\ntest tests::persists_inserted_rows ... ok\ntest tests::rolls_back_transaction_snapshot ... ok\ntest tests::concurrent_writes_keep_valid_json_and_preserve_rows ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "normalization_applied": true,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "Finished release build\nOutput: build/out.exe\n\nExecuting build/out.exe...\n2.7182818284590451\n7\n1024\n3\n2\n1.4142135623730951\n3\n2\n3\n3",
+      "capabilities": [
+        "numbers.precedence"
+      ],
+      "category": "scientific",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "scientific-native-stats",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "Finished release build\nOutput: build/out.exe\n\nExecuting build/out.exe...\n2.7182818284590451\n7\n1024\n3\n2\n1.4142135623730951\n3\n2\n3\n3",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.33s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_compute-483c881c2ca0dfa4.exe)",
+      "canonical_stdout": "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s",
+      "capabilities": [
+        "numbers.bigint"
+      ],
+      "category": "ml",
+      "classification": [],
+      "comparison_mode": "cargo-test-normalized",
+      "id": "ml-runtime-compute",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "Finished `release` profile [optimized] target(s) in 0.34s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_compute-483c881c2ca0dfa4.exe)",
+      "native_stdout": "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s",
+      "normalization_applied": true,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.69s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-c5a4cddfb8731372.exe)",
+      "canonical_stdout": "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s",
+      "capabilities": [
+        "numbers.mixed_arithmetic"
+      ],
+      "category": "ml",
+      "classification": [
+        "DIAGNOSTIC"
+      ],
+      "comparison_mode": "cargo-test-normalized",
+      "id": "ml-runtime-abi",
+      "mismatch_classes": [
+        "DIAGNOSTIC"
+      ],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "Compiling ring v0.17.14\n   Compiling rustls v0.23.42\n   Compiling rustls-webpki v0.103.13\n   Compiling tokio-rustls v0.26.4\n   Compiling hyper-rustls v0.27.9\n   Compiling reqwest v0.12.28\n   Compiling agilang-runtime-http v0.7.0 (C:\\Users\\pc\\AGILANG-NATIVE\\crates\\agilang-runtime-http)\n   Compiling agilang-runtime-abi v0.7.0 (C:\\Users\\pc\\AGILANG-NATIVE\\crates\\agilang-runtime-abi)\n    Finished `release` profile [optimized] target(s) in 36.91s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-c5a4cddfb8731372.exe)",
+      "native_stdout": "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s",
+      "normalization_applied": true,
+      "parity_status": "fail"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "AGILANG check passed: 1 function(s)",
+      "capabilities": [
+        "numbers.mixed_arithmetic"
+      ],
+      "category": "numbers_operators",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-typed-values",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "AGILANG check passed: 1 function(s)",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "AGILANG check passed: 1 function(s)",
+      "capabilities": [
+        "numbers.precedence"
+      ],
+      "category": "numbers_operators",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-main-return-zero",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "AGILANG check passed: 1 function(s)",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2006] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/negative/main_i32_wrong_return_type.agi:2:12: type mismatch: expected return type `i32`, found `string`\n      return \"zero\"\n             ^^^^^^\nError: compilation failed with 1 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "exceptions.propagation"
+      ],
+      "category": "diagnostics_negative",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-main-wrong-return-type",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2006] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/negative/main_i32_wrong_return_type.agi:2:12: type mismatch: expected return type `i32`, found `string`\n      return \"zero\"\n             ^^^^^^\nError: compilation failed with 1 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "AGILANG check passed: 3 function(s)",
+      "capabilities": [
+        "collections.list",
+        "collections.nesting"
+      ],
+      "category": "arrays_lists",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "native-arrays",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "AGILANG check passed: 3 function(s)",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "AGILANG check passed: 1 function(s)",
+      "capabilities": [
+        "strings.unicode"
+      ],
+      "category": "strings_unicode",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "native-hello",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "AGILANG check passed: 1 function(s)",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "AGILANG check passed: 1 function(s)",
+      "capabilities": [
+        "strings.unicode"
+      ],
+      "category": "strings_unicode",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "native-hello-native",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "AGILANG check passed: 1 function(s)",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "AGILANG check passed: 3 function(s)",
+      "capabilities": [
+        "functions.defaults"
+      ],
+      "category": "functions_arguments",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "native-bootstrap-features",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "AGILANG check passed: 3 function(s)",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E100] at C:/Users/pc/AGILANG-NATIVE/examples/native/bootstrap-tests.agi:1:1: expected `fn`\n  // This test suite validates the native AGILANG compiler bootstrap\n  ^\nError: compilation failed with 1 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "exceptions.finally"
+      ],
+      "category": "diagnostics_negative",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "native-bootstrap-tests",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E100] at C:/Users/pc/AGILANG-NATIVE/examples/native/bootstrap-tests.agi:1:1: expected `fn`\n  // This test suite validates the native AGILANG compiler bootstrap\n  ^\nError: compilation failed with 1 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 0,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "canonical_stdout": "AGILANG check passed: 1 function(s)",
+      "capabilities": [
+        "functions.closures"
+      ],
+      "category": "functions_arguments",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "native-modern-features",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 0,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^",
+      "native_stdout": "AGILANG check passed: 1 function(s)",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E137] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/control_flow.agi:7:10: expected `:`\n      else if not verified:\n           ^^\nerror[E120] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/control_flow.agi:8:1: expected expression\n          print(\"Customer verification required\")\n  ^^^^^^^^\nerror[E100] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/control_flow.agi:10:5: expected `fn`\n      else:\n      ^^^^\nError: compilation failed with 3 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "iterators.for_loop"
+      ],
+      "category": "control_flow",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "target-control-flow",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E137] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/control_flow.agi:7:10: expected `:`\n      else if not verified:\n           ^^\nerror[E120] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/control_flow.agi:8:1: expected expression\n          print(\"Customer verification required\")\n  ^^^^^^^^\nerror[E100] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/control_flow.agi:10:5: expected `fn`\n      else:\n      ^^^^\nError: compilation failed with 3 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2001] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/loops.agi:4:30: list index must be integer, found `string`\n          total = total + item[\"amount\"]\n                               ^^^^^^^^\nerror[E2005] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/loops.agi:5:12: extraneous return value in void function\n      return total\n             ^^^^^\nError: compilation failed with 2 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "iterators.for_loop"
+      ],
+      "category": "control_flow",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "target-loops",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E2001] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/loops.agi:4:30: list index must be integer, found `string`\n          total = total + item[\"amount\"]\n                               ^^^^^^^^\nerror[E2005] at C:/Users/pc/AGILANG-NATIVE/compat/fixtures/target/loops.agi:5:12: extraneous return value in void function\n      return total\n             ^^^^^\nError: compilation failed with 2 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/routes_api_status.agi:11:1: unexpected character \"@\"\n  @get \"/api/status\"\n  ^\nError: compilation failed with 1 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "modules.relative_import"
+      ],
+      "category": "modules_imports",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-routes-api-status",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/routes_api_status.agi:11:1: unexpected character \"@\"\n  @get \"/api/status\"\n  ^\nError: compilation failed with 1 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    },
+    {
+      "canonical_execution_error": null,
+      "canonical_exit_code": 1,
+      "canonical_status": "executed",
+      "canonical_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:35:30: unexpected character \"?\"\n  // Returns error if chain_id ≠ 1990 to prevent displaying wrong-chain data\n                               ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:35:31: unexpected character \"?\"\n  // Returns error if chain_id ≠ 1990 to prevent displaying wrong-chain data\n                                ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:35:32: unexpected character \"?\"\n  // Returns error if chain_id ≠ 1990 to prevent displaying wrong-chain data\n                                 ^\nerror[E004] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:43:17: unterminated string literal\n      // Verify we're on the correct chain\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:65:36: unexpected character \"?\"\n          \"status\": telemetry.status ?? \"online\",\n                                     ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:65:37: unexpected character \"?\"\n          \"status\": telemetry.status ?? \"online\",\n                                      ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:67:56: unexpected character \"?\"\n          \"finalized_height\": telemetry.finalized_height ?? block_number,\n                                                         ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:67:57: unexpected character \"?\"\n          \"finalized_height\": telemetry.finalized_height ?? block_number,\n                                                          ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:68:54: unexpected character \"?\"\n          \"validator_count\": telemetry.validator_count ?? 0,\n                                                       ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:68:55: unexpected character \"?\"\n          \"validator_count\": telemetry.validator_count ?? 0,\n                                                        ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:69:58: unexpected character \"?\"\n          \"transaction_count\": telemetry.transaction_count ?? 0,\n                                                           ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:69:59: unexpected character \"?\"\n          \"transaction_count\": telemetry.transaction_count ?? 0,\n                                                            ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:70:42: unexpected character \"?\"\n          \"consensus\": telemetry.consensus ?? \"Proof of Stake\",\n                                           ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:70:43: unexpected character \"?\"\n          \"consensus\": telemetry.consensus ?? \"Proof of Stake\",\n                                            ^\nError: compilation failed with 14 error(s)",
+      "canonical_stdout": "",
+      "capabilities": [
+        "modules.import_resolution"
+      ],
+      "category": "modules_imports",
+      "classification": [],
+      "comparison_mode": "strict",
+      "id": "agi-sibaq-status",
+      "mismatch_classes": [],
+      "native_execution_error": null,
+      "native_exit_code": 1,
+      "native_status": "pass",
+      "native_stderr": "warning: field `expires_at` is never read\n  --> crates\\agilang-framework-server\\src\\lib.rs:47:5\n   |\n43 | struct AuthSessionRecord {\n   |        ----------------- field in this struct\n...\n47 |     expires_at: u64,\n   |     ^^^^^^^^^^\n   |\n   = note: `AuthSessionRecord` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `find_controller_file` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2506:4\n     |\n2506 | fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^^\n\nwarning: function `find_file_recursive` is never used\n    --> crates\\agilang-framework-server\\src\\lib.rs:2522:4\n     |\n2522 | fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {\n     |    ^^^^^^^^^^^^^^^^^^^\n\nwarning: associated functions `ping` and `close` are never used\n  --> crates\\agilang-framework-server\\src\\websocket.rs:74:12\n   |\n57 | impl WebSocketFrame {\n   | ------------------- associated functions in this implementation\n...\n74 |     pub fn ping(value: impl Into<Vec<u8>>) -> Self {\n   |            ^^^^\n...\n90 |     pub fn close(code: u16, reason: &str) -> Self {\n   |            ^^^^^\n\nwarning: methods `into_inner`, `send_ping`, and `close` are never used\n   --> crates\\agilang-framework-server\\src\\websocket.rs:255:12\n    |\n240 | impl<S: Read + Write> WebSocketConnection<S> {\n    | -------------------------------------------- methods in this implementation\n...\n255 |     pub fn into_inner(self) -> S {\n    |            ^^^^^^^^^^\n...\n267 |     pub fn send_ping(&mut self, value: &[u8]) -> Result<(), WebSocketError> {\n    |            ^^^^^^^^^\n...\n271 |     pub fn close(&mut self, code: u16, reason: &str) -> Result<(), WebSocketError> {\n    |            ^^^^^\n\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:35:30: unexpected character \"?\"\n  // Returns error if chain_id ≠ 1990 to prevent displaying wrong-chain data\n                               ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:35:31: unexpected character \"?\"\n  // Returns error if chain_id ≠ 1990 to prevent displaying wrong-chain data\n                                ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:35:32: unexpected character \"?\"\n  // Returns error if chain_id ≠ 1990 to prevent displaying wrong-chain data\n                                 ^\nerror[E004] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:43:17: unterminated string literal\n      // Verify we're on the correct chain\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:65:36: unexpected character \"?\"\n          \"status\": telemetry.status ?? \"online\",\n                                     ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:65:37: unexpected character \"?\"\n          \"status\": telemetry.status ?? \"online\",\n                                      ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:67:56: unexpected character \"?\"\n          \"finalized_height\": telemetry.finalized_height ?? block_number,\n                                                         ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:67:57: unexpected character \"?\"\n          \"finalized_height\": telemetry.finalized_height ?? block_number,\n                                                          ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:68:54: unexpected character \"?\"\n          \"validator_count\": telemetry.validator_count ?? 0,\n                                                       ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:68:55: unexpected character \"?\"\n          \"validator_count\": telemetry.validator_count ?? 0,\n                                                        ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:69:58: unexpected character \"?\"\n          \"transaction_count\": telemetry.transaction_count ?? 0,\n                                                           ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:69:59: unexpected character \"?\"\n          \"transaction_count\": telemetry.transaction_count ?? 0,\n                                                            ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:70:42: unexpected character \"?\"\n          \"consensus\": telemetry.consensus ?? \"Proof of Stake\",\n                                           ^\nerror[E001] at C:/Users/pc/AGILANG-NATIVE/examples/agi/sibaq_status.agi:70:43: unexpected character \"?\"\n          \"consensus\": telemetry.consensus ?? \"Proof of Stake\",\n                                            ^\nError: compilation failed with 14 error(s)",
+      "native_stdout": "",
+      "normalization_applied": false,
+      "parity_status": "pass"
+    }
+  ],
+  "summary": {
+    "capability_coverage_percent": 78.94736842105263,
+    "capability_covered_count": 15,
+    "capability_registry_count": 19,
+    "capability_status_counts": {
+      "COVERED": 8,
+      "DIFFERENT": 1,
+      "PARTIAL": 6,
+      "UNTESTED": 4
+    },
+    "compared": 25,
+    "coverage_percent": 25.0,
+    "coverage_scope": "current fixture sample",
+    "coverage_target_fixture_count": 100,
+    "fixture_count": 25,
+    "fixture_parity_percent": 96.0,
+    "mismatch_count": 1,
+    "native_passed": 25,
+    "python314_language_coverage": "still expanding"
+  }
+}

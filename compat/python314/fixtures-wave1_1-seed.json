@@ -1,0 +1,52 @@
+{
+  "schema": "AGI-PARITY-PLAN-1",
+  "phase": "wave1_1",
+  "current_stage": "25-to-50",
+  "objective": "Expand from 12 to 100 fixtures with strict semantic parity checks.",
+  "stages": [
+    { "name": "12-to-25", "target_fixture_count": 25 },
+    { "name": "25-to-50", "target_fixture_count": 50 },
+    { "name": "50-to-100", "target_fixture_count": 100 }
+  ],
+  "category_targets": {
+    "numbers_operators": 10,
+    "strings_unicode": 10,
+    "arrays_lists": 10,
+    "maps_sets_tuples": 10,
+    "functions_arguments": 10,
+    "scope_closures": 10,
+    "control_flow": 8,
+    "classes_objects": 10,
+    "exceptions": 8,
+    "modules_imports": 6,
+    "iterators_generators": 4,
+    "diagnostics_negative": 4
+  },
+  "seed_25_candidates": [
+    { "id": "seed-main-i32", "category": "numbers_operators", "path": "compat/fixtures/verified/main_i32.agi", "status": "ready" },
+    { "id": "seed-typed-values", "category": "numbers_operators", "path": "compat/fixtures/verified/typed_values.agi", "status": "ready" },
+    { "id": "seed-functions", "category": "functions_arguments", "path": "compat/fixtures/verified/functions.agi", "status": "ready" },
+    { "id": "seed-arrays-native", "category": "arrays_lists", "path": "examples/native/arrays.agi", "status": "ready" },
+    { "id": "seed-control-flow", "category": "control_flow", "path": "compat/fixtures/target/control_flow.agi", "status": "ready" },
+    { "id": "seed-loops", "category": "iterators_generators", "path": "compat/fixtures/target/loops.agi", "status": "ready" },
+    { "id": "seed-collections", "category": "arrays_lists", "path": "compat/fixtures/target/collections.agi", "status": "ready" },
+    { "id": "seed-objects-struct", "category": "classes_objects", "path": "compat/python314/fixtures/objects_struct.agi", "status": "ready" },
+    { "id": "seed-hello-native", "category": "strings_unicode", "path": "examples/native/hello-native.agi", "status": "ready" },
+    { "id": "seed-hello", "category": "strings_unicode", "path": "examples/native/hello.agi", "status": "ready" },
+    { "id": "seed-bootstrap-features", "category": "functions_arguments", "path": "examples/native/bootstrap-features.agi", "status": "candidate" },
+    { "id": "seed-bootstrap-tests", "category": "diagnostics_negative", "path": "examples/native/bootstrap-tests.agi", "status": "candidate" },
+    { "id": "seed-http-test", "category": "modules_imports", "path": "examples/native/http_test.agi", "status": "candidate" },
+    { "id": "seed-routes-api-status", "category": "modules_imports", "path": "examples/agi/routes_api_status.agi", "status": "candidate" },
+    { "id": "seed-sibaq-status", "category": "modules_imports", "path": "examples/agi/sibaq_status.agi", "status": "candidate" },
+    { "id": "seed-main-return-zero", "category": "numbers_operators", "path": "compat/fixtures/positive/main_i32_return_zero.agi", "status": "ready" },
+    { "id": "seed-main-missing-return", "category": "diagnostics_negative", "path": "compat/fixtures/negative/main_i32_missing_return.agi", "status": "ready" },
+    { "id": "seed-main-wrong-return", "category": "diagnostics_negative", "path": "compat/fixtures/negative/main_i32_wrong_return_type.agi", "status": "ready" },
+    { "id": "seed-auth-policy", "category": "exceptions", "path": "compat/fixtures/target/auth_policy.agi", "status": "candidate" },
+    { "id": "seed-include-entrypoint", "category": "modules_imports", "path": "compat/fixtures/target/include_entrypoint.agi", "status": "ready" },
+    { "id": "seed-web-routes", "category": "modules_imports", "path": "compat/fixtures/target/web_routes.agi", "status": "ready" },
+    { "id": "seed-modern-features-native", "category": "functions_arguments", "path": "test_modern_features_native.agi", "status": "candidate" },
+    { "id": "seed-native-math-stats", "category": "numbers_operators", "path": "test_native_math_stats.agi", "status": "ready" },
+    { "id": "seed-reactive-counter-ags", "category": "modules_imports", "path": "compat/fixtures/target/reactive_counter.ags", "status": "candidate" },
+    { "id": "seed-dashboard-ags", "category": "modules_imports", "path": "compat/fixtures/target/dashboard.ags", "status": "candidate" }
+  ]
+}
