@@ -892,8 +892,7 @@ fn require(root: &Path, rel: &str) -> Result<()> {
 fn validate_canonical_lock(root: &Path) -> Result<()> {
     let lock_path = root.join("compat/canonical.lock.json");
     let lock_text = fs::read_to_string(&lock_path)?;
-    let lock: Value =
-        serde_json::from_str(&lock_text).context("invalid canonical lock JSON")?;
+    let lock: Value = serde_json::from_str(&lock_text).context("invalid canonical lock JSON")?;
 
     let schema = lock
         .get("schema")

@@ -194,7 +194,11 @@ pub fn perform_handshake(
     }
 }
 
-fn send_request(addr: &str, timeout: Duration, request: &TransportRequest) -> Result<TransportResponse> {
+fn send_request(
+    addr: &str,
+    timeout: Duration,
+    request: &TransportRequest,
+) -> Result<TransportResponse> {
     let mut stream = TcpStream::connect(addr)
         .with_context(|| format!("failed to connect to transport peer at {addr}"))?;
     stream.set_read_timeout(Some(timeout))?;
@@ -237,12 +241,15 @@ fn handle_connection(
             let snapshot = state.lock().unwrap().snapshot();
             TransportResponse::Status { snapshot }
         }
-        TransportRequest::HandshakeInit { client_identity, .. } => {
+        TransportRequest::HandshakeInit {
+            client_identity, ..
+        } => {
             let challenge = AuthHandshake::issue_challenge(db_identity)?;
-            state.lock().unwrap().pending_challenges.insert(
-                client_identity.name.clone(),
-                challenge.clone(),
-            );
+            state
+                .lock()
+                .unwrap()
+                .pending_challenges
+                .insert(client_identity.name.clone(), challenge.clone());
             TransportResponse::HandshakeChallenge { challenge }
         }
         TransportRequest::HandshakeFinish {

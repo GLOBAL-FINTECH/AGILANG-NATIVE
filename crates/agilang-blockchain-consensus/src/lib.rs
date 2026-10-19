@@ -71,7 +71,10 @@ impl ConsensusEngine {
             return Ok(false);
         }
         let expected = self.sign_block(validator, block)?;
-        Ok(constant_time_eq(expected.as_bytes(), block.validator_signature.as_bytes()))
+        Ok(constant_time_eq(
+            expected.as_bytes(),
+            block.validator_signature.as_bytes(),
+        ))
     }
 
     pub fn create_attestation(
@@ -108,7 +111,10 @@ impl ConsensusEngine {
         };
         let payload = attestation_payload(&attestation.validator, &source, &target)?;
         let expected = sign(ATTESTATION_DOMAIN, key.as_bytes(), payload.as_bytes())?;
-        Ok(constant_time_eq(expected.as_bytes(), attestation.signature.as_bytes()))
+        Ok(constant_time_eq(
+            expected.as_bytes(),
+            attestation.signature.as_bytes(),
+        ))
     }
 
     pub fn submit_attestation(&mut self, attestation: Attestation) -> RuntimeResult<FinalityState> {
@@ -122,7 +128,9 @@ impl ConsensusEngine {
         let validator_epoch = (attestation.validator.clone(), attestation.target_epoch);
         if let Some(existing_hash) = self.validator_targets.get(&validator_epoch) {
             if existing_hash != &attestation.target_hash {
-                self.state.equivocators.insert(attestation.validator.clone());
+                self.state
+                    .equivocators
+                    .insert(attestation.validator.clone());
                 return invalid("validator equivocation detected for target epoch");
             }
             return Ok(self.state.clone());
@@ -157,7 +165,11 @@ impl ConsensusEngine {
     }
 
     fn has_supermajority(&self, key: &(u64, String)) -> bool {
-        let total: u128 = self.validators.values().map(|stake| u128::from(*stake)).sum();
+        let total: u128 = self
+            .validators
+            .values()
+            .map(|stake| u128::from(*stake))
+            .sum();
         if total == 0 {
             return false;
         }
@@ -279,24 +291,39 @@ mod tests {
         )
         .unwrap();
         block.validator_signature = engine.sign_block("validator-a", &block).unwrap();
-        assert!(engine.verify_block_signature("validator-a", &block).unwrap());
+        assert!(engine
+            .verify_block_signature("validator-a", &block)
+            .unwrap());
     }
 
     #[test]
     fn supermajority_justifies_and_next_link_finalizes() {
         let config = config();
         let mut engine = ConsensusEngine::new(&config).unwrap();
-        let genesis = Checkpoint { epoch: 0, block_hash: "g".into() };
-        let one = Checkpoint { epoch: 1, block_hash: "one".into() };
+        let genesis = Checkpoint {
+            epoch: 0,
+            block_hash: "g".into(),
+        };
+        let one = Checkpoint {
+            epoch: 1,
+            block_hash: "one".into(),
+        };
         for validator in ["validator-a", "validator-b"] {
-            let vote = engine.create_attestation(validator, genesis.clone(), one.clone()).unwrap();
+            let vote = engine
+                .create_attestation(validator, genesis.clone(), one.clone())
+                .unwrap();
             engine.submit_attestation(vote).unwrap();
         }
         assert_eq!(engine.state().justified.as_ref().unwrap().epoch, 1);
 
-        let two = Checkpoint { epoch: 2, block_hash: "two".into() };
+        let two = Checkpoint {
+            epoch: 2,
+            block_hash: "two".into(),
+        };
         for validator in ["validator-a", "validator-b"] {
-            let vote = engine.create_attestation(validator, one.clone(), two.clone()).unwrap();
+            let vote = engine
+                .create_attestation(validator, one.clone(), two.clone())
+                .unwrap();
             engine.submit_attestation(vote).unwrap();
         }
         assert_eq!(engine.state().finalized.as_ref().unwrap().epoch, 1);
@@ -306,12 +333,25 @@ mod tests {
     fn detects_equivocation() {
         let config = config();
         let mut engine = ConsensusEngine::new(&config).unwrap();
-        let source = Checkpoint { epoch: 0, block_hash: "g".into() };
-        let first = Checkpoint { epoch: 1, block_hash: "a".into() };
-        let second = Checkpoint { epoch: 1, block_hash: "b".into() };
-        let vote = engine.create_attestation("validator-a", source.clone(), first).unwrap();
+        let source = Checkpoint {
+            epoch: 0,
+            block_hash: "g".into(),
+        };
+        let first = Checkpoint {
+            epoch: 1,
+            block_hash: "a".into(),
+        };
+        let second = Checkpoint {
+            epoch: 1,
+            block_hash: "b".into(),
+        };
+        let vote = engine
+            .create_attestation("validator-a", source.clone(), first)
+            .unwrap();
         engine.submit_attestation(vote).unwrap();
-        let conflict = engine.create_attestation("validator-a", source, second).unwrap();
+        let conflict = engine
+            .create_attestation("validator-a", source, second)
+            .unwrap();
         assert!(engine.submit_attestation(conflict).is_err());
         assert!(engine.state().equivocators.contains("validator-a"));
     }

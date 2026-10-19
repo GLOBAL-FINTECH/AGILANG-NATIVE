@@ -1418,9 +1418,7 @@ pub fn install_http_client(force: bool) -> Result<()> {
     }
 
     if exists && !force {
-        bail!(
-            "HTTP client files already exist.\n\nUse:\n    agilang http-client --force"
-        );
+        bail!("HTTP client files already exist.\n\nUse:\n    agilang http-client --force");
     }
 
     for (relative_path, content) in &files {
@@ -1440,7 +1438,9 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
     let normalized_name = normalize_path_name(name);
     let parts: Vec<&str> = normalized_name.split('/').collect();
     let class_name = parts.last().cloned().unwrap_or("");
-    let resource_name = class_name.trim_end_matches("Controller").trim_end_matches("Request");
+    let resource_name = class_name
+        .trim_end_matches("Controller")
+        .trim_end_matches("Request");
     let resource_pascal = to_pascal_case(resource_name);
     let resource_snake = to_snake_case(&resource_pascal);
     let resource_table = pluralize(&resource_snake);
@@ -1457,7 +1457,9 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             } else {
                 format!("{}Controller", class_name)
             };
-            let path = project_root.join("app/Controllers").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Controllers")
+                .join(format!("{}.agi", file_name));
             let ns = nested_namespace("App.Controllers", &file_name);
             let content = format!(
                 "module {ns}\n\nuse App.Models.{resource_pascal}\nuse App.Requests.Store{resource_pascal}Request\nuse App.Requests.Update{resource_pascal}Request\nuse Framework.Http.Request\nuse Framework.Http.Response\nuse Framework.Validation.Validator\n\nclass {actual_class_name}:\n    fn index(request: Request) -> Response:\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"index\"\n        }})\n\n    fn show(request: Request, id: i64) -> Response:\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"show\",\n            \"id\": id\n        }})\n\n    fn store(request: Store{resource_pascal}Request) -> Response:\n        let payload = request.body()\n        Validator.validate(payload, {{\n            \"name\": [\"required\", \"string\", \"max:255\"]\n        }})\n        return Response.status(201).json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"store\",\n            \"validated_fields\": [\"name\"]\n        }})\n\n    fn update(request: Update{resource_pascal}Request, id: i64) -> Response:\n        let payload = request.body()\n        Validator.validate(payload, {{\n            \"name\": [\"required\", \"string\", \"max:255\"]\n        }})\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"update\",\n            \"id\": id,\n            \"validated_fields\": [\"name\"]\n        }})\n\n    fn destroy(request: Request, id: i64) -> Response:\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"destroy\",\n            \"id\": id,\n            \"authorization\": \"required\"\n        }})\n\n    fn restore(request: Request, id: i64) -> Response:\n        return Response.json({{\n            \"resource\": \"{resource_table}\",\n            \"repository\": \"orm\",\n            \"action\": \"restore\",\n            \"id\": id,\n            \"authorization\": \"required\"\n        }})\n"
@@ -1466,7 +1468,9 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             println!("Created controller app/Controllers/{}.agi", file_name);
         }
         "model" => {
-            let path = project_root.join("app/Models").join(format!("{}.agi", normalized_name));
+            let path = project_root
+                .join("app/Models")
+                .join(format!("{}.agi", normalized_name));
             let ns = nested_namespace("App.Models", &normalized_name);
             let content = format!(
                 "module {ns}\n\nuse Framework.Database.Model\n\nclass {resource_pascal} extends Model:\n    table = \"{resource_table}\"\n    primary_key = \"id\"\n    fillable = [\"name\"]\n    hidden = []\n    casts = {{\n        \"id\": \"integer\"\n    }}\n    timestamps = true\n    soft_deletes = true\n"
@@ -1485,7 +1489,9 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             } else {
                 format!("{}Middleware", class_name)
             };
-            let path = project_root.join("app/Middleware").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Middleware")
+                .join(format!("{}.agi", file_name));
             let ns = nested_namespace("App.Middleware", &file_name);
             let content = format!(
                 "module {ns}\n\nuse Framework.Http.Request\nuse Framework.Http.Response\nuse Framework.Middleware.Next\n\nclass {actual_class_name}:\n    fn handle(request: Request, next: Next) -> Response:\n        return next(request)\n"
@@ -1504,7 +1510,9 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             } else {
                 format!("{}Request", class_name)
             };
-            let path = project_root.join("app/Requests").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Requests")
+                .join(format!("{}.agi", file_name));
             let ns = nested_namespace("App.Requests", &file_name);
             let content = format!(
                 "module {ns}\n\nuse Framework.Validation.FormRequest\n\nclass {actual_class_name} extends FormRequest:\n    fn authorize() -> bool:\n        return true\n\n    fn rules() -> map:\n        return {{\n            \"name\": [\"required\", \"string\", \"max:255\"]\n        }}\n\n    fn validated_fields() -> list:\n        return [\"name\"]\n"
@@ -1523,7 +1531,9 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             } else {
                 format!("{}Policy", class_name)
             };
-            let path = project_root.join("app/Policies").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Policies")
+                .join(format!("{}.agi", file_name));
             let ns = nested_namespace("App.Policies", &file_name);
             let content = format!(
                 "module {ns}\n\nclass {actual_class_name}:\n    fn view_any(user: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n\n    fn view(user: map, model: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n\n    fn create(user: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n\n    fn update(user: map, model: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n\n    fn delete(user: map, model: map) -> bool:\n        return user.get(\"role\", \"\") == \"admin\"\n"
@@ -1542,7 +1552,9 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             } else {
                 format!("{}Service", class_name)
             };
-            let path = project_root.join("app/Services").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Services")
+                .join(format!("{}.agi", file_name));
             let ns = nested_namespace("App.Services", &file_name);
             let content = format!(
                 "module {ns}\n\nclass {actual_class_name}:\n    fn handle() -> void:\n        pass\n"
@@ -1561,7 +1573,9 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             } else {
                 format!("{}ServiceProvider", class_name)
             };
-            let path = project_root.join("app/Providers").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("app/Providers")
+                .join(format!("{}.agi", file_name));
             let ns = nested_namespace("App.Providers", &file_name);
             let content = format!(
                 "module {ns}\n\nuse Framework.Container.Container\nuse Framework.Providers.ServiceProvider\n\nclass {actual_class_name} extends ServiceProvider:\n    fn register(container: Container) -> void:\n        pass\n\n    fn boot() -> void:\n        pass\n"
@@ -1570,13 +1584,17 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             println!("Created provider app/Providers/{}.agi", file_name);
         }
         "view" => {
-            let path = project_root.join("resources/views").join(format!("{}.ags", normalized_name));
+            let path = project_root
+                .join("resources/views")
+                .join(format!("{}.ags", normalized_name));
             let content = format!("<!-- View template {} -->\n", normalized_name);
             write_generated_file(&path, &content, force, "view")?;
             println!("Created view resources/views/{}.ags", normalized_name);
         }
         "route" => {
-            let path = project_root.join("routes").join(format!("{}.agi", normalized_name));
+            let path = project_root
+                .join("routes")
+                .join(format!("{}.agi", normalized_name));
             let content = format!(
                 "use Framework.Routing.Route\n\nfn register_{}() -> void:\n    pass\n",
                 class_name.to_lowercase()
@@ -1585,10 +1603,14 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             println!("Created routes/{}.agi", normalized_name);
         }
         "migration" => {
-            let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_secs();
             let migration_class = to_pascal_case(class_name);
             let file_name = format!("{}_{}", timestamp, migration_class);
-            let path = project_root.join("database/migrations").join(format!("{}.agi", file_name));
+            let path = project_root
+                .join("database/migrations")
+                .join(format!("{}.agi", file_name));
             let content = format!(
                 "use Framework.Database.Migration\nuse Framework.Database.Schema\n\nclass {migration_class} extends Migration:\n    fn up() -> void:\n        Schema.create(\"{resource_table}\", fn table:\n            table.id()\n            table.string(\"name\")\n            table.timestamps()\n        )\n\n    fn down() -> void:\n        Schema.drop_if_exists(\"{resource_table}\")\n"
             );
@@ -1596,9 +1618,19 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             println!("Created migration database/migrations/{}.agi", file_name);
         }
         "seeder" => {
-            let file_name = if class_name.ends_with("Seeder") { normalized_name.clone() } else { format!("{}Seeder", normalized_name) };
-            let actual_class_name = if class_name.ends_with("Seeder") { class_name.to_string() } else { format!("{}Seeder", class_name) };
-            let path = project_root.join("database/seeders").join(format!("{}.agi", file_name));
+            let file_name = if class_name.ends_with("Seeder") {
+                normalized_name.clone()
+            } else {
+                format!("{}Seeder", normalized_name)
+            };
+            let actual_class_name = if class_name.ends_with("Seeder") {
+                class_name.to_string()
+            } else {
+                format!("{}Seeder", class_name)
+            };
+            let path = project_root
+                .join("database/seeders")
+                .join(format!("{}.agi", file_name));
             let content = format!(
                 "use Framework.Database.Seeder\n\nclass {actual_class_name} extends Seeder:\n    fn run() -> void:\n        print(\"Seeding {resource_table}\")\n"
             );
@@ -1606,9 +1638,19 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             println!("Created seeder database/seeders/{}.agi", file_name);
         }
         "factory" => {
-            let file_name = if class_name.ends_with("Factory") { normalized_name.clone() } else { format!("{}Factory", normalized_name) };
-            let actual_class_name = if class_name.ends_with("Factory") { class_name.to_string() } else { format!("{}Factory", class_name) };
-            let path = project_root.join("database/factories").join(format!("{}.agi", file_name));
+            let file_name = if class_name.ends_with("Factory") {
+                normalized_name.clone()
+            } else {
+                format!("{}Factory", normalized_name)
+            };
+            let actual_class_name = if class_name.ends_with("Factory") {
+                class_name.to_string()
+            } else {
+                format!("{}Factory", class_name)
+            };
+            let path = project_root
+                .join("database/factories")
+                .join(format!("{}.agi", file_name));
             let content = format!(
                 "class {actual_class_name}:\n    fn definition() -> map:\n        return {{\n            \"name\": \"Example {resource_pascal}\",\n            \"created_at\": \"seeded\",\n            \"updated_at\": \"seeded\"\n        }}\n"
             );
@@ -1616,7 +1658,9 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             println!("Created factory database/factories/{}.agi", file_name);
         }
         "test" => {
-            let path = project_root.join("tests/Feature").join(format!("{}Test.agi", normalized_name));
+            let path = project_root
+                .join("tests/Feature")
+                .join(format!("{}Test.agi", normalized_name));
             let content = format!(
                 "use Framework.Testing.WebTest\n\ntest \"{} resource scaffold is reachable\":\n    let response = WebTest.get(\"/\")\n    response.assert_status(200)\n    response.assert_contains(\"AGILANG\")\n",
                 normalized_name
@@ -1630,7 +1674,11 @@ pub fn make_component(component: &str, name: &str, force: bool) -> Result<()> {
             make_component("request", &format!("Store{resource_pascal}"), force)?;
             make_component("request", &format!("Update{resource_pascal}"), force)?;
             make_component("policy", &resource_pascal, force)?;
-            make_component("migration", &format!("create_{}_table", resource_table), force)?;
+            make_component(
+                "migration",
+                &format!("create_{}_table", resource_table),
+                force,
+            )?;
             make_component("factory", &resource_pascal, force)?;
             make_component("seeder", &resource_pascal, force)?;
             make_component("test", &format!("{resource_pascal}Resource"), force)?;
@@ -3156,7 +3204,8 @@ mod tests {
         assert!(model.contains("soft_deletes = true"));
         assert!(model.contains("\"id\": \"integer\""));
 
-        let controller = fs::read_to_string(root.join("app/Controllers/PostController.agi")).unwrap();
+        let controller =
+            fs::read_to_string(root.join("app/Controllers/PostController.agi")).unwrap();
         assert!(controller.contains("\"repository\": \"orm\""));
         assert!(controller.contains("validated_fields"));
         assert!(controller.contains("fn restore"));
@@ -3164,7 +3213,8 @@ mod tests {
         let request = fs::read_to_string(root.join("app/Requests/StorePostRequest.agi")).unwrap();
         assert!(request.contains("fn validated_fields() -> list:"));
 
-        let test_file = fs::read_to_string(root.join("tests/Feature/PostResourceTest.agi")).unwrap();
+        let test_file =
+            fs::read_to_string(root.join("tests/Feature/PostResourceTest.agi")).unwrap();
         assert!(test_file.contains("Framework.Testing.WebTest"));
 
         let _ = fs::remove_dir_all(root);

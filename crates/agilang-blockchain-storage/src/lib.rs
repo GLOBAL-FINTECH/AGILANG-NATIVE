@@ -79,7 +79,11 @@ impl ChainDatabase {
     pub fn metadata<T: DeserializeOwned>(&self, key: &str) -> RuntimeResult<Option<T>> {
         let encoded: Option<String> = self
             .connection
-            .query_row("SELECT value FROM metadata WHERE key=?1", params![key], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM metadata WHERE key=?1",
+                params![key],
+                |row| row.get(0),
+            )
             .optional()
             .map_err(storage_error)?;
         encoded.map(|value| decode(&value)).transpose()
@@ -100,7 +104,11 @@ impl ChainDatabase {
     pub fn state<T: DeserializeOwned>(&self, key: &str) -> RuntimeResult<Option<T>> {
         let encoded: Option<String> = self
             .connection
-            .query_row("SELECT value FROM state WHERE key=?1", params![key], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM state WHERE key=?1",
+                params![key],
+                |row| row.get(0),
+            )
             .optional()
             .map_err(storage_error)?;
         encoded.map(|value| decode(&value)).transpose()
@@ -112,7 +120,9 @@ impl ChainDatabase {
             .prepare("SELECT key, value FROM state ORDER BY key")
             .map_err(storage_error)?;
         let rows = statement
-            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
             .map_err(storage_error)?;
         let mut state = BTreeMap::new();
         for row in rows {
@@ -122,7 +132,12 @@ impl ChainDatabase {
         Ok(state)
     }
 
-    pub fn put_block(&mut self, block: &Block, canonical: bool, finalized: bool) -> RuntimeResult<()> {
+    pub fn put_block(
+        &mut self,
+        block: &Block,
+        canonical: bool,
+        finalized: bool,
+    ) -> RuntimeResult<()> {
         let transaction = self.connection.transaction().map_err(storage_error)?;
         put_block_transaction(&transaction, block, canonical, finalized)?;
         transaction.commit().map_err(storage_error)
@@ -141,7 +156,11 @@ impl ChainDatabase {
             .transpose()
     }
 
-    pub fn block_by_height(&self, height: u64, canonical_only: bool) -> RuntimeResult<Option<StoredBlock>> {
+    pub fn block_by_height(
+        &self,
+        height: u64,
+        canonical_only: bool,
+    ) -> RuntimeResult<Option<StoredBlock>> {
         let sql = if canonical_only {
             "SELECT json, canonical, finalized FROM blocks WHERE height=?1 AND canonical=1 ORDER BY score DESC LIMIT 1"
         } else {
@@ -177,7 +196,9 @@ impl ChainDatabase {
     pub fn has_block(&self, hash: &str) -> RuntimeResult<bool> {
         let found: Option<i64> = self
             .connection
-            .query_row("SELECT 1 FROM blocks WHERE hash=?1", params![hash], |row| row.get(0))
+            .query_row("SELECT 1 FROM blocks WHERE hash=?1", params![hash], |row| {
+                row.get(0)
+            })
             .optional()
             .map_err(storage_error)?;
         Ok(found.is_some())
@@ -217,15 +238,24 @@ impl ChainDatabase {
         Ok(blocks)
     }
 
-    pub fn set_canonical_chain(&mut self, head_hash: &str, finality_depth: u64) -> RuntimeResult<()> {
+    pub fn set_canonical_chain(
+        &mut self,
+        head_hash: &str,
+        finality_depth: u64,
+    ) -> RuntimeResult<()> {
         let path = self.ancestor_path(head_hash)?;
         if path.is_empty() {
-            return Err(AgilangError::new(ErrorCode::InvalidArgument, "canonical head was not found"));
+            return Err(AgilangError::new(
+                ErrorCode::InvalidArgument,
+                "canonical head was not found",
+            ));
         }
         let head_height = path[0].header.height;
         let finalize_height = head_height.saturating_sub(finality_depth);
         let transaction = self.connection.transaction().map_err(storage_error)?;
-        transaction.execute("UPDATE blocks SET canonical=0", []).map_err(storage_error)?;
+        transaction
+            .execute("UPDATE blocks SET canonical=0", [])
+            .map_err(storage_error)?;
         for block in &path {
             transaction
                 .execute(
@@ -387,8 +417,14 @@ mod tests {
         database.put_block(&first, true, false).unwrap();
         database.put_state("balance:alice", &90_u64).unwrap();
         assert_eq!(database.state::<u64>("balance:alice").unwrap(), Some(90));
-        assert_eq!(database.canonical_head().unwrap().unwrap().block.hash, first.hash);
-        let transaction = database.transaction(&first.transactions[0].hash).unwrap().unwrap();
+        assert_eq!(
+            database.canonical_head().unwrap().unwrap().block.hash,
+            first.hash
+        );
+        let transaction = database
+            .transaction(&first.transactions[0].hash)
+            .unwrap()
+            .unwrap();
         assert_eq!(transaction.block_hash.as_deref(), Some(first.hash.as_str()));
     }
 
@@ -403,6 +439,9 @@ mod tests {
         assert!(database.block(&genesis.hash).unwrap().unwrap().finalized);
         assert!(database.block(&first.hash).unwrap().unwrap().finalized);
         assert!(!database.block(&second.hash).unwrap().unwrap().finalized);
-        assert_eq!(database.canonical_head().unwrap().unwrap().block.hash, second.hash);
+        assert_eq!(
+            database.canonical_head().unwrap().unwrap().block.hash,
+            second.hash
+        );
     }
 }

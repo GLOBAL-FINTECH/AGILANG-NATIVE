@@ -392,12 +392,11 @@ impl<S: Read + Write> WebSocketConnection<S> {
 
         let mut mask = [0_u8; 4];
         self.stream.read_exact(&mut mask)?;
-        let payload_len = usize::try_from(payload_length).map_err(|_| {
-            WebSocketError::MessageTooLarge {
+        let payload_len =
+            usize::try_from(payload_length).map_err(|_| WebSocketError::MessageTooLarge {
                 size: payload_length,
                 limit: self.max_message_size,
-            }
-        })?;
+            })?;
         let mut payload = vec![0_u8; payload_len];
         self.stream.read_exact(&mut payload)?;
         for (index, byte) in payload.iter_mut().enumerate() {
@@ -540,7 +539,12 @@ mod tests {
             }
         }
         bytes.extend_from_slice(&mask);
-        bytes.extend(payload.iter().enumerate().map(|(i, byte)| byte ^ mask[i % 4]));
+        bytes.extend(
+            payload
+                .iter()
+                .enumerate()
+                .map(|(i, byte)| byte ^ mask[i % 4]),
+        );
         bytes
     }
 

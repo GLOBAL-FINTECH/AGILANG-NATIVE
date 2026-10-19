@@ -107,7 +107,9 @@ fn websocket_upgrade_and_echo_work_over_tcp() {
     assert!(response.starts_with("HTTP/1.1 101 Switching Protocols"));
     assert!(response.contains("Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo="));
 
-    client.write_all(&masked_text_frame("hello AGILANG")).unwrap();
+    client
+        .write_all(&masked_text_frame("hello AGILANG"))
+        .unwrap();
 
     let mut header = [0_u8; 2];
     client.read_exact(&mut header).unwrap();

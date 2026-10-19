@@ -164,7 +164,10 @@ impl Analyser {
         }
 
         for enum_decl in &program.enums {
-            if let Some(existing) = self.enum_defs.insert(enum_decl.name.clone(), enum_decl.clone()) {
+            if let Some(existing) = self
+                .enum_defs
+                .insert(enum_decl.name.clone(), enum_decl.clone())
+            {
                 self.errors.push(
                     Diagnostic::error(
                         "E1002",
@@ -180,7 +183,10 @@ impl Analyser {
         }
 
         for alias_decl in &program.aliases {
-            if let Some(existing) = self.alias_defs.insert(alias_decl.name.clone(), alias_decl.clone()) {
+            if let Some(existing) = self
+                .alias_defs
+                .insert(alias_decl.name.clone(), alias_decl.clone())
+            {
                 self.errors.push(
                     Diagnostic::error(
                         "E1002",
@@ -360,7 +366,11 @@ impl Analyser {
         }
     }
 
-    fn validate_alias_target(&mut self, alias_decl: &TypeAliasDecl, trail: &mut Vec<String>) -> Type {
+    fn validate_alias_target(
+        &mut self,
+        alias_decl: &TypeAliasDecl,
+        trail: &mut Vec<String>,
+    ) -> Type {
         if trail.iter().any(|segment| segment == &alias_decl.name) {
             self.errors.push(Diagnostic::error(
                 "E2210",
@@ -408,7 +418,10 @@ impl Analyser {
                 self.errors.push(
                     Diagnostic::error(
                         "E1002",
-                        format!("duplicate field `{}` in struct `{}`", field.name, struct_decl.name),
+                        format!(
+                            "duplicate field `{}` in struct `{}`",
+                            field.name, struct_decl.name
+                        ),
                         field.span,
                     )
                     .with_hint(format!(
@@ -545,9 +558,11 @@ impl Analyser {
                 then_body,
                 else_body,
                 ..
-            } => !else_body.is_empty()
-                && self.block_returns(then_body)
-                && self.block_returns(else_body),
+            } => {
+                !else_body.is_empty()
+                    && self.block_returns(then_body)
+                    && self.block_returns(else_body)
+            }
             HirStmt::Match {
                 arms, exhaustive, ..
             } => *exhaustive && arms.iter().all(|arm| self.block_returns(&arm.body)),
@@ -675,7 +690,12 @@ impl Analyser {
                             }
                         }
                     }
-                    HirExpr::MemberAccess { object, member, span, .. } => {
+                    HirExpr::MemberAccess {
+                        object,
+                        member,
+                        span,
+                        ..
+                    } => {
                         if let HirExpr::Identifier(name, _, target_span) = object.as_ref() {
                             if let Some(sym) = self.lookup(name) {
                                 if !sym.mutable {
@@ -815,7 +835,11 @@ impl Analyser {
                     span: *span,
                 })
             }
-            Stmt::Match { subject, arms, span } => {
+            Stmt::Match {
+                subject,
+                arms,
+                span,
+            } => {
                 let hir_subject = self.analyse_expr(subject, None)?;
                 let Type::Enum(subject_enum_name) = hir_subject.ty().clone() else {
                     self.errors.push(Diagnostic::error(
@@ -907,7 +931,9 @@ impl Analyser {
                                 );
                             }
                             wildcard_seen = Some(*pattern_span);
-                            HirMatchPattern::Wildcard { span: *pattern_span }
+                            HirMatchPattern::Wildcard {
+                                span: *pattern_span,
+                            }
                         }
                     };
 
@@ -1153,7 +1179,8 @@ impl Analyser {
                         for (name, value) in &hir_items {
                             match struct_decl.fields.iter().find(|field| field.name == *name) {
                                 Some(field) => {
-                                    let expected_field_ty = self.resolve_known_type_name(&field.ty.name);
+                                    let expected_field_ty =
+                                        self.resolve_known_type_name(&field.ty.name);
                                     if !expected_field_ty.is_compatible(value.ty()) {
                                         self.errors.push(Diagnostic::error(
                                             "E2001",
@@ -1198,7 +1225,11 @@ impl Analyser {
                 match hir_object.ty() {
                     Type::Enum(enum_name) => {
                         if let Some(enum_decl) = self.enum_defs.get(enum_name) {
-                            if enum_decl.variants.iter().any(|variant| variant.name == *member) {
+                            if enum_decl
+                                .variants
+                                .iter()
+                                .any(|variant| variant.name == *member)
+                            {
                                 return Some(HirExpr::EnumVariant {
                                     enum_name: enum_name.clone(),
                                     variant: member.clone(),
@@ -1208,10 +1239,7 @@ impl Analyser {
                             }
                             self.errors.push(Diagnostic::error(
                                 "E2106",
-                                format!(
-                                    "unknown variant `{}` for enum `{}`",
-                                    member, enum_name
-                                ),
+                                format!("unknown variant `{}` for enum `{}`", member, enum_name),
                                 *span,
                             ));
                             return Some(HirExpr::EnumVariant {
@@ -1233,8 +1261,10 @@ impl Analyser {
                 let result_ty = match hir_object.ty() {
                     Type::Struct(struct_name) => {
                         if let Some(struct_decl) = self.struct_defs.get(struct_name) {
-                            if let Some(field) =
-                                struct_decl.fields.iter().find(|field| field.name == *member)
+                            if let Some(field) = struct_decl
+                                .fields
+                                .iter()
+                                .find(|field| field.name == *member)
                             {
                                 self.resolve_known_type_name(&field.ty.name)
                             } else {
@@ -2095,7 +2125,8 @@ mod tests {
 
     #[test]
     fn test_break_and_continue_are_lowered_inside_loop() {
-        let src = "fn main() -> i32:\n    while true:\n        continue\n        break\n    return 0\n";
+        let src =
+            "fn main() -> i32:\n    while true:\n        continue\n        break\n    return 0\n";
         let hir = check_source(src).unwrap();
         match &hir.functions[0].body[0] {
             HirStmt::While { body, .. } => {
@@ -2191,16 +2222,15 @@ mod tests {
 
     #[test]
     fn test_cyclic_type_alias_is_rejected() {
-        let src = "type UserId = AccountId\ntype AccountId = UserId\n\nfn main() -> i32:\n    return 0\n";
+        let src =
+            "type UserId = AccountId\ntype AccountId = UserId\n\nfn main() -> i32:\n    return 0\n";
         let errs = check_source(src).unwrap_err();
         assert!(errs.iter().any(|e| e.code == "E2210"));
     }
 }
 
 fn is_framework_type_name(name: &str) -> bool {
-    name == "map"
-        || name == "bytes"
-        || name.chars().next().map(char::is_uppercase).unwrap_or(false)
+    name == "map" || name == "bytes" || name.chars().next().map(char::is_uppercase).unwrap_or(false)
 }
 
 fn is_constructor_like_expr(expr: &Expr) -> bool {

@@ -1,4 +1,18 @@
+# Next
+
+- Added an explicit production-readiness gate covering formatting, Clippy, compatibility audit, native-only policy, full workspace tests, release build, runtime diagnostics, and an actual `.agi` compile-and-execute smoke test.
+- Added macOS x86_64 and Apple Silicon native toolchain target support in the build/runtime manifest layer.
+- Updated the native hello-world smoke example to the current 0.7.0 runtime version.
+
 # Changelog
+
+## 0.8.0 - Native production hardening
+
+- Added deterministic package manifest/lock tooling via agilang-pkg.
+- Added native REPL, negative compiler tests and reproducible-build gates.
+- Added debugger launch configuration and tagged multi-platform release workflow.
+- Expanded production CI gates for package and compiler rejection tests.
+
 
 ## 0.6.0 — Native-only stack and permanent language identity
 

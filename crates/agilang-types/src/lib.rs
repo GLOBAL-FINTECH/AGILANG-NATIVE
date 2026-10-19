@@ -184,7 +184,10 @@ mod tests {
     fn parses_native_array_aliases() {
         assert_eq!(Type::from_str("array"), Type::List(Box::new(Type::Unknown)));
         assert_eq!(Type::from_str("list"), Type::List(Box::new(Type::Unknown)));
-        assert_eq!(Type::from_str("array<f64>"), Type::List(Box::new(Type::F64)));
+        assert_eq!(
+            Type::from_str("array<f64>"),
+            Type::List(Box::new(Type::F64))
+        );
         assert_eq!(Type::from_str("list<i64>"), Type::List(Box::new(Type::I64)));
         assert_eq!(Type::from_str("f64[]"), Type::List(Box::new(Type::F64)));
     }

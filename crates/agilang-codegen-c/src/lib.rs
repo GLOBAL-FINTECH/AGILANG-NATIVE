@@ -83,7 +83,9 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("    out[i] = '\\0';\n");
     out.push_str("    return out;\n");
     out.push_str("}\n\n");
-    out.push_str("static char* agi_json_object(const char** keys, const char** values, size_t count) {\n");
+    out.push_str(
+        "static char* agi_json_object(const char** keys, const char** values, size_t count) {\n",
+    );
     out.push_str("    size_t len = 2;\n");
     out.push_str("    for (size_t i = 0; i < count; ++i) {\n");
     out.push_str("        len += strlen(keys[i]) + strlen(values[i]) + 4;\n");
@@ -653,14 +655,9 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
             for arm in arms {
                 match &arm.pattern {
                     agilang_ir::HirMatchPattern::EnumVariant {
-                        enum_name,
-                        variant,
-                        ..
+                        enum_name, variant, ..
                     } => {
-                        out.push_str(&format!(
-                            "{}    case {}_{}:\n",
-                            ind, enum_name, variant
-                        ));
+                        out.push_str(&format!("{}    case {}_{}:\n", ind, enum_name, variant));
                     }
                     agilang_ir::HirMatchPattern::Wildcard { .. } => {
                         out.push_str(&format!("{}    default:\n", ind));
@@ -730,9 +727,7 @@ fn generate_expr(expr: &HirExpr) -> String {
             _ => generate_json_object_expr(items),
         },
         HirExpr::EnumVariant {
-            enum_name,
-            variant,
-            ..
+            enum_name, variant, ..
         } => format!("{}_{}", enum_name, variant),
         HirExpr::MemberAccess { object, member, .. } => {
             format!("{}.{}", generate_expr(object), member)
@@ -1219,7 +1214,10 @@ mod tests {
 
     #[test]
     fn test_codegen_inferred_void_main_bridge_returns_zero() {
-        let source = SourceFile::new("inferred_void_main.agi", "fn main():\n    print(\"hello\")\n");
+        let source = SourceFile::new(
+            "inferred_void_main.agi",
+            "fn main():\n    print(\"hello\")\n",
+        );
         let hir = agilang_compiler::hir(&source).unwrap();
         let c_code = generate(&hir);
 
@@ -1414,7 +1412,10 @@ mod tests {
         fs::remove_dir_all(&dir).ok();
     }
 
-    fn compile_and_run_with_runtime_stub(source_name: &str, source_text: &str) -> Option<(i32, String)> {
+    fn compile_and_run_with_runtime_stub(
+        source_name: &str,
+        source_text: &str,
+    ) -> Option<(i32, String)> {
         if !cfg!(windows) {
             return None;
         }
@@ -1489,9 +1490,10 @@ mod tests {
 
     #[test]
     fn test_codegen_exec_void_main_binary() {
-        let Some((code, _stdout)) =
-            compile_and_run_with_runtime_stub("void_exec.agi", "fn main() -> void:\n    print(\"hello\")\n")
-        else {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "void_exec.agi",
+            "fn main() -> void:\n    print(\"hello\")\n",
+        ) else {
             return;
         };
         assert_eq!(code, 0);
@@ -1499,9 +1501,10 @@ mod tests {
 
     #[test]
     fn test_codegen_exec_inferred_void_main_binary() {
-        let Some((code, _stdout)) =
-            compile_and_run_with_runtime_stub("inferred_void_exec.agi", "fn main():\n    print(\"hello\")\n")
-        else {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "inferred_void_exec.agi",
+            "fn main():\n    print(\"hello\")\n",
+        ) else {
             return;
         };
         assert_eq!(code, 0);
@@ -1520,10 +1523,9 @@ mod tests {
 
     #[test]
     fn test_codegen_exec_i32_main_binary_preserves_exit_code() {
-        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
-            "i32_exec.agi",
-            "fn main() -> i32:\n    return 7\n",
-        ) else {
+        let Some((code, _stdout)) =
+            compile_and_run_with_runtime_stub("i32_exec.agi", "fn main() -> i32:\n    return 7\n")
+        else {
             return;
         };
         assert_eq!(code, 7);
