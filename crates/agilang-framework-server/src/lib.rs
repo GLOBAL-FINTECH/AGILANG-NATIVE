@@ -2692,6 +2692,15 @@ mod tests {
         LOCK.get_or_init(|| Mutex::new(()))
     }
 
+    // Auth and WebRTC integration tests reset process-global registries. Run these
+    // tests serially so one test cannot clear another test's active sessions,
+    // rate-limit buckets, or signaling state while it is making assertions.
+    fn auth_integration_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+
     fn request(
         method: HttpMethod,
         path: &str,
@@ -3183,6 +3192,9 @@ fn register_api() -> void:
 
     #[test]
     fn auth_lifecycle_is_enforced_end_to_end() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("lifecycle");
 
         let unauth = invoke(
@@ -3312,6 +3324,9 @@ fn register_api() -> void:
 
     #[test]
     fn csrf_is_enforced_for_cookie_authenticated_state_changes() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("csrf");
         let register_page = invoke(
             &root,
@@ -3401,6 +3416,9 @@ fn register_api() -> void:
 
     #[test]
     fn rate_limits_and_duplicate_registration_are_enforced() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("limits");
 
         for index in 0..RATE_LIMIT_REGISTER_MAX {
@@ -3549,6 +3567,9 @@ fn register_api() -> void:
 
     #[test]
     fn authorization_rotation_cleanup_and_concurrent_logout_are_enforced() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("authorization");
         let user_cookie = register_user(
             &root,
@@ -3693,6 +3714,9 @@ fn register_api() -> void:
 
     #[test]
     fn login_and_register_preserve_safe_return_to() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("return_to");
 
         let login_page = invoke(
@@ -3798,6 +3822,9 @@ fn register_api() -> void:
 
     #[test]
     fn login_recovers_from_legacy_duplicate_email_rows() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("duplicate_email_rows");
 
         let register_page = invoke(
@@ -3870,6 +3897,9 @@ fn register_api() -> void:
 
     #[test]
     fn meeting_login_flow_persists_session_in_agidb() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("meeting_login_flow");
 
         let auth_cookie = register_user(
@@ -4001,16 +4031,25 @@ fn register_api() -> void:
 
     #[test]
     fn generated_post_resource_executes_end_to_end_on_agidb() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         run_generated_post_flow(FrameworkDriver::Agidb, "generated_post_agidb");
     }
 
     #[test]
     fn generated_post_resource_executes_end_to_end_on_sqlite() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         run_generated_post_flow(FrameworkDriver::Sqlite, "generated_post_sqlite");
     }
 
     #[test]
     fn webrtc_signaling_requires_authentication() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         reset_webrtc_runtime_state();
         let (root, _) = setup_auth_project("webrtc_auth");
 
@@ -4054,6 +4093,9 @@ fn register_api() -> void:
 
     #[test]
     fn webrtc_signaling_enforces_csrf_and_delivers_messages() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         reset_webrtc_runtime_state();
         let (root, engine) = setup_auth_project("webrtc_signal");
         let alice_cookie = register_user(
@@ -4293,6 +4335,9 @@ fn register_api() -> void:
 
     #[test]
     fn webrtc_meeting_registry_resolves_host_and_cleans_up_members() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         reset_webrtc_runtime_state();
         let (root, engine) = setup_auth_project("webrtc_meeting_registry");
         let host_cookie = register_user(
