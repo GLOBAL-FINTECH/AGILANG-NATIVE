@@ -539,7 +539,14 @@ fn enforce_max_active_sessions(conn: &mut AgiDbConnection, user_id: &str) -> Res
             &[DatabaseValue::Text(user_id.to_string())],
         )
         .map_err(|err| err.to_string())?;
-    rows.sort_by_key(|row| row_integer(row, "created_at").unwrap_or_default());
+    // Sessions opened within one second have the same timestamp. Break ties
+    // using the database's increasing row ID so the oldest session is evicted.
+    rows.sort_by_key(|row| {
+        (
+            row_integer(row, "created_at").unwrap_or_default(),
+            row_integer(row, "id").unwrap_or_default(),
+        )
+    });
     while rows.len() > MAX_ACTIVE_USER_SESSIONS {
         let row = rows.remove(0);
         if let Some(token_hash) = row_text(&row, "token") {
