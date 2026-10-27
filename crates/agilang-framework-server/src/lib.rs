@@ -533,13 +533,23 @@ fn create_session(
 }
 
 fn enforce_max_active_sessions(conn: &mut AgiDbConnection, user_id: &str) -> Result<(), String> {
+    // AGIDB compares typed values strictly. Session user IDs are stored as
+    // integers when they are numeric, so the lookup must use the same type.
+    let user_id_value = match user_id.parse::<i64>() {
+        Ok(value) => DatabaseValue::Integer(value),
+        Err(_) => DatabaseValue::Text(user_id.to_string()),
+    };
     let mut rows = conn
-        .query(
-            "SELECT * FROM sessions WHERE user_id = ?",
-            &[DatabaseValue::Text(user_id.to_string())],
-        )
+        .query("SELECT * FROM sessions WHERE user_id = ?", &[user_id_value])
         .map_err(|err| err.to_string())?;
-    rows.sort_by_key(|row| row_integer(row, "created_at").unwrap_or_default());
+    // Sessions opened within one second have the same timestamp. Break ties
+    // using the database's increasing row ID so the oldest session is evicted.
+    rows.sort_by_key(|row| {
+        (
+            row_integer(row, "created_at").unwrap_or_default(),
+            row_integer(row, "id").unwrap_or_default(),
+        )
+    });
     while rows.len() > MAX_ACTIVE_USER_SESSIONS {
         let row = rows.remove(0);
         if let Some(token_hash) = row_text(&row, "token") {
@@ -2692,6 +2702,15 @@ mod tests {
         LOCK.get_or_init(|| Mutex::new(()))
     }
 
+    // Auth and WebRTC integration tests reset process-global registries. Run these
+    // tests serially so one test cannot clear another test's active sessions,
+    // rate-limit buckets, or signaling state while it is making assertions.
+    fn auth_integration_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+
     fn request(
         method: HttpMethod,
         path: &str,
@@ -3183,6 +3202,9 @@ fn register_api() -> void:
 
     #[test]
     fn auth_lifecycle_is_enforced_end_to_end() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("lifecycle");
 
         let unauth = invoke(
@@ -3312,6 +3334,9 @@ fn register_api() -> void:
 
     #[test]
     fn csrf_is_enforced_for_cookie_authenticated_state_changes() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("csrf");
         let register_page = invoke(
             &root,
@@ -3401,6 +3426,9 @@ fn register_api() -> void:
 
     #[test]
     fn rate_limits_and_duplicate_registration_are_enforced() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("limits");
 
         for index in 0..RATE_LIMIT_REGISTER_MAX {
@@ -3548,7 +3576,56 @@ fn register_api() -> void:
     }
 
     #[test]
+    fn session_cap_uses_typed_user_ids_and_eviction_order() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let (root, engine) = setup_auth_project("session_cap");
+        let _registered_cookie = register_user(
+            &root,
+            &engine,
+            72,
+            "session-cap@example.com",
+            "Password123!",
+            "Session Cap",
+        );
+        let user_id = user_rows(&root)
+            .iter()
+            .find(|row| row_text(row, "email") == Some("session-cap@example.com"))
+            .and_then(|row| row_integer(row, "id"))
+            .expect("registered user must have a numeric id");
+
+        let mut conn = open_auth_db(&root).unwrap();
+        let mut issued_tokens = Vec::new();
+        for _ in 0..(MAX_ACTIVE_USER_SESSIONS + 2) {
+            let (_, session) = create_session(&mut conn, &user_id.to_string(), None).unwrap();
+            issued_tokens.push(session.token_hash);
+        }
+
+        let active = conn
+            .query(
+                "SELECT * FROM sessions WHERE user_id = ?",
+                &[DatabaseValue::Integer(user_id)],
+            )
+            .unwrap();
+        assert_eq!(active.len(), MAX_ACTIVE_USER_SESSIONS);
+        let active_hashes = active
+            .iter()
+            .filter_map(|row| row_text(row, "token"))
+            .collect::<std::collections::HashSet<_>>();
+
+        assert!(!active_hashes.contains(issued_tokens[0].as_str()));
+        for token in issued_tokens.iter().rev().take(MAX_ACTIVE_USER_SESSIONS) {
+            assert!(active_hashes.contains(token.as_str()));
+        }
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn authorization_rotation_cleanup_and_concurrent_logout_are_enforced() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("authorization");
         let user_cookie = register_user(
             &root,
@@ -3614,7 +3691,11 @@ fn register_api() -> void:
             .unwrap();
         let user_sessions = session_rows(&root)
             .into_iter()
-            .filter(|row| row_text(row, "user_id").unwrap_or_default() == admin_user_id)
+            .filter(|row| {
+                row_integer(row, "user_id")
+                    .is_some_and(|value| value.to_string() == admin_user_id)
+                    || row_text(row, "user_id") == Some(admin_user_id.as_str())
+            })
             .count();
         assert_eq!(user_sessions, MAX_ACTIVE_USER_SESSIONS);
 
@@ -3693,6 +3774,9 @@ fn register_api() -> void:
 
     #[test]
     fn login_and_register_preserve_safe_return_to() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("return_to");
 
         let login_page = invoke(
@@ -3798,6 +3882,9 @@ fn register_api() -> void:
 
     #[test]
     fn login_recovers_from_legacy_duplicate_email_rows() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("duplicate_email_rows");
 
         let register_page = invoke(
@@ -3870,6 +3957,9 @@ fn register_api() -> void:
 
     #[test]
     fn meeting_login_flow_persists_session_in_agidb() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("meeting_login_flow");
 
         let auth_cookie = register_user(
@@ -4001,16 +4091,25 @@ fn register_api() -> void:
 
     #[test]
     fn generated_post_resource_executes_end_to_end_on_agidb() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         run_generated_post_flow(FrameworkDriver::Agidb, "generated_post_agidb");
     }
 
     #[test]
     fn generated_post_resource_executes_end_to_end_on_sqlite() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         run_generated_post_flow(FrameworkDriver::Sqlite, "generated_post_sqlite");
     }
 
     #[test]
     fn webrtc_signaling_requires_authentication() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         reset_webrtc_runtime_state();
         let (root, _) = setup_auth_project("webrtc_auth");
 
@@ -4054,6 +4153,9 @@ fn register_api() -> void:
 
     #[test]
     fn webrtc_signaling_enforces_csrf_and_delivers_messages() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         reset_webrtc_runtime_state();
         let (root, engine) = setup_auth_project("webrtc_signal");
         let alice_cookie = register_user(
@@ -4293,6 +4395,9 @@ fn register_api() -> void:
 
     #[test]
     fn webrtc_meeting_registry_resolves_host_and_cleans_up_members() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         reset_webrtc_runtime_state();
         let (root, engine) = setup_auth_project("webrtc_meeting_registry");
         let host_cookie = register_user(
