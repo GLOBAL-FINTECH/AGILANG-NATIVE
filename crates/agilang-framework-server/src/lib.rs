@@ -533,11 +533,14 @@ fn create_session(
 }
 
 fn enforce_max_active_sessions(conn: &mut AgiDbConnection, user_id: &str) -> Result<(), String> {
+    // AGIDB compares typed values strictly. Session user IDs are stored as
+    // integers when they are numeric, so the lookup must use the same type.
+    let user_id_value = match user_id.parse::<i64>() {
+        Ok(value) => DatabaseValue::Integer(value),
+        Err(_) => DatabaseValue::Text(user_id.to_string()),
+    };
     let mut rows = conn
-        .query(
-            "SELECT * FROM sessions WHERE user_id = ?",
-            &[DatabaseValue::Text(user_id.to_string())],
-        )
+        .query("SELECT * FROM sessions WHERE user_id = ?", &[user_id_value])
         .map_err(|err| err.to_string())?;
     // Sessions opened within one second have the same timestamp. Break ties
     // using the database's increasing row ID so the oldest session is evicted.
@@ -3573,6 +3576,52 @@ fn register_api() -> void:
     }
 
     #[test]
+    fn session_cap_uses_typed_user_ids_and_eviction_order() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let (root, engine) = setup_auth_project("session_cap");
+        let _registered_cookie = register_user(
+            &root,
+            &engine,
+            72,
+            "session-cap@example.com",
+            "Password123!",
+            "Session Cap",
+        );
+        let user_id = user_rows(&root)
+            .iter()
+            .find(|row| row_text(row, "email") == Some("session-cap@example.com"))
+            .and_then(|row| row_integer(row, "id"))
+            .expect("registered user must have a numeric id");
+
+        let mut conn = open_auth_db(&root).unwrap();
+        let mut issued_tokens = Vec::new();
+        for _ in 0..(MAX_ACTIVE_USER_SESSIONS + 2) {
+            let (_, session) = create_session(&mut conn, &user_id.to_string(), None).unwrap();
+            issued_tokens.push(session.token_hash);
+        }
+
+        let active = conn
+            .query(
+                "SELECT * FROM sessions WHERE user_id = ?",
+                &[DatabaseValue::Integer(user_id)],
+            )
+            .unwrap();
+        assert_eq!(active.len(), MAX_ACTIVE_USER_SESSIONS);
+        let active_hashes = active
+            .iter()
+            .filter_map(|row| row_text(row, "token"))
+            .collect::<std::collections::HashSet<_>>();
+
+        assert!(!active_hashes.contains(issued_tokens[0].as_str()));
+        for token in issued_tokens.iter().rev().take(MAX_ACTIVE_USER_SESSIONS) {
+            assert!(active_hashes.contains(token.as_str()));
+        }
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn authorization_rotation_cleanup_and_concurrent_logout_are_enforced() {
         let _isolation_guard = auth_integration_test_lock()
             .lock()
@@ -3642,7 +3691,11 @@ fn register_api() -> void:
             .unwrap();
         let user_sessions = session_rows(&root)
             .into_iter()
-            .filter(|row| row_text(row, "user_id").unwrap_or_default() == admin_user_id)
+            .filter(|row| {
+                row_integer(row, "user_id")
+                    .is_some_and(|value| value.to_string() == admin_user_id)
+                    || row_text(row, "user_id") == Some(admin_user_id.as_str())
+            })
             .count();
         assert_eq!(user_sessions, MAX_ACTIVE_USER_SESSIONS);
 
