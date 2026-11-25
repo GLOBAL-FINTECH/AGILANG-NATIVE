@@ -45,7 +45,6 @@ struct AuthSessionRecord {
     token_hash: String,
     user_id: String,
     csrf_secret: String,
-    expires_at: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -379,7 +378,6 @@ fn load_session_by_cookie(
             .or_else(|| row_text(row, "user_id").map(|value| value.to_string()))
             .unwrap_or_default(),
         csrf_secret: row_text(row, "csrf_secret").unwrap_or_default().to_string(),
-        expires_at,
     }))
 }
 
@@ -527,7 +525,6 @@ fn create_session(
             token_hash,
             user_id: user_id.to_string(),
             csrf_secret,
-            expires_at: expires_at as u64,
         },
     ))
 }
@@ -2516,38 +2513,6 @@ pub fn handle_client(
     Ok(())
 }
 
-fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {
-    let target_filename = format!("{}.agi", controller_name.replace('.', "/"));
-    let direct = dir.join(&target_filename);
-    if direct.is_file() {
-        return Some(direct);
-    }
-
-    let leaf_name = if let Some(last_slash) = target_filename.rfind('/') {
-        &target_filename[last_slash + 1..]
-    } else {
-        &target_filename
-    };
-
-    find_file_recursive(dir, leaf_name)
-}
-
-fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if let Some(found) = find_file_recursive(&path, filename) {
-                    return Some(found);
-                }
-            } else if path.file_name().and_then(|s| s.to_str()) == Some(filename) {
-                return Some(path);
-            }
-        }
-    }
-    None
-}
-
 pub fn start_stun_server() {
     std::thread::spawn(|| {
         let socket = match std::net::UdpSocket::bind("0.0.0.0:3478") {
@@ -2625,6 +2590,104 @@ impl CertificateGenerator {
     }
 }
 
+struct WebSocketUpgradeResult {
+    status_code: u16,
+    log_message: Option<String>,
+}
+
+fn try_handle_websocket_request(
+    stream: &mut TcpStream,
+    router: &Router,
+    project_root: &Path,
+    req: &Request,
+) -> Option<WebSocketUpgradeResult> {
+    let is_websocket = req
+        .headers
+        .get("upgrade")
+        .or_else(|| req.headers.get("Upgrade"))
+        .map(|v| v.eq_ignore_ascii_case("websocket"))
+        .unwrap_or(false);
+    if !is_websocket {
+        return None;
+    }
+
+    let path = req.path();
+    let Some(route_match) = router.match_websocket_route(path) else {
+        let response = build_text_response(
+            404,
+            "text/plain; charset=utf-8",
+            "WebSocket route not defined.".to_string(),
+        );
+        let _ = write_framework_response(stream, response);
+        return Some(WebSocketUpgradeResult {
+            status_code: 404,
+            log_message: None,
+        });
+    };
+
+    let status_code = match dispatch_websocket_route(project_root, req, route_match, &mut *stream) {
+        Ok(()) => 101,
+        Err(WebSocketError::BadRequest(message)) => {
+            let response = build_text_response(400, "text/plain; charset=utf-8", message);
+            let _ = write_framework_response(stream, response);
+            400
+        }
+        Err(WebSocketError::Protocol(message)) => {
+            let response = build_text_response(400, "text/plain; charset=utf-8", message);
+            let _ = write_framework_response(stream, response);
+            400
+        }
+        Err(error) => {
+            let response = build_text_response(500, "text/plain; charset=utf-8", error.to_string());
+            let _ = write_framework_response(stream, response);
+            500
+        }
+    };
+
+    Some(WebSocketUpgradeResult {
+        status_code,
+        log_message: (status_code == 101).then_some(format!("websocket upgraded for {path}")),
+    })
+}
+
+fn dispatch_websocket_route(
+    _project_root: &Path,
+    req: &Request,
+    route_match: agilang_framework_routing::RouteMatch<'_>,
+    stream: &mut TcpStream,
+) -> Result<(), WebSocketError> {
+    let route = route_match.route;
+    let owned_stream = stream.try_clone()?;
+    let mut socket = accept_websocket(owned_stream, &req.headers)?;
+    match (route.controller.as_str(), route.action.as_str()) {
+        ("ChatController", "echo") | ("WebSocketController", "echo") => {
+            websocket_echo_handler(&mut socket)
+        }
+        _ => Err(WebSocketError::Protocol(format!(
+            "WebSocket handler `{}.{}` is not registered",
+            route.controller, route.action
+        ))),
+    }
+}
+
+fn websocket_echo_handler(
+    socket: &mut WebSocketConnection<TcpStream>,
+) -> Result<(), WebSocketError> {
+    loop {
+        let frame = socket.read_message()?;
+        match frame.opcode {
+            WebSocketOpcode::Text => socket.send_text(frame.text_value()?)?,
+            WebSocketOpcode::Binary => socket.send_binary(&frame.payload)?,
+            WebSocketOpcode::Close => return Ok(()),
+            WebSocketOpcode::Continuation | WebSocketOpcode::Ping | WebSocketOpcode::Pong => {
+                return Err(WebSocketError::Protocol(
+                    "unexpected internal WebSocket frame state".to_string(),
+                ))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2647,9 +2710,12 @@ mod tests {
         let crud = builtin_api_response("/api/crud/status").unwrap();
 
         assert!(framework.contains("\"database_status\":\"AGIDB ready\""));
-        assert!(framework.contains("\"webrtc_status\":\"signaling-only\""));
+        // Expected WebRTC state depends on whether `full-webrtc` is compiled in.
+        let peer = agilang_runtime_webrtc::capabilities().peer_connection;
+        let status = if peer { "native" } else { "signaling-only" };
+        assert!(framework.contains(&format!("\"webrtc_status\":\"{status}\"")));
         assert!(framework.contains("\"webrtc_signaling\":true"));
-        assert!(framework.contains("\"webrtc_peer_connection\":false"));
+        assert!(framework.contains(&format!("\"webrtc_peer_connection\":{peer}")));
         assert!(runtime.contains("\"storage\":\"AGIDB\""));
         assert!(chain.contains("\"height\""));
         assert!(auth.contains("\"roles\":[\"user\",\"admin\"]"));
@@ -2709,7 +2775,6 @@ mod tests {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
     }
-
 
     fn request(
         method: HttpMethod,
@@ -3692,8 +3757,7 @@ fn register_api() -> void:
         let user_sessions = session_rows(&root)
             .into_iter()
             .filter(|row| {
-                row_integer(row, "user_id")
-                    .is_some_and(|value| value.to_string() == admin_user_id)
+                row_integer(row, "user_id").is_some_and(|value| value.to_string() == admin_user_id)
                     || row_text(row, "user_id") == Some(admin_user_id.as_str())
             })
             .count();
@@ -4119,7 +4183,8 @@ fn register_api() -> void:
         );
         assert_eq!(status.status, 200);
         assert!(response_text(&status).contains("\"signaling\":true"));
-        assert!(response_text(&status).contains("\"peer_connection\":false"));
+        let peer = agilang_runtime_webrtc::capabilities().peer_connection;
+        assert!(response_text(&status).contains(&format!("\"peer_connection\":{peer}")));
         assert!(response_text(&status).contains("\"active_peers\":0"));
 
         let unauthorized_register = invoke_app(
@@ -4507,103 +4572,5 @@ fn register_api() -> void:
 
         fs::remove_dir_all(root).ok();
         reset_webrtc_runtime_state();
-    }
-}
-
-struct WebSocketUpgradeResult {
-    status_code: u16,
-    log_message: Option<String>,
-}
-
-fn try_handle_websocket_request(
-    stream: &mut TcpStream,
-    router: &Router,
-    project_root: &Path,
-    req: &Request,
-) -> Option<WebSocketUpgradeResult> {
-    let is_websocket = req
-        .headers
-        .get("upgrade")
-        .or_else(|| req.headers.get("Upgrade"))
-        .map(|v| v.eq_ignore_ascii_case("websocket"))
-        .unwrap_or(false);
-    if !is_websocket {
-        return None;
-    }
-
-    let path = req.path();
-    let Some(route_match) = router.match_websocket_route(path) else {
-        let response = build_text_response(
-            404,
-            "text/plain; charset=utf-8",
-            "WebSocket route not defined.".to_string(),
-        );
-        let _ = write_framework_response(stream, response);
-        return Some(WebSocketUpgradeResult {
-            status_code: 404,
-            log_message: None,
-        });
-    };
-
-    let status_code = match dispatch_websocket_route(project_root, req, route_match, &mut *stream) {
-        Ok(()) => 101,
-        Err(WebSocketError::BadRequest(message)) => {
-            let response = build_text_response(400, "text/plain; charset=utf-8", message);
-            let _ = write_framework_response(stream, response);
-            400
-        }
-        Err(WebSocketError::Protocol(message)) => {
-            let response = build_text_response(400, "text/plain; charset=utf-8", message);
-            let _ = write_framework_response(stream, response);
-            400
-        }
-        Err(error) => {
-            let response = build_text_response(500, "text/plain; charset=utf-8", error.to_string());
-            let _ = write_framework_response(stream, response);
-            500
-        }
-    };
-
-    Some(WebSocketUpgradeResult {
-        status_code,
-        log_message: (status_code == 101).then_some(format!("websocket upgraded for {path}")),
-    })
-}
-
-fn dispatch_websocket_route(
-    _project_root: &Path,
-    req: &Request,
-    route_match: agilang_framework_routing::RouteMatch<'_>,
-    stream: &mut TcpStream,
-) -> Result<(), WebSocketError> {
-    let route = route_match.route;
-    let owned_stream = stream.try_clone()?;
-    let mut socket = accept_websocket(owned_stream, &req.headers)?;
-    match (route.controller.as_str(), route.action.as_str()) {
-        ("ChatController", "echo") | ("WebSocketController", "echo") => {
-            websocket_echo_handler(&mut socket)
-        }
-        _ => Err(WebSocketError::Protocol(format!(
-            "WebSocket handler `{}.{}` is not registered",
-            route.controller, route.action
-        ))),
-    }
-}
-
-fn websocket_echo_handler(
-    socket: &mut WebSocketConnection<TcpStream>,
-) -> Result<(), WebSocketError> {
-    loop {
-        let frame = socket.read_message()?;
-        match frame.opcode {
-            WebSocketOpcode::Text => socket.send_text(frame.text_value()?)?,
-            WebSocketOpcode::Binary => socket.send_binary(&frame.payload)?,
-            WebSocketOpcode::Close => return Ok(()),
-            WebSocketOpcode::Continuation | WebSocketOpcode::Ping | WebSocketOpcode::Pong => {
-                return Err(WebSocketError::Protocol(
-                    "unexpected internal WebSocket frame state".to_string(),
-                ))
-            }
-        }
     }
 }

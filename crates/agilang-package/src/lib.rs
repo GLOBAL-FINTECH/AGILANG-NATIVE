@@ -137,29 +137,6 @@ fn normalize_path(path: &Path) -> String {
         .collect::<Vec<_>>()
         .join("/")
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn dependency_sources_are_deterministic() {
-        let dep = Dependency::Detailed {
-            version: Some("1.2.3".into()),
-            path: Some("../shared".into()),
-            git: None,
-            rev: None,
-        };
-        assert!(dep
-            .canonical_source(Path::new("/workspace/app"))
-            .starts_with("path:"));
-    }
-    #[test]
-    fn lockfile_dependencies_are_sorted() {
-        let mut deps = BTreeMap::<String, Dependency>::new();
-        deps.insert("z".into(), Dependency::Version("1".into()));
-        deps.insert("a".into(), Dependency::Version("2".into()));
-        assert_eq!(deps.keys().cloned().collect::<Vec<_>>(), vec!["a", "z"]);
-    }
-}
 
 fn parse_manifest(text: &str) -> Result<Manifest> {
     let mut section = String::new();
@@ -287,4 +264,27 @@ fn parse_lockfile(text: &str) -> Result<Lockfile> {
         manifest_sha256: hash.context("manifest hash missing")?,
         dependencies: deps,
     })
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dependency_sources_are_deterministic() {
+        let dep = Dependency::Detailed {
+            version: Some("1.2.3".into()),
+            path: Some("../shared".into()),
+            git: None,
+            rev: None,
+        };
+        assert!(dep
+            .canonical_source(Path::new("/workspace/app"))
+            .starts_with("path:"));
+    }
+    #[test]
+    fn lockfile_dependencies_are_sorted() {
+        let mut deps = BTreeMap::<String, Dependency>::new();
+        deps.insert("z".into(), Dependency::Version("1".into()));
+        deps.insert("a".into(), Dependency::Version("2".into()));
+        assert_eq!(deps.keys().cloned().collect::<Vec<_>>(), vec!["a", "z"]);
+    }
 }

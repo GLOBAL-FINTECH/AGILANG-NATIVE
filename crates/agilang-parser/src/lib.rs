@@ -701,7 +701,7 @@ impl<'a> Parser<'a> {
     }
 
     fn multiplicative(&mut self) -> Option<Expr> {
-        let mut left = self.postfix()?;
+        let mut left = self.unary()?;
         loop {
             let op = if self.eat(&TokenKind::Star).is_some() {
                 Some(BinaryOp::Multiply)
@@ -711,7 +711,7 @@ impl<'a> Parser<'a> {
                 None
             };
             if let Some(op) = op {
-                let right = self.postfix()?;
+                let right = self.unary()?;
                 let span = left.span().join(right.span());
                 left = Expr::Binary {
                     left: Box::new(left),
@@ -724,6 +724,29 @@ impl<'a> Parser<'a> {
             }
         }
         Some(left)
+    }
+
+    /// `-x` and `not x`. Negated numeric literals fold to negative literals.
+    fn unary(&mut self) -> Option<Expr> {
+        let op = if self.at(&TokenKind::Minus) {
+            UnaryOp::Negate
+        } else if self.at(&TokenKind::Not) {
+            UnaryOp::Not
+        } else {
+            return self.postfix();
+        };
+        let op_start = self.advance().span.start;
+        let operand = self.unary()?;
+        let span = self.span(op_start, operand.span().end);
+        Some(match (op, operand) {
+            (UnaryOp::Negate, Expr::Integer(value, _)) => Expr::Integer(value.wrapping_neg(), span),
+            (UnaryOp::Negate, Expr::Float(value, _)) => Expr::Float(-value, span),
+            (op, operand) => Expr::Unary {
+                op,
+                operand: Box::new(operand),
+                span,
+            },
+        })
     }
 
     fn postfix(&mut self) -> Option<Expr> {
@@ -1095,6 +1118,35 @@ mod tests {
         );
         let p = parse(&lex(&s).unwrap()).unwrap();
         assert_eq!(p.functions[0].body.len(), 3);
+    }
+
+    #[test]
+    fn parses_unary_negation_and_not() {
+        let s = SourceFile::new(
+            "x.agi",
+            "fn main() -> i32:\n    let a: i64 = -1\n    let b: f64 = -2.5\n    let c: i64 = -a * 3\n    let d: bool = not true\n    return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        let body = &p.functions[0].body;
+        let value = |i: usize| match &body[i] {
+            Stmt::Let { value, .. } => value.clone(),
+            other => panic!("expected let, got {other:?}"),
+        };
+        assert!(matches!(value(0), Expr::Integer(-1, _)));
+        assert!(matches!(value(1), Expr::Float(v, _) if v == -2.5));
+        // Unary binds tighter than `*`: (-a) * 3
+        assert!(matches!(
+            value(2),
+            Expr::Binary { op: BinaryOp::Multiply, ref left, .. }
+                if matches!(**left, Expr::Unary { op: UnaryOp::Negate, .. })
+        ));
+        assert!(matches!(
+            value(3),
+            Expr::Unary {
+                op: UnaryOp::Not,
+                ..
+            }
+        ));
     }
 
     #[test]

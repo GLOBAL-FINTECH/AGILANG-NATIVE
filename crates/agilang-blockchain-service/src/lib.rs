@@ -242,7 +242,7 @@ fn to_u64(value: u128, name: &str) -> RuntimeResult<u64> {
     u64::try_from(value).map_err(|_| invalid_error(format!("transaction {name} exceeds u64")))
 }
 
-fn param_string<'a>(params: &'a Value, index: usize) -> RuntimeResult<&'a str> {
+fn param_string(params: &Value, index: usize) -> RuntimeResult<&str> {
     params
         .as_array()
         .and_then(|values| values.get(index))

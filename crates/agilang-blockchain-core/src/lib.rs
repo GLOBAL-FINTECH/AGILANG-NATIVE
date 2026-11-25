@@ -330,6 +330,7 @@ impl Block {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn child(
         config: &BlockchainConfig,
         parent: &Block,

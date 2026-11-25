@@ -412,7 +412,7 @@ pub fn parse_quantity(value: &str) -> RuntimeResult<u64> {
     u64::from_str_radix(raw, 16).map_err(|error| invalid_error(error.to_string()))
 }
 
-fn param_string<'a>(params: &'a Value, index: usize) -> RuntimeResult<&'a str> {
+fn param_string(params: &Value, index: usize) -> RuntimeResult<&str> {
     params
         .as_array()
         .and_then(|values| values.get(index))
@@ -493,8 +493,10 @@ mod tests {
     use agilang_blockchain_state::Account;
 
     fn node() -> BlockchainNode {
-        let mut config = BlockchainConfig::default();
-        config.strict_accounting = true;
+        let mut config = BlockchainConfig {
+            strict_accounting: true,
+            ..BlockchainConfig::default()
+        };
         config.genesis_state.insert(
             "alice".into(),
             serde_json::to_value(Account {

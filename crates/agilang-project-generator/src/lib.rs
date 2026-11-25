@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const DEFAULT_WEB_VIEW: &str = include_str!("../templates/welcome.ags");
 const DEFAULT_WEB_CSS: &str = include_str!("../templates/assets/app.css");
@@ -1347,7 +1347,7 @@ fn to_snake_case(s: &str) -> String {
     out.trim_matches('_').to_string()
 }
 
-fn ensure_parent_dir(path: &PathBuf) -> Result<()> {
+fn ensure_parent_dir(path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }

@@ -171,7 +171,7 @@ pub fn intrinsic_gas(transaction: &Transaction) -> RuntimeResult<u64> {
         .data
         .strip_prefix("0x")
         .unwrap_or(&transaction.data);
-    if data.len() % 2 != 0 {
+    if !data.len().is_multiple_of(2) {
         return invalid("transaction data must contain complete hexadecimal bytes");
     }
     let mut gas = 21_000_u64;
@@ -200,8 +200,10 @@ mod tests {
     use super::*;
 
     fn funded_state() -> (BlockchainConfig, ChainState) {
-        let mut config = BlockchainConfig::default();
-        config.strict_accounting = true;
+        let config = BlockchainConfig {
+            strict_accounting: true,
+            ..BlockchainConfig::default()
+        };
         let mut state = ChainState::default();
         state.set_account(
             "alice",

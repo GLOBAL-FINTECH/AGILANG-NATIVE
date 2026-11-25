@@ -1,3 +1,6 @@
+// Complete RFC 6455 frame/connection API; not every control frame helper is
+// used by the current server, so unused helpers are expected.
+#![allow(dead_code)]
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use sha1::{Digest, Sha1};
 use std::collections::HashMap;

@@ -141,13 +141,19 @@ mod tests {
 
     #[test]
     fn capabilities_report_signaling_and_explain_provider_boundary() {
+        let full = cfg!(feature = "full-webrtc");
         let caps = capabilities();
         assert!(caps.signaling);
-        assert!(!caps.peer_connection);
-        assert!(!caps.turn_server);
-        assert!(caps.explanation.contains("signaling"));
+        assert_eq!(caps.peer_connection, full);
+        assert_eq!(caps.turn_server, full);
+        if full {
+            assert!(caps.explanation.contains("native WebRTC provider"));
+        } else {
+            assert!(caps.explanation.contains("signaling"));
+        }
     }
 
+    #[cfg(not(feature = "full-webrtc"))]
     #[test]
     fn full_provider_guard_fails_closed_without_feature() {
         let error = require_full_provider().unwrap_err();
@@ -155,12 +161,18 @@ mod tests {
         assert!(error.message.contains("full-webrtc"));
     }
 
+    #[cfg(feature = "full-webrtc")]
+    #[test]
+    fn full_provider_guard_allows_compiled_provider() {
+        require_full_provider().unwrap();
+    }
+
     #[test]
     fn capabilities_json_serializes_current_state() {
         let json = capabilities_json().unwrap();
         let value: serde_json::Value = serde_json::from_slice(&json).unwrap();
         assert_eq!(value["signaling"], true);
-        assert_eq!(value["peer_connection"], false);
-        assert!(value["explanation"].as_str().unwrap().contains("signaling"));
+        assert_eq!(value["peer_connection"], cfg!(feature = "full-webrtc"));
+        assert!(!value["explanation"].as_str().unwrap().is_empty());
     }
 }

@@ -359,11 +359,9 @@ impl Analyser {
             return resolved;
         }
 
-        if is_framework_type_name(name) {
-            Type::Unknown
-        } else {
-            Type::Unknown
-        }
+        // Framework type names and unknown names both resolve to `Unknown`;
+        // framework types are bound by the framework runtime, not natively.
+        Type::Unknown
     }
 
     fn validate_alias_target(
@@ -520,17 +518,15 @@ impl Analyser {
         }
 
         // Return analysis: check that a non-void function returns on all control flows
-        if ret_type != Type::Void && ret_type != Type::Error {
-            if !self.block_returns(&hir_body) {
-                self.errors.push(Diagnostic::error(
-                    "E2008",
-                    format!(
-                        "missing return statement in function returning `{}`",
-                        ret_type
-                    ),
-                    func.span,
-                ));
-            }
+        if ret_type != Type::Void && ret_type != Type::Error && !self.block_returns(&hir_body) {
+            self.errors.push(Diagnostic::error(
+                "E2008",
+                format!(
+                    "missing return statement in function returning `{}`",
+                    ret_type
+                ),
+                func.span,
+            ));
         }
 
         self.exit_scope();
@@ -591,7 +587,17 @@ impl Analyser {
                 };
 
                 let final_ty = if declared_ty != Type::Unknown {
-                    declared_ty
+                    match &declared_ty {
+                        // A bare `array` declaration keeps the element type
+                        // inferred from its initializer.
+                        Type::List(inner) if inner.as_ref() == &Type::Unknown => {
+                            match val_expr.ty() {
+                                Type::List(inferred) => Type::List(inferred.clone()),
+                                _ => declared_ty.clone(),
+                            }
+                        }
+                        _ => declared_ty.clone(),
+                    }
                 } else {
                     val_expr.ty().clone()
                 };
@@ -1019,12 +1025,29 @@ impl Analyser {
                 span,
             } => {
                 let hir_iterable = self.analyse_expr(iterable, None)?;
+                // `for x in xs` binds the element; `for i, x in xs` binds the
+                // integer index and the element. Bare arrays hold f64 values.
+                let element_ty = match hir_iterable.ty() {
+                    Type::List(inner) if inner.as_ref() == &Type::Unknown => Type::F64,
+                    Type::List(inner) => inner.as_ref().clone(),
+                    _ => Type::Unknown,
+                };
+                let (key_ty, value_ty) = if value_name.is_some() {
+                    let index_ty = if matches!(hir_iterable.ty(), Type::List(_)) {
+                        Type::I64
+                    } else {
+                        Type::Unknown
+                    };
+                    (index_ty, element_ty)
+                } else {
+                    (element_ty, Type::Unknown)
+                };
                 self.loop_depth += 1;
                 self.enter_scope();
                 let key_sym = Symbol {
                     name: key_name.clone(),
                     kind: SymbolKind::Local,
-                    ty: Type::Unknown,
+                    ty: key_ty,
                     span: *span,
                     mutable: true,
                 };
@@ -1034,7 +1057,7 @@ impl Analyser {
                     let value_sym = Symbol {
                         name: value_name.clone(),
                         kind: SymbolKind::Local,
-                        ty: Type::Unknown,
+                        ty: value_ty,
                         span: *span,
                         mutable: true,
                     };
@@ -1212,33 +1235,25 @@ impl Analyser {
                 span,
             } => {
                 let hir_object = self.analyse_expr(object, None)?;
-                match hir_object.ty() {
-                    Type::Enum(enum_name) => {
-                        if let Some(enum_decl) = self.enum_defs.get(enum_name) {
-                            if enum_decl
-                                .variants
-                                .iter()
-                                .any(|variant| variant.name == *member)
-                            {
-                                return Some(HirExpr::EnumVariant {
-                                    enum_name: enum_name.clone(),
-                                    variant: member.clone(),
-                                    ty: Type::Enum(enum_name.clone()),
-                                    span: *span,
-                                });
-                            }
-                            self.errors.push(Diagnostic::error(
-                                "E2106",
-                                format!("unknown variant `{}` for enum `{}`", member, enum_name),
-                                *span,
-                            ));
+                if let Type::Enum(enum_name) = hir_object.ty() {
+                    if let Some(enum_decl) = self.enum_defs.get(enum_name) {
+                        if enum_decl
+                            .variants
+                            .iter()
+                            .any(|variant| variant.name == *member)
+                        {
                             return Some(HirExpr::EnumVariant {
                                 enum_name: enum_name.clone(),
                                 variant: member.clone(),
-                                ty: Type::Error,
+                                ty: Type::Enum(enum_name.clone()),
                                 span: *span,
                             });
                         }
+                        self.errors.push(Diagnostic::error(
+                            "E2106",
+                            format!("unknown variant `{}` for enum `{}`", member, enum_name),
+                            *span,
+                        ));
                         return Some(HirExpr::EnumVariant {
                             enum_name: enum_name.clone(),
                             variant: member.clone(),
@@ -1246,7 +1261,12 @@ impl Analyser {
                             span: *span,
                         });
                     }
-                    _ => {}
+                    return Some(HirExpr::EnumVariant {
+                        enum_name: enum_name.clone(),
+                        variant: member.clone(),
+                        ty: Type::Error,
+                        span: *span,
+                    });
                 }
                 let result_ty = match hir_object.ty() {
                     Type::Struct(struct_name) => {
@@ -1506,6 +1526,58 @@ impl Analyser {
                     }
                 }
             }
+            Expr::Unary { op, operand, span } => {
+                let hir_operand = self.analyse_expr(operand, expected_ty)?;
+                let operand_ty = hir_operand.ty().clone();
+                match op {
+                    // `-x` lowers to `0 - x` with a zero of the operand's type.
+                    agilang_ast::UnaryOp::Negate => {
+                        let zero = if operand_ty.is_float() {
+                            HirExpr::Float(0.0, operand_ty.clone(), *span)
+                        } else if operand_ty.is_integer() || operand_ty == Type::Unknown {
+                            let ty = if operand_ty == Type::Unknown {
+                                Type::I64
+                            } else {
+                                operand_ty.clone()
+                            };
+                            HirExpr::Integer(0, ty, *span)
+                        } else {
+                            self.errors.push(Diagnostic::error(
+                                "E2001",
+                                format!("type mismatch: cannot negate `{operand_ty}`"),
+                                *span,
+                            ));
+                            return Some(HirExpr::Identifier("<error>".into(), Type::Error, *span));
+                        };
+                        Some(HirExpr::Binary {
+                            left: Box::new(zero),
+                            op: HirBinaryOp::Subtract,
+                            right: Box::new(hir_operand),
+                            ty: operand_ty,
+                            span: *span,
+                        })
+                    }
+                    // `not x` lowers to `x == false`.
+                    agilang_ast::UnaryOp::Not => {
+                        if operand_ty != Type::Bool && operand_ty != Type::Unknown {
+                            self.errors.push(Diagnostic::error(
+                                "E2001",
+                                format!(
+                                    "type mismatch: `not` requires `bool`, found `{operand_ty}`"
+                                ),
+                                *span,
+                            ));
+                        }
+                        Some(HirExpr::Binary {
+                            left: Box::new(hir_operand),
+                            op: HirBinaryOp::Equal,
+                            right: Box::new(HirExpr::Bool(false, Type::Bool, *span)),
+                            ty: Type::Bool,
+                            span: *span,
+                        })
+                    }
+                }
+            }
             Expr::Binary {
                 left,
                 op,
@@ -1663,11 +1735,9 @@ impl Analyser {
                     | BinaryOp::GreaterEqual => {
                         let ty = if hir_left.ty() == &Type::Unknown
                             || hir_right.ty() == &Type::Unknown
-                        {
-                            Type::Bool
-                        } else if hir_left.ty().is_numeric()
-                            && hir_right.ty().is_numeric()
-                            && hir_left.ty().is_compatible(hir_right.ty())
+                            || (hir_left.ty().is_numeric()
+                                && hir_right.ty().is_numeric()
+                                && hir_left.ty().is_compatible(hir_right.ty()))
                         {
                             Type::Bool
                         } else {
@@ -1991,6 +2061,17 @@ impl Analyser {
     }
 }
 
+fn is_framework_type_name(name: &str) -> bool {
+    name == "map" || name == "bytes" || name.chars().next().map(char::is_uppercase).unwrap_or(false)
+}
+
+fn is_constructor_like_expr(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Identifier(name, _) if name.chars().next().map(char::is_uppercase).unwrap_or(false)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2217,15 +2298,4 @@ mod tests {
         let errs = check_source(src).unwrap_err();
         assert!(errs.iter().any(|e| e.code == "E2210"));
     }
-}
-
-fn is_framework_type_name(name: &str) -> bool {
-    name == "map" || name == "bytes" || name.chars().next().map(char::is_uppercase).unwrap_or(false)
-}
-
-fn is_constructor_like_expr(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Identifier(name, _) if name.chars().next().map(char::is_uppercase).unwrap_or(false)
-    )
 }

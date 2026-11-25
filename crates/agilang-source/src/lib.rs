@@ -81,9 +81,11 @@ pub struct SourceFile {
     file_id: FileId,
 }
 
-fn registry() -> &'static Mutex<(HashMap<PathBuf, FileId>, HashMap<FileId, SourceFile>)> {
-    static REGISTRY: OnceLock<Mutex<(HashMap<PathBuf, FileId>, HashMap<FileId, SourceFile>)>> =
-        OnceLock::new();
+/// Path -> id and id -> file maps for sources registered for diagnostics.
+type Registry = (HashMap<PathBuf, FileId>, HashMap<FileId, SourceFile>);
+
+fn registry() -> &'static Mutex<Registry> {
+    static REGISTRY: OnceLock<Mutex<Registry>> = OnceLock::new();
     REGISTRY.get_or_init(|| Mutex::new((HashMap::new(), HashMap::new())))
 }
 
