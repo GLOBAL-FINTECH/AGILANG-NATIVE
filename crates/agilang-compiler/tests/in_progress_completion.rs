@@ -46,11 +46,24 @@ fn nested_numeric_arrays_reach_hir_with_nested_types() {
         "fn main() -> i32:\n    let matrix: array = [[1.0, 2.0], [3.0, 4.0]]\n    let row: array = matrix[1]\n    let value: f64 = row[0]\n    if value == 3.0:\n        return 0\n    return 1\n",
     );
     let program = hir(&src).expect("nested numeric arrays must lower to HIR");
-    let main = program.functions.iter().find(|function| function.name == "main").unwrap();
-    let matrix_type = main.body.iter().find_map(|statement| match statement {
-        HirStmt::Let { name, ty, value: HirExpr::ListLiteral(_, _, _), .. } if name == "matrix" => Some(ty.clone()),
-        _ => None,
-    }).expect("matrix declaration must exist");
+    let main = program
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    let matrix_type = main
+        .body
+        .iter()
+        .find_map(|statement| match statement {
+            HirStmt::Let {
+                name,
+                ty,
+                value: HirExpr::ListLiteral(_, _, _),
+                ..
+            } if name == "matrix" => Some(ty.clone()),
+            _ => None,
+        })
+        .expect("matrix declaration must exist");
     assert!(matches!(matrix_type, Type::List(inner) if matches!(inner.as_ref(), Type::List(_))));
 }
 
