@@ -1,0 +1,20 @@
+fn close(actual: f64, expected: f64) -> bool:
+    return abs(actual - expected) < 0.001
+
+# Multiplies row-major A[2,3] by B[3,2] on the GPU and checks the result.
+fn main() -> i32:
+    let a: array = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let b: array = [7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+
+    # Policy 2 requires a real Vulkan GPU and never falls back to the CPU.
+    let c: array = gpu_matmul(a, b, 2, 3, 2, 2)
+
+    print(c[0], c[1])
+    print(c[2], c[3])
+
+    if close(c[0], 58.0) and close(c[1], 64.0) and close(c[2], 139.0) and close(c[3], 154.0):
+        print("AGILANG GPU matmul: PASSED")
+        return 0
+
+    print("AGILANG GPU matmul: FAILED")
+    return 1

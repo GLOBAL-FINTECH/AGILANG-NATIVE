@@ -8,6 +8,10 @@ rust-version.workspace = true
 [lib]
 crate-type = ["rlib", "cdylib", "staticlib"]
 
+[features]
+default = []
+vulkan = ["agilang-runtime-accelerator/vulkan"]
+
 [dependencies]
 agilang-runtime-core = { path = "../agilang-runtime-core" }
 agilang-runtime-platform = { path = "../agilang-runtime-platform" }
