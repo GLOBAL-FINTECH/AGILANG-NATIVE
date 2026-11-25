@@ -10,8 +10,14 @@ pub fn resolve(root: &Path, modules: &[String]) -> Result<BTreeMap<String, PathB
         if name.contains("..") {
             bail!("module path escapes project root: {}", name);
         }
-        let rel = name.replace('.', '/') + ".agi";
-        let path = root.join(rel);
+        let mut path = root.to_path_buf();
+        for segment in name.split('.') {
+            if segment.is_empty() {
+                bail!("invalid module path: {}", name);
+            }
+            path.push(segment);
+        }
+        path.set_extension("agi");
         if !path.starts_with(root) {
             bail!("module path escapes project root");
         }

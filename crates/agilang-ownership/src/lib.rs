@@ -19,16 +19,18 @@ fn validate_stmt(s: &HirStmt, immutable: &mut HashSet<String>, errors: &mut Vec<
                 immutable.insert(name.clone());
             }
         }
-        HirStmt::Assign { target, span, .. } => {
-            if let HirExpr::Identifier(name, _, _) = target {
-                if immutable.contains(name) {
-                    errors.push(Diagnostic::error(
-                        "E3001",
-                        "cannot assign to immutable binding",
-                        *span,
-                    ));
-                }
-            }
+        // E2010 matches the semantic analyser's immutable-assignment code
+        // (E3001 is reserved for "module not found").
+        HirStmt::Assign {
+            target: HirExpr::Identifier(name, _, _),
+            span,
+            ..
+        } if immutable.contains(name) => {
+            errors.push(Diagnostic::error(
+                "E2010",
+                format!("cannot assign to immutable binding `{name}`"),
+                *span,
+            ));
         }
         HirStmt::If {
             then_body,
