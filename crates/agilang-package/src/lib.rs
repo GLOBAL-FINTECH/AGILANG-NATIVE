@@ -154,7 +154,7 @@ mod tests {
     }
     #[test]
     fn lockfile_dependencies_are_sorted() {
-        let mut deps = BTreeMap::new();
+        let mut deps = BTreeMap::<String, Dependency>::new();
         deps.insert("z".into(), Dependency::Version("1".into()));
         deps.insert("a".into(), Dependency::Version("2".into()));
         assert_eq!(deps.keys().cloned().collect::<Vec<_>>(), vec!["a", "z"]);
@@ -180,7 +180,7 @@ fn parse_manifest(text: &str) -> Result<Manifest> {
         let k = k.trim();
         let v = v.trim().trim_matches('"').to_string();
         if section == "project" {
-            project.insert(k.into(), v)
+            project.insert(k.into(), v);
         } else if section == "dependencies" {
             if v.starts_with("{") {
                 let inner = v.trim_matches(&['{', '}'][..]);

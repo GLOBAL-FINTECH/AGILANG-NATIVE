@@ -56,6 +56,20 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("extern const char* agi_http_get_json(const char* url);\n");
     out.push_str("extern const char* agi_http_post_json(const char* url, const char* body);\n");
     out.push_str("extern const char* agi_http_request_json(const char* request_json);\n\n");
+    out.push_str("static const char* agi_string_concat(const char* left, const char* right) {\n");
+    out.push_str("    if (!left) left = \"\";\n");
+    out.push_str("    if (!right) right = \"\";\n");
+    out.push_str("    size_t left_len = strlen(left);\n");
+    out.push_str("    size_t right_len = strlen(right);\n");
+    out.push_str("    char* out = (char*)malloc(left_len + right_len + 1);\n");
+    out.push_str("    if (!out) { fputs(\"agilang: out of memory\\n\", stderr); abort(); }\n");
+    out.push_str("    memcpy(out, left, left_len);\n");
+    out.push_str("    memcpy(out + left_len, right, right_len + 1);\n");
+    out.push_str("    return out;\n");
+    out.push_str("}\n\n");
+    out.push_str("static int agi_string_compare(const char* left, const char* right) {\n");
+    out.push_str("    return strcmp(left ? left : \"\", right ? right : \"\");\n");
+    out.push_str("}\n\n");
     out.push_str("static char* agi_json_escape_and_quote(const char* input) {\n");
     out.push_str("    if (!input) input = \"\";\n");
     out.push_str("    size_t len = 2;\n");
@@ -773,6 +787,21 @@ fn generate_expr(expr: &HirExpr) -> String {
         HirExpr::Binary {
             left, op, right, ..
         } => {
+            if matches!(left.ty(), Type::String) && matches!(right.ty(), Type::String) {
+                let l = generate_expr(left);
+                let r = generate_expr(right);
+                let cmp = |c_op: &str| format!("(agi_string_compare({l}, {r}) {c_op} 0)");
+                match op {
+                    HirBinaryOp::Add => return format!("agi_string_concat({l}, {r})"),
+                    HirBinaryOp::Equal => return cmp("=="),
+                    HirBinaryOp::NotEqual => return cmp("!="),
+                    HirBinaryOp::Less => return cmp("<"),
+                    HirBinaryOp::LessEqual => return cmp("<="),
+                    HirBinaryOp::Greater => return cmp(">"),
+                    HirBinaryOp::GreaterEqual => return cmp(">="),
+                    _ => {}
+                }
+            }
             let op_str = match op {
                 HirBinaryOp::Add => "+",
                 HirBinaryOp::Subtract => "-",
@@ -1166,6 +1195,22 @@ mod tests {
         assert!(c_code.contains("agi_print_f64((double)(m))"));
         assert!(c_code.contains("return 0;"));
         assert!(c_code.contains("int main(void)"));
+    }
+
+    #[test]
+    fn test_codegen_string_concat_and_comparison_use_string_semantics() {
+        let source = SourceFile::new(
+            "strings.agi",
+            "fn greet(name: string) -> string:\n    return \"hello, \" + name\n\nfn main() -> i32:\n    let env = \"prod\"\n    if env != \"local\":\n        print(greet(env))\n    if env == \"prod\":\n        print(\"ok\")\n    return 0\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("agi_string_concat(\"hello, \", name)"));
+        assert!(c_code.contains("(agi_string_compare(env, \"local\") != 0)"));
+        assert!(c_code.contains("(agi_string_compare(env, \"prod\") == 0)"));
+        assert!(!c_code.contains("(\"hello, \" + name)"));
+        assert!(!c_code.contains("(env != \"local\")"));
     }
 
     #[test]

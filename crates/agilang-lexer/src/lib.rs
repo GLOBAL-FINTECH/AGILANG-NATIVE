@@ -74,7 +74,25 @@ pub struct Token {
 }
 
 pub fn lex(source: &SourceFile) -> Result<Vec<Token>, Vec<Diagnostic>> {
-    Lexer::new(source).run()
+    let file = source.file_id();
+    match Lexer::new(source).run() {
+        Ok(mut tokens) => {
+            if file != 0 {
+                for token in &mut tokens {
+                    token.span = token.span.in_file(file);
+                }
+            }
+            Ok(tokens)
+        }
+        Err(mut errors) => {
+            if file != 0 {
+                for error in &mut errors {
+                    error.span = error.span.in_file(file);
+                }
+            }
+            Err(errors)
+        }
+    }
 }
 
 struct Lexer<'a> {

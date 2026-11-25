@@ -34,6 +34,16 @@ impl Diagnostic {
         self
     }
     pub fn render(&self, source: &SourceFile) -> String {
+        // Spans from imported modules carry their own file id; render them
+        // against that file instead of the caller-supplied entry source.
+        let owned;
+        let source = match SourceFile::lookup(self.span.file) {
+            Some(file) if file.path() != source.path() => {
+                owned = file;
+                &owned
+            }
+            _ => source,
+        };
         let pos = source.position(self.span.start);
         let line = source.line_text(pos.line).unwrap_or("");
         let marker_width = self.span.len().max(1);

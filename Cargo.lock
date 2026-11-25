@@ -45,15 +45,15 @@ dependencies = [
 
 [[package]]
 name = "agilang-agi-ags-bridge"
-version = "0.7.0"
+version = "0.8.0"
 
 [[package]]
 name = "agilang-ags-ast"
-version = "0.7.0"
+version = "0.8.0"
 
 [[package]]
 name = "agilang-ags-compiler"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-agi-ags-bridge",
  "agilang-ags-lexer",
@@ -65,7 +65,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-ags-hydration"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-view-ir",
  "serde_json",
@@ -73,11 +73,11 @@ dependencies = [
 
 [[package]]
 name = "agilang-ags-lexer"
-version = "0.7.0"
+version = "0.8.0"
 
 [[package]]
 name = "agilang-ags-parser"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-ags-ast",
  "agilang-ags-lexer",
@@ -85,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-ags-plugins"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-view-ir",
  "serde_json",
@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-ags-semantic"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-agi-ags-bridge",
  "agilang-ags-ast",
@@ -102,7 +102,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-ags-ssr"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-view-ir",
  "serde_json",
@@ -110,14 +110,14 @@ dependencies = [
 
 [[package]]
 name = "agilang-ast"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-source",
 ]
 
 [[package]]
 name = "agilang-blockchain-consensus"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-blockchain-core",
  "agilang-runtime-core",
@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-blockchain-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "serde",
@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-blockchain-fee"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "serde",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-blockchain-node"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-blockchain-core",
  "agilang-blockchain-state",
@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-blockchain-p2p"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-blockchain-core",
  "agilang-runtime-core",
@@ -171,7 +171,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-blockchain-rpc"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-blockchain-service",
  "agilang-runtime-core",
@@ -183,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-blockchain-service"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-blockchain-core",
  "agilang-blockchain-node",
@@ -194,7 +194,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-blockchain-state"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-blockchain-core",
  "agilang-runtime-core",
@@ -204,7 +204,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-blockchain-storage"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-blockchain-core",
  "agilang-runtime-core",
@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-blockchain-transaction"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "k256",
@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-build"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-codegen-c",
  "agilang-compiler",
@@ -242,7 +242,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-codegen-c"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-compiler",
  "agilang-ir",
@@ -254,7 +254,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-compat-audit"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde_json",
@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-compiler"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-ast",
  "agilang-diagnostics",
@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-agidb"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-agtp",
  "agilang-database-driver",
@@ -294,7 +294,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-agtp"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -302,7 +302,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-audit"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-auth"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-identity",
  "agilang-database-transport",
@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-benchmark"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-audit",
  "agilang-database-crypto",
@@ -339,7 +339,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-blockchain-store"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -347,7 +347,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-crypto"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -356,7 +356,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-driver"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -365,7 +365,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-group-commit"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-wal",
  "anyhow",
@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-identity"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-index"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -390,7 +390,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-ipc"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-transport",
  "anyhow",
@@ -399,7 +399,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-keyring"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -407,7 +407,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-mvcc"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-mysql"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-driver",
  "anyhow",
@@ -425,7 +425,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-mysql-gateway"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-agidb",
  "agilang-database-driver",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-page-cache"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-storage",
  "anyhow",
@@ -447,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-parser"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-sql",
  "anyhow",
@@ -456,7 +456,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-planner"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-sql",
  "anyhow",
@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-policy"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-security-kernel",
  "anyhow",
@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-pool"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-driver",
  "agilang-database-sqlite",
@@ -484,7 +484,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-postgres"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-driver",
  "anyhow",
@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-prepared"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-driver",
  "agilang-database-sql",
@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-query-security"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-parser",
  "agilang-database-planner",
@@ -516,7 +516,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-recovery"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-storage",
  "agilang-database-wal",
@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-scheduler"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -534,7 +534,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-security-kernel"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -542,7 +542,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-session"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-security-kernel",
  "anyhow",
@@ -551,7 +551,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-snapshot"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -559,7 +559,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-sql"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -567,7 +567,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-sqlite"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-driver",
  "anyhow",
@@ -577,7 +577,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-storage"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -585,7 +585,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-tcp"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-auth",
  "agilang-database-identity",
@@ -599,7 +599,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-transactions"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-driver",
  "anyhow",
@@ -608,7 +608,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-transport"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-identity",
  "agilang-database-security-kernel",
@@ -619,7 +619,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-vault"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-audit",
  "agilang-database-crypto",
@@ -633,7 +633,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-database-wal"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-storage",
  "anyhow",
@@ -642,14 +642,14 @@ dependencies = [
 
 [[package]]
 name = "agilang-diagnostics"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-source",
 ]
 
 [[package]]
 name = "agilang-framework-auth"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -662,22 +662,22 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-config"
-version = "0.7.0"
+version = "0.8.0"
 
 [[package]]
 name = "agilang-framework-container"
-version = "0.7.0"
+version = "0.8.0"
 
 [[package]]
 name = "agilang-framework-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-framework-container",
 ]
 
 [[package]]
 name = "agilang-framework-database"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-agidb",
  "agilang-database-driver",
@@ -691,18 +691,18 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-http"
-version = "0.7.0"
+version = "0.8.0"
 
 [[package]]
 name = "agilang-framework-middleware"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-framework-http",
 ]
 
 [[package]]
 name = "agilang-framework-migrations"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-driver",
  "agilang-framework-database",
@@ -715,7 +715,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-rate-limit"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -723,14 +723,14 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-routing"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-framework-http",
 ]
 
 [[package]]
 name = "agilang-framework-schema"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -738,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-security"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-framework-rate-limit",
  "agilang-framework-session",
@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-seeding"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-driver",
  "agilang-framework-database",
@@ -760,7 +760,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-server"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-database-agidb",
  "agilang-database-driver",
@@ -790,7 +790,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-session"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -799,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-validation"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -808,7 +808,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-framework-view"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-agi-ags-bridge",
  "agilang-ags-compiler",
@@ -816,7 +816,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-ir"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-source",
  "agilang-symbols",
@@ -826,7 +826,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-lexer"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-diagnostics",
  "agilang-source",
@@ -834,14 +834,14 @@ dependencies = [
 
 [[package]]
 name = "agilang-linker"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
 ]
 
 [[package]]
 name = "agilang-lsp"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-compiler",
  "agilang-diagnostics",
@@ -858,7 +858,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-native-cli"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-agi-ags-bridge",
  "agilang-ags-compiler",
@@ -887,8 +887,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-package"
+version = "0.8.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "sha2",
+]
+
+[[package]]
 name = "agilang-parser"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-ast",
  "agilang-diagnostics",
@@ -898,15 +907,24 @@ dependencies = [
 
 [[package]]
 name = "agilang-project-generator"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "serde_json",
 ]
 
 [[package]]
+name = "agilang-repl"
+version = "0.8.0"
+dependencies = [
+ "agilang-compiler",
+ "agilang-source",
+ "anyhow",
+]
+
+[[package]]
 name = "agilang-runtime-abi"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-accelerator",
  "agilang-runtime-async",
@@ -924,7 +942,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-accelerator"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "serde",
@@ -933,7 +951,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-async"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "once_cell",
@@ -942,7 +960,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-cli"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-abi",
  "agilang-runtime-async",
@@ -956,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-compute"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "serde",
@@ -964,7 +982,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "bytes",
  "parking_lot",
@@ -975,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-crypto"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "rand_core 0.6.4",
@@ -985,7 +1003,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-evm"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "agilang-runtime-http",
@@ -995,7 +1013,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-http"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "reqwest",
@@ -1007,7 +1025,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-llm"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "agilang-runtime-http",
@@ -1017,7 +1035,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-platform"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "serde",
@@ -1025,7 +1043,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-realtime"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "futures-util",
@@ -1038,7 +1056,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-resource"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "memmap2",
@@ -1050,7 +1068,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-webrtc"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-runtime-core",
  "serde",
@@ -1063,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-runtime-websocket"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "base64",
  "sha1",
@@ -1071,7 +1089,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-semantic"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-ast",
  "agilang-diagnostics",
@@ -1086,7 +1104,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-sibaq-integration"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "reqwest",
  "serde_json",
@@ -1095,14 +1113,14 @@ dependencies = [
 
 [[package]]
 name = "agilang-source"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "agilang-symbols"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-source",
  "agilang-types",
@@ -1111,7 +1129,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-types"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "agilang-source",
  "serde",
@@ -1119,7 +1137,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-vault-core"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -1130,7 +1148,7 @@ dependencies = [
 
 [[package]]
 name = "agilang-view-ir"
-version = "0.7.0"
+version = "0.8.0"
 
 [[package]]
 name = "ahash"

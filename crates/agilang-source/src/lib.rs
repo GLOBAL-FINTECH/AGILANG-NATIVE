@@ -1,9 +1,15 @@
 //! Source files, byte spans, and line/column mapping for the native AGILANG compiler.
 
 use std::{
+    collections::HashMap,
     fs, io,
     path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
 };
+
+/// File identifier carried by every [`Span`]. `0` means "the file the caller
+/// is rendering against" (the entry file); registered files get ids >= 1.
+pub type FileId = u32;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
@@ -11,14 +17,32 @@ use std::{
 pub struct Span {
     pub start: usize,
     pub end: usize,
+    #[serde(default)]
+    pub file: FileId,
 }
 
 impl Span {
     pub const fn new(start: usize, end: usize) -> Self {
-        Self { start, end }
+        Self {
+            start,
+            end,
+            file: 0,
+        }
     }
     pub const fn empty(at: usize) -> Self {
-        Self { start: at, end: at }
+        Self {
+            start: at,
+            end: at,
+            file: 0,
+        }
+    }
+    /// Returns this span attributed to `file`.
+    pub const fn in_file(self, file: FileId) -> Self {
+        Self {
+            start: self.start,
+            end: self.end,
+            file,
+        }
     }
     pub const fn len(self) -> usize {
         self.end.saturating_sub(self.start)
@@ -38,6 +62,7 @@ impl Span {
             } else {
                 other.end
             },
+            file: self.file,
         }
     }
 }
@@ -53,6 +78,13 @@ pub struct SourceFile {
     path: PathBuf,
     text: String,
     line_starts: Vec<usize>,
+    file_id: FileId,
+}
+
+fn registry() -> &'static Mutex<(HashMap<PathBuf, FileId>, HashMap<FileId, SourceFile>)> {
+    static REGISTRY: OnceLock<Mutex<(HashMap<PathBuf, FileId>, HashMap<FileId, SourceFile>)>> =
+        OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new((HashMap::new(), HashMap::new())))
 }
 
 impl SourceFile {
@@ -76,7 +108,36 @@ impl SourceFile {
             path: path.into(),
             text,
             line_starts,
+            file_id: 0,
         }
+    }
+
+    /// Identifier stamped on spans produced from this file.
+    pub fn file_id(&self) -> FileId {
+        self.file_id
+    }
+
+    /// Registers this file so diagnostics whose spans point into it can be
+    /// rendered with the right path and source line, even when reported
+    /// against a different (entry) file. Re-registering the same path reuses
+    /// its id and refreshes the stored text.
+    pub fn registered(mut self) -> Self {
+        let mut guard = registry().lock().unwrap_or_else(|e| e.into_inner());
+        let (ids, files) = &mut *guard;
+        let next = ids.len() as FileId + 1;
+        let id = *ids.entry(self.path.clone()).or_insert(next);
+        self.file_id = id;
+        files.insert(id, self.clone());
+        self
+    }
+
+    /// Looks up a registered file by id.
+    pub fn lookup(id: FileId) -> Option<SourceFile> {
+        if id == 0 {
+            return None;
+        }
+        let guard = registry().lock().unwrap_or_else(|e| e.into_inner());
+        guard.1.get(&id).cloned()
     }
 
     pub fn path(&self) -> &Path {

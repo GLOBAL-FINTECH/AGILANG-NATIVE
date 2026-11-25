@@ -123,7 +123,18 @@ fn main() -> Result<()> {
             println!("Imported AGILANG HTTP client into the current project");
         }
         "check" => {
-            let source = load_optional(args.next())?;
+            let file_arg = args.next();
+            if file_arg.is_none() {
+                if let Some(root) = framework_project_root() {
+                    let result = check_framework_project(&root)?;
+                    println!(
+                        "AGILANG framework check passed: {} route(s), {} view(s)",
+                        result.routes, result.views
+                    );
+                    return Ok(());
+                }
+            }
+            let source = load_optional(file_arg)?;
             match check(&source) {
                 Ok(ast) => println!("AGILANG check passed: {} function(s)", ast.functions.len()),
                 Err(e) => report(&source, e)?,
@@ -338,6 +349,18 @@ fn main() -> Result<()> {
                     file_arg = Some(arg);
                 }
             }
+            if file_arg.is_none() && framework_project_root().is_some() {
+                println!("Framework application detected; starting `agilang serve`...");
+                let exe = env::current_exe().context("failed to locate agilang executable")?;
+                let status = std::process::Command::new(exe)
+                    .arg("serve")
+                    .status()
+                    .context("failed to start agilang serve")?;
+                if !status.success() {
+                    bail!("agilang serve exited with {status}");
+                }
+                return Ok(());
+            }
             let entry_path = match file_arg {
                 Some(p) => PathBuf::from(p),
                 None => find_project_entry()?,
@@ -388,6 +411,23 @@ fn main() -> Result<()> {
                     verbose = true;
                 } else if file_arg.is_none() {
                     file_arg = Some(arg);
+                }
+            }
+            if file_arg.is_none() {
+                if let Some(root) = framework_project_root() {
+                    let result = check_framework_project(&root)?;
+                    agilang_framework_server::write_framework_manifest(&root)?;
+                    println!(
+                        "Framework application validated: {} route(s), {} view(s)",
+                        result.routes, result.views
+                    );
+                    println!(
+                        "Framework applications run on the AGILANG server runtime; start it with `agilang serve` (development) or `agilang start` (production)."
+                    );
+                    println!(
+                        "To compile a standalone native program instead, pass its entry file: `agilang build src/main.agi`."
+                    );
+                    return Ok(());
                 }
             }
             let entry_path = match file_arg {
@@ -2003,4 +2043,57 @@ fn count_views(dir: &std::path::Path) -> usize {
         }
     }
     count
+}
+
+/// Returns the project root when the current directory belongs to a framework
+/// application (an `agilang.toml` with a `[routes]` section). Framework
+/// applications run on the AGILANG framework server runtime rather than being
+/// compiled from `application.entry` as a standalone native program.
+fn framework_project_root() -> Option<PathBuf> {
+    let mut dir = env::current_dir().ok()?;
+    loop {
+        let manifest = dir.join("agilang.toml");
+        if manifest.exists() {
+            let content = fs::read_to_string(&manifest).ok()?;
+            let is_framework = content.lines().any(|line| line.trim() == "[routes]");
+            return is_framework.then_some(dir);
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
+struct FrameworkCheck {
+    routes: usize,
+    views: usize,
+}
+
+/// Validates the parts of a framework application that the framework server
+/// loads at startup: route files and the view directory.
+fn check_framework_project(root: &Path) -> Result<FrameworkCheck> {
+    let mut router = agilang_framework_routing::Router::new();
+    let mut problems = Vec::new();
+    for rel in ["routes/web.agi", "routes/api.agi"] {
+        let file = root.join(rel);
+        if !file.exists() {
+            continue;
+        }
+        if let Err(error) = router.load_routes_from_file(&file) {
+            problems.push(format!("{}: {error}", file.display()));
+        }
+    }
+    if !problems.is_empty() {
+        bail!("framework check failed:\n  {}", problems.join("\n  "));
+    }
+    if router.routes.is_empty() {
+        bail!(
+            "framework check failed: no routes found in {}/routes (expected routes/web.agi or routes/api.agi)",
+            root.display()
+        );
+    }
+    Ok(FrameworkCheck {
+        routes: router.routes.len(),
+        views: count_views(&root.join("resources/views")),
+    })
 }

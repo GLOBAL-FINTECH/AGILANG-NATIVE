@@ -13,3 +13,7 @@ crates/agilang-framework-seeding/storage/
 *.out
 *.err
 nul*
+
+# Runtime state produced by running examples and dev servers
+*.pid
+examples/*/storage/database/*.agidb

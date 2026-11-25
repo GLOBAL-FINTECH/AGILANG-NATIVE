@@ -79,7 +79,7 @@ fn dispatch_request(req: &JsonRpcRequest) -> Option<String> {
                 },
                 "serverInfo": {
                     "name": "AGILANG Language Server",
-                    "version": "0.5.0"
+                    "version": env!("CARGO_PKG_VERSION")
                 }
             });
 

@@ -3,6 +3,13 @@
 - Added an explicit production-readiness gate covering formatting, Clippy, compatibility audit, native-only policy, full workspace tests, release build, runtime diagnostics, and an actual `.agi` compile-and-execute smoke test.
 - Added macOS x86_64 and Apple Silicon native toolchain target support in the build/runtime manifest layer.
 - Updated the native hello-world smoke example to the current 0.7.0 runtime version.
+- Fixed native codegen for strings: `+` now concatenates (`agi_string_concat`) and `==`, `!=`, `<`, `<=`, `>`, `>=` compare contents (`agi_string_compare`) instead of emitting C pointer arithmetic and pointer comparison.
+- Fixed diagnostics from imported modules being rendered against the entry file (wrong path, line and caret). Spans now carry a file id and imported sources are registered for rendering.
+- Framework projects (an `agilang.toml` with a `[routes]` section, as created by `agilang new`) no longer try to compile `bootstrap/app.agi` as a standalone native program: `agilang check` and `agilang build` validate routes and views, and `agilang run` starts `agilang serve`. Passing an explicit file (`agilang build src/main.agi`) still compiles natively.
+- Fixed `agilang-package` failing to compile (missing semicolon), which broke `cargo test --workspace`.
+- Fixed Linux build of `agilang-build` (`installed_runtime_candidates` mutated a non-`mut` vector).
+- Health endpoint and LSP `serverInfo` now report the real toolchain version instead of a hardcoded `0.5.0`; the generated `ApplicationServiceTest` no longer asserts a version that contradicts its own service.
+- Synchronized `Cargo.lock` with the 0.8.0 workspace manifests.
 
 # Changelog
 
