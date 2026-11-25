@@ -23,6 +23,10 @@ echo "[4/8] Native-only policy"
 echo "[5/8] Full test suite"
 cargo test --workspace --all-features
 cargo test -p agilang-package --all-features
+cargo test -p agilang-ownership --all-features
+cargo test -p agilang-module-resolver --all-features
+cargo test -p agilang-debugger --all-features
+cargo run -q -p agilang-fmt -- examples/native/hello-native.agi --check
 ./scripts/negative-tests.sh
 
 echo "[6/8] Release build"
