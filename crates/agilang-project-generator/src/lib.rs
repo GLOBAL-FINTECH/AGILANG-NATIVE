@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const DEFAULT_WEB_VIEW: &str = include_str!("../templates/welcome.ags");
 const DEFAULT_WEB_CSS: &str = include_str!("../templates/assets/app.css");
@@ -364,7 +364,7 @@ class HealthController:
         return Response.json({
             "status": "healthy",
             "framework": "AGILANG",
-            "version": "0.5.0"
+            "version": "0.1.0"
         })
 "#,
         ),
@@ -450,7 +450,7 @@ class RouteServiceProvider extends ServiceProvider:
 
 class ApplicationService:
     fn get_version() -> string:
-        return "0.5.0"
+        return "0.1.0"
 "#,
         ),
         ("app/Policies/.gitkeep", ""),
@@ -1225,9 +1225,9 @@ test "health API returns healthy status":
             r#"use Framework.Testing.UnitTest
 use App.Services.ApplicationService
 
-test "version returns 0.5.0":
+test "version returns 0.1.0":
     let service = ApplicationService()
-    assert(service.get_version() == "0.4.0")
+    assert(service.get_version() == "0.1.0")
 "#,
         ),
         // Keep the application generator's default frontend in standalone files.
@@ -1347,7 +1347,7 @@ fn to_snake_case(s: &str) -> String {
     out.trim_matches('_').to_string()
 }
 
-fn ensure_parent_dir(path: &PathBuf) -> Result<()> {
+fn ensure_parent_dir(path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -2314,7 +2314,7 @@ class HealthController:
         return Response.json({
             "status": "healthy",
             "framework": "AGILANG",
-            "version": "0.5.0"
+            "version": "0.1.0"
         })
 "#,
         ),
@@ -2400,7 +2400,7 @@ class RouteServiceProvider extends ServiceProvider:
 
 class ApplicationService:
     fn get_version() -> string:
-        return "0.5.0"
+        return "0.1.0"
 "#,
         ),
         (
@@ -2857,9 +2857,9 @@ test "health API returns healthy status":
             r#"use Framework.Testing.UnitTest
 use App.Services.ApplicationService
 
-test "version returns 0.5.0":
+test "version returns 0.1.0":
     let service = ApplicationService()
-    assert(service.get_version() == "0.4.0")
+    assert(service.get_version() == "0.1.0")
 "#,
         ),
         // Keep template repair aligned with newly generated applications.

@@ -130,7 +130,7 @@ fn dispatch_controller(
                 json!({
                     "status": "healthy",
                     "framework": "AGILANG",
-                    "version": "0.5.0"
+                    "version": env!("CARGO_PKG_VERSION")
                 })
                 .to_string(),
             ));

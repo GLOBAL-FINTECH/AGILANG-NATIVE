@@ -63,7 +63,7 @@ impl ConsensusEngine {
     pub fn sign_block(&self, validator: &str, block: &Block) -> RuntimeResult<String> {
         let key = self.key_for(validator)?;
         let payload = block_signing_payload(block)?;
-        Ok(sign(BLOCK_DOMAIN, key.as_bytes(), payload.as_bytes())?)
+        sign(BLOCK_DOMAIN, key.as_bytes(), payload.as_bytes())
     }
 
     pub fn verify_block_signature(&self, validator: &str, block: &Block) -> RuntimeResult<bool> {
@@ -259,18 +259,19 @@ mod tests {
     use agilang_blockchain_core::Block;
 
     fn config() -> BlockchainConfig {
-        let mut config = BlockchainConfig::default();
-        config.validators = BTreeMap::from([
-            ("validator-a".to_string(), 40),
-            ("validator-b".to_string(), 35),
-            ("validator-c".to_string(), 25),
-        ]);
-        config.validator_signing_keys = BTreeMap::from([
-            ("validator-a".to_string(), "key-a".to_string()),
-            ("validator-b".to_string(), "key-b".to_string()),
-            ("validator-c".to_string(), "key-c".to_string()),
-        ]);
-        config
+        BlockchainConfig {
+            validators: BTreeMap::from([
+                ("validator-a".to_string(), 40),
+                ("validator-b".to_string(), 35),
+                ("validator-c".to_string(), 25),
+            ]),
+            validator_signing_keys: BTreeMap::from([
+                ("validator-a".to_string(), "key-a".to_string()),
+                ("validator-b".to_string(), "key-b".to_string()),
+                ("validator-c".to_string(), "key-c".to_string()),
+            ]),
+            ..BlockchainConfig::default()
+        }
     }
 
     #[test]

@@ -174,7 +174,7 @@ fn load_module_recursive(
             }
         };
         let imported_source = match SourceFile::load(&resolved_path) {
-            Ok(source) => source,
+            Ok(source) => source.registered(),
             Err(_) => {
                 diagnostics.push(Diagnostic::error(
                     "E3001",
@@ -421,6 +421,41 @@ mod tests {
         let source = SourceFile::load(root.join("app").join("Main.agi")).unwrap();
         let errs = parse(&source).unwrap_err();
         assert!(errs.iter().any(|err| err.code == "E3001"));
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn diagnostics_in_imported_module_render_against_that_module() {
+        let root = unique_temp_dir("imported-diagnostic");
+        fs::create_dir_all(root.join("app").join("Services")).unwrap();
+        fs::write(
+            root.join("agilang.toml"),
+            "[project]\nname='demo'\nversion='0.1.0'\n\n[application]\nentry='app/Main.agi'\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("app").join("Main.agi"),
+            "module App.Main\nimport App.Services.Greeter\n\nfn main() -> i32:\n    return 0\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("app").join("Services").join("Greeter.agi"),
+            "module App.Services.Greeter\nimport App.Services.DoesNotExist\n",
+        )
+        .unwrap();
+
+        let source = SourceFile::load(root.join("app").join("Main.agi")).unwrap();
+        let errs = parse(&source).unwrap_err();
+        let missing = errs
+            .iter()
+            .find(|err| err.code == "E3001")
+            .expect("missing-module diagnostic");
+        let rendered = missing.render(&source);
+        assert!(
+            rendered.contains("Greeter.agi:2:1"),
+            "diagnostic should point at the importing module, got:\n{rendered}"
+        );
+        assert!(rendered.contains("import App.Services.DoesNotExist"));
         fs::remove_dir_all(root).ok();
     }
 

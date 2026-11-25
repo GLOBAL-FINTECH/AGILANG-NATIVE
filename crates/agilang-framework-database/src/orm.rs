@@ -130,7 +130,7 @@ impl<M: OrmModel> ModelRepository<M> {
             .conn
             .query(&format!("SELECT * FROM {}", M::table_name()), &[])?;
         rows.into_iter()
-            .map(|row| db_row_to_json(row))
+            .map(db_row_to_json)
             .filter(|row| !M::uses_soft_deletes() || !is_soft_deleted(row))
             .map(|row| M::from_attributes(apply_casts::<M>(row)))
             .collect()
@@ -142,7 +142,7 @@ impl<M: OrmModel> ModelRepository<M> {
             &[json_to_database_value(&value)],
         )?;
         rows.into_iter()
-            .map(|row| db_row_to_json(row))
+            .map(db_row_to_json)
             .filter(|row| !M::uses_soft_deletes() || !is_soft_deleted(row))
             .map(|row| M::from_attributes(apply_casts::<M>(row)))
             .collect()

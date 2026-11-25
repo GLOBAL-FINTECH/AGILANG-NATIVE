@@ -173,6 +173,18 @@ pub enum Expr {
         right: Box<Expr>,
         span: Span,
     },
+    Unary {
+        op: UnaryOp,
+        operand: Box<Expr>,
+        span: Span,
+    },
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOp {
+    /// Arithmetic negation: `-x`
+    Negate,
+    /// Logical negation: `not x`
+    Not,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
@@ -202,7 +214,8 @@ impl Expr {
             Self::MemberAccess { span, .. }
             | Self::Index { span, .. }
             | Self::Call { span, .. }
-            | Self::Binary { span, .. } => *span,
+            | Self::Binary { span, .. }
+            | Self::Unary { span, .. } => *span,
         }
     }
 }

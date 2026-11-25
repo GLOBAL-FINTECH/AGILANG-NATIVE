@@ -152,7 +152,6 @@ impl ChainDatabase {
             )
             .optional()
             .map_err(storage_error)?
-            .map(|result| result)
             .transpose()
     }
 
@@ -170,7 +169,6 @@ impl ChainDatabase {
             .query_row(sql, params![height], stored_block_from_row)
             .optional()
             .map_err(storage_error)?
-            .map(|result| result)
             .transpose()
     }
 
@@ -214,7 +212,6 @@ impl ChainDatabase {
             )
             .optional()
             .map_err(storage_error)?
-            .map(|result| result)
             .transpose()
     }
 

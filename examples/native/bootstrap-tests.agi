@@ -1,5 +1,5 @@
-// This test suite validates the native AGILANG compiler bootstrap
-// Run: cargo run -p agilang-runtime-cli -- test bootstrap-suite.agi
+# This test suite validates the native AGILANG compiler bootstrap
+# Run: agilang run examples/native/bootstrap-tests.agi
 
 fn arithmetic_test() -> i32:
     let a: i32 = 10

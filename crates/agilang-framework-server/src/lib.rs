@@ -45,7 +45,6 @@ struct AuthSessionRecord {
     token_hash: String,
     user_id: String,
     csrf_secret: String,
-    expires_at: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -379,7 +378,6 @@ fn load_session_by_cookie(
             .or_else(|| row_text(row, "user_id").map(|value| value.to_string()))
             .unwrap_or_default(),
         csrf_secret: row_text(row, "csrf_secret").unwrap_or_default().to_string(),
-        expires_at,
     }))
 }
 
@@ -527,19 +525,28 @@ fn create_session(
             token_hash,
             user_id: user_id.to_string(),
             csrf_secret,
-            expires_at: expires_at as u64,
         },
     ))
 }
 
 fn enforce_max_active_sessions(conn: &mut AgiDbConnection, user_id: &str) -> Result<(), String> {
+    // AGIDB compares typed values strictly. Session user IDs are stored as
+    // integers when they are numeric, so the lookup must use the same type.
+    let user_id_value = match user_id.parse::<i64>() {
+        Ok(value) => DatabaseValue::Integer(value),
+        Err(_) => DatabaseValue::Text(user_id.to_string()),
+    };
     let mut rows = conn
-        .query(
-            "SELECT * FROM sessions WHERE user_id = ?",
-            &[DatabaseValue::Text(user_id.to_string())],
-        )
+        .query("SELECT * FROM sessions WHERE user_id = ?", &[user_id_value])
         .map_err(|err| err.to_string())?;
-    rows.sort_by_key(|row| row_integer(row, "created_at").unwrap_or_default());
+    // Sessions opened within one second have the same timestamp. Break ties
+    // using the database's increasing row ID so the oldest session is evicted.
+    rows.sort_by_key(|row| {
+        (
+            row_integer(row, "created_at").unwrap_or_default(),
+            row_integer(row, "id").unwrap_or_default(),
+        )
+    });
     while rows.len() > MAX_ACTIVE_USER_SESSIONS {
         let row = rows.remove(0);
         if let Some(token_hash) = row_text(&row, "token") {
@@ -2506,38 +2513,6 @@ pub fn handle_client(
     Ok(())
 }
 
-fn find_controller_file(dir: &Path, controller_name: &str) -> Option<std::path::PathBuf> {
-    let target_filename = format!("{}.agi", controller_name.replace('.', "/"));
-    let direct = dir.join(&target_filename);
-    if direct.is_file() {
-        return Some(direct);
-    }
-
-    let leaf_name = if let Some(last_slash) = target_filename.rfind('/') {
-        &target_filename[last_slash + 1..]
-    } else {
-        &target_filename
-    };
-
-    find_file_recursive(dir, leaf_name)
-}
-
-fn find_file_recursive(dir: &Path, filename: &str) -> Option<std::path::PathBuf> {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if let Some(found) = find_file_recursive(&path, filename) {
-                    return Some(found);
-                }
-            } else if path.file_name().and_then(|s| s.to_str()) == Some(filename) {
-                return Some(path);
-            }
-        }
-    }
-    None
-}
-
 pub fn start_stun_server() {
     std::thread::spawn(|| {
         let socket = match std::net::UdpSocket::bind("0.0.0.0:3478") {
@@ -2615,6 +2590,104 @@ impl CertificateGenerator {
     }
 }
 
+struct WebSocketUpgradeResult {
+    status_code: u16,
+    log_message: Option<String>,
+}
+
+fn try_handle_websocket_request(
+    stream: &mut TcpStream,
+    router: &Router,
+    project_root: &Path,
+    req: &Request,
+) -> Option<WebSocketUpgradeResult> {
+    let is_websocket = req
+        .headers
+        .get("upgrade")
+        .or_else(|| req.headers.get("Upgrade"))
+        .map(|v| v.eq_ignore_ascii_case("websocket"))
+        .unwrap_or(false);
+    if !is_websocket {
+        return None;
+    }
+
+    let path = req.path();
+    let Some(route_match) = router.match_websocket_route(path) else {
+        let response = build_text_response(
+            404,
+            "text/plain; charset=utf-8",
+            "WebSocket route not defined.".to_string(),
+        );
+        let _ = write_framework_response(stream, response);
+        return Some(WebSocketUpgradeResult {
+            status_code: 404,
+            log_message: None,
+        });
+    };
+
+    let status_code = match dispatch_websocket_route(project_root, req, route_match, &mut *stream) {
+        Ok(()) => 101,
+        Err(WebSocketError::BadRequest(message)) => {
+            let response = build_text_response(400, "text/plain; charset=utf-8", message);
+            let _ = write_framework_response(stream, response);
+            400
+        }
+        Err(WebSocketError::Protocol(message)) => {
+            let response = build_text_response(400, "text/plain; charset=utf-8", message);
+            let _ = write_framework_response(stream, response);
+            400
+        }
+        Err(error) => {
+            let response = build_text_response(500, "text/plain; charset=utf-8", error.to_string());
+            let _ = write_framework_response(stream, response);
+            500
+        }
+    };
+
+    Some(WebSocketUpgradeResult {
+        status_code,
+        log_message: (status_code == 101).then_some(format!("websocket upgraded for {path}")),
+    })
+}
+
+fn dispatch_websocket_route(
+    _project_root: &Path,
+    req: &Request,
+    route_match: agilang_framework_routing::RouteMatch<'_>,
+    stream: &mut TcpStream,
+) -> Result<(), WebSocketError> {
+    let route = route_match.route;
+    let owned_stream = stream.try_clone()?;
+    let mut socket = accept_websocket(owned_stream, &req.headers)?;
+    match (route.controller.as_str(), route.action.as_str()) {
+        ("ChatController", "echo") | ("WebSocketController", "echo") => {
+            websocket_echo_handler(&mut socket)
+        }
+        _ => Err(WebSocketError::Protocol(format!(
+            "WebSocket handler `{}.{}` is not registered",
+            route.controller, route.action
+        ))),
+    }
+}
+
+fn websocket_echo_handler(
+    socket: &mut WebSocketConnection<TcpStream>,
+) -> Result<(), WebSocketError> {
+    loop {
+        let frame = socket.read_message()?;
+        match frame.opcode {
+            WebSocketOpcode::Text => socket.send_text(frame.text_value()?)?,
+            WebSocketOpcode::Binary => socket.send_binary(&frame.payload)?,
+            WebSocketOpcode::Close => return Ok(()),
+            WebSocketOpcode::Continuation | WebSocketOpcode::Ping | WebSocketOpcode::Pong => {
+                return Err(WebSocketError::Protocol(
+                    "unexpected internal WebSocket frame state".to_string(),
+                ))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2637,9 +2710,12 @@ mod tests {
         let crud = builtin_api_response("/api/crud/status").unwrap();
 
         assert!(framework.contains("\"database_status\":\"AGIDB ready\""));
-        assert!(framework.contains("\"webrtc_status\":\"signaling-only\""));
+        // Expected WebRTC state depends on whether `full-webrtc` is compiled in.
+        let peer = agilang_runtime_webrtc::capabilities().peer_connection;
+        let status = if peer { "native" } else { "signaling-only" };
+        assert!(framework.contains(&format!("\"webrtc_status\":\"{status}\"")));
         assert!(framework.contains("\"webrtc_signaling\":true"));
-        assert!(framework.contains("\"webrtc_peer_connection\":false"));
+        assert!(framework.contains(&format!("\"webrtc_peer_connection\":{peer}")));
         assert!(runtime.contains("\"storage\":\"AGIDB\""));
         assert!(chain.contains("\"height\""));
         assert!(auth.contains("\"roles\":[\"user\",\"admin\"]"));
@@ -2688,6 +2764,14 @@ mod tests {
     }
 
     fn project_generation_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    // Auth and WebRTC integration tests reset process-global registries. Run these
+    // tests serially so one test cannot clear another test's active sessions,
+    // rate-limit buckets, or signaling state while it is making assertions.
+    fn auth_integration_test_lock() -> &'static Mutex<()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
     }
@@ -3183,6 +3267,9 @@ fn register_api() -> void:
 
     #[test]
     fn auth_lifecycle_is_enforced_end_to_end() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("lifecycle");
 
         let unauth = invoke(
@@ -3312,6 +3399,9 @@ fn register_api() -> void:
 
     #[test]
     fn csrf_is_enforced_for_cookie_authenticated_state_changes() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("csrf");
         let register_page = invoke(
             &root,
@@ -3401,6 +3491,9 @@ fn register_api() -> void:
 
     #[test]
     fn rate_limits_and_duplicate_registration_are_enforced() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("limits");
 
         for index in 0..RATE_LIMIT_REGISTER_MAX {
@@ -3548,7 +3641,56 @@ fn register_api() -> void:
     }
 
     #[test]
+    fn session_cap_uses_typed_user_ids_and_eviction_order() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let (root, engine) = setup_auth_project("session_cap");
+        let _registered_cookie = register_user(
+            &root,
+            &engine,
+            72,
+            "session-cap@example.com",
+            "Password123!",
+            "Session Cap",
+        );
+        let user_id = user_rows(&root)
+            .iter()
+            .find(|row| row_text(row, "email") == Some("session-cap@example.com"))
+            .and_then(|row| row_integer(row, "id"))
+            .expect("registered user must have a numeric id");
+
+        let mut conn = open_auth_db(&root).unwrap();
+        let mut issued_tokens = Vec::new();
+        for _ in 0..(MAX_ACTIVE_USER_SESSIONS + 2) {
+            let (_, session) = create_session(&mut conn, &user_id.to_string(), None).unwrap();
+            issued_tokens.push(session.token_hash);
+        }
+
+        let active = conn
+            .query(
+                "SELECT * FROM sessions WHERE user_id = ?",
+                &[DatabaseValue::Integer(user_id)],
+            )
+            .unwrap();
+        assert_eq!(active.len(), MAX_ACTIVE_USER_SESSIONS);
+        let active_hashes = active
+            .iter()
+            .filter_map(|row| row_text(row, "token"))
+            .collect::<std::collections::HashSet<_>>();
+
+        assert!(!active_hashes.contains(issued_tokens[0].as_str()));
+        for token in issued_tokens.iter().rev().take(MAX_ACTIVE_USER_SESSIONS) {
+            assert!(active_hashes.contains(token.as_str()));
+        }
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
     fn authorization_rotation_cleanup_and_concurrent_logout_are_enforced() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("authorization");
         let user_cookie = register_user(
             &root,
@@ -3614,7 +3756,10 @@ fn register_api() -> void:
             .unwrap();
         let user_sessions = session_rows(&root)
             .into_iter()
-            .filter(|row| row_text(row, "user_id").unwrap_or_default() == admin_user_id)
+            .filter(|row| {
+                row_integer(row, "user_id").is_some_and(|value| value.to_string() == admin_user_id)
+                    || row_text(row, "user_id") == Some(admin_user_id.as_str())
+            })
             .count();
         assert_eq!(user_sessions, MAX_ACTIVE_USER_SESSIONS);
 
@@ -3693,6 +3838,9 @@ fn register_api() -> void:
 
     #[test]
     fn login_and_register_preserve_safe_return_to() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("return_to");
 
         let login_page = invoke(
@@ -3798,6 +3946,9 @@ fn register_api() -> void:
 
     #[test]
     fn login_recovers_from_legacy_duplicate_email_rows() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("duplicate_email_rows");
 
         let register_page = invoke(
@@ -3870,6 +4021,9 @@ fn register_api() -> void:
 
     #[test]
     fn meeting_login_flow_persists_session_in_agidb() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let (root, engine) = setup_auth_project("meeting_login_flow");
 
         let auth_cookie = register_user(
@@ -4001,16 +4155,25 @@ fn register_api() -> void:
 
     #[test]
     fn generated_post_resource_executes_end_to_end_on_agidb() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         run_generated_post_flow(FrameworkDriver::Agidb, "generated_post_agidb");
     }
 
     #[test]
     fn generated_post_resource_executes_end_to_end_on_sqlite() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         run_generated_post_flow(FrameworkDriver::Sqlite, "generated_post_sqlite");
     }
 
     #[test]
     fn webrtc_signaling_requires_authentication() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         reset_webrtc_runtime_state();
         let (root, _) = setup_auth_project("webrtc_auth");
 
@@ -4020,7 +4183,8 @@ fn register_api() -> void:
         );
         assert_eq!(status.status, 200);
         assert!(response_text(&status).contains("\"signaling\":true"));
-        assert!(response_text(&status).contains("\"peer_connection\":false"));
+        let peer = agilang_runtime_webrtc::capabilities().peer_connection;
+        assert!(response_text(&status).contains(&format!("\"peer_connection\":{peer}")));
         assert!(response_text(&status).contains("\"active_peers\":0"));
 
         let unauthorized_register = invoke_app(
@@ -4054,6 +4218,9 @@ fn register_api() -> void:
 
     #[test]
     fn webrtc_signaling_enforces_csrf_and_delivers_messages() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         reset_webrtc_runtime_state();
         let (root, engine) = setup_auth_project("webrtc_signal");
         let alice_cookie = register_user(
@@ -4293,6 +4460,9 @@ fn register_api() -> void:
 
     #[test]
     fn webrtc_meeting_registry_resolves_host_and_cleans_up_members() {
+        let _isolation_guard = auth_integration_test_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         reset_webrtc_runtime_state();
         let (root, engine) = setup_auth_project("webrtc_meeting_registry");
         let host_cookie = register_user(
@@ -4402,103 +4572,5 @@ fn register_api() -> void:
 
         fs::remove_dir_all(root).ok();
         reset_webrtc_runtime_state();
-    }
-}
-
-struct WebSocketUpgradeResult {
-    status_code: u16,
-    log_message: Option<String>,
-}
-
-fn try_handle_websocket_request(
-    stream: &mut TcpStream,
-    router: &Router,
-    project_root: &Path,
-    req: &Request,
-) -> Option<WebSocketUpgradeResult> {
-    let is_websocket = req
-        .headers
-        .get("upgrade")
-        .or_else(|| req.headers.get("Upgrade"))
-        .map(|v| v.eq_ignore_ascii_case("websocket"))
-        .unwrap_or(false);
-    if !is_websocket {
-        return None;
-    }
-
-    let path = req.path();
-    let Some(route_match) = router.match_websocket_route(path) else {
-        let response = build_text_response(
-            404,
-            "text/plain; charset=utf-8",
-            "WebSocket route not defined.".to_string(),
-        );
-        let _ = write_framework_response(stream, response);
-        return Some(WebSocketUpgradeResult {
-            status_code: 404,
-            log_message: None,
-        });
-    };
-
-    let status_code = match dispatch_websocket_route(project_root, req, route_match, &mut *stream) {
-        Ok(()) => 101,
-        Err(WebSocketError::BadRequest(message)) => {
-            let response = build_text_response(400, "text/plain; charset=utf-8", message);
-            let _ = write_framework_response(stream, response);
-            400
-        }
-        Err(WebSocketError::Protocol(message)) => {
-            let response = build_text_response(400, "text/plain; charset=utf-8", message);
-            let _ = write_framework_response(stream, response);
-            400
-        }
-        Err(error) => {
-            let response = build_text_response(500, "text/plain; charset=utf-8", error.to_string());
-            let _ = write_framework_response(stream, response);
-            500
-        }
-    };
-
-    Some(WebSocketUpgradeResult {
-        status_code,
-        log_message: (status_code == 101).then_some(format!("websocket upgraded for {path}")),
-    })
-}
-
-fn dispatch_websocket_route(
-    _project_root: &Path,
-    req: &Request,
-    route_match: agilang_framework_routing::RouteMatch<'_>,
-    stream: &mut TcpStream,
-) -> Result<(), WebSocketError> {
-    let route = route_match.route;
-    let owned_stream = stream.try_clone()?;
-    let mut socket = accept_websocket(owned_stream, &req.headers)?;
-    match (route.controller.as_str(), route.action.as_str()) {
-        ("ChatController", "echo") | ("WebSocketController", "echo") => {
-            websocket_echo_handler(&mut socket)
-        }
-        _ => Err(WebSocketError::Protocol(format!(
-            "WebSocket handler `{}.{}` is not registered",
-            route.controller, route.action
-        ))),
-    }
-}
-
-fn websocket_echo_handler(
-    socket: &mut WebSocketConnection<TcpStream>,
-) -> Result<(), WebSocketError> {
-    loop {
-        let frame = socket.read_message()?;
-        match frame.opcode {
-            WebSocketOpcode::Text => socket.send_text(frame.text_value()?)?,
-            WebSocketOpcode::Binary => socket.send_binary(&frame.payload)?,
-            WebSocketOpcode::Close => return Ok(()),
-            WebSocketOpcode::Continuation | WebSocketOpcode::Ping | WebSocketOpcode::Pong => {
-                return Err(WebSocketError::Protocol(
-                    "unexpected internal WebSocket frame state".to_string(),
-                ))
-            }
-        }
     }
 }

@@ -187,7 +187,7 @@ fn from_mysql_row(row: Row) -> DatabaseRow {
         .collect::<Vec<_>>();
     let values = row.unwrap();
     let mut out = DatabaseRow::new();
-    for (name, value) in columns.into_iter().zip(values.into_iter()) {
+    for (name, value) in columns.into_iter().zip(values) {
         let mapped = match value {
             Value::NULL => DatabaseValue::Null,
             Value::Bytes(bytes) => DatabaseValue::Text(String::from_utf8_lossy(&bytes).to_string()),

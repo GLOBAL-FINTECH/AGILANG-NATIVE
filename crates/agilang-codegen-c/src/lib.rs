@@ -56,6 +56,20 @@ pub fn generate(program: &HirProgram) -> String {
     out.push_str("extern const char* agi_http_get_json(const char* url);\n");
     out.push_str("extern const char* agi_http_post_json(const char* url, const char* body);\n");
     out.push_str("extern const char* agi_http_request_json(const char* request_json);\n\n");
+    out.push_str("static const char* agi_string_concat(const char* left, const char* right) {\n");
+    out.push_str("    if (!left) left = \"\";\n");
+    out.push_str("    if (!right) right = \"\";\n");
+    out.push_str("    size_t left_len = strlen(left);\n");
+    out.push_str("    size_t right_len = strlen(right);\n");
+    out.push_str("    char* out = (char*)malloc(left_len + right_len + 1);\n");
+    out.push_str("    if (!out) { fputs(\"agilang: out of memory\\n\", stderr); abort(); }\n");
+    out.push_str("    memcpy(out, left, left_len);\n");
+    out.push_str("    memcpy(out + left_len, right, right_len + 1);\n");
+    out.push_str("    return out;\n");
+    out.push_str("}\n\n");
+    out.push_str("static int agi_string_compare(const char* left, const char* right) {\n");
+    out.push_str("    return strcmp(left ? left : \"\", right ? right : \"\");\n");
+    out.push_str("}\n\n");
     out.push_str("static char* agi_json_escape_and_quote(const char* input) {\n");
     out.push_str("    if (!input) input = \"\";\n");
     out.push_str("    size_t len = 2;\n");
@@ -605,7 +619,10 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
                     generate_expr(value)
                 )
             }
-            _ => format!("{}/* unsupported assignment target */;\n", ind),
+            _ => format!(
+                "{}\n#error \"AGILANG native backend: unsupported assignment target\"\n",
+                ind
+            ),
         },
         HirStmt::Expr(expr) => {
             format!("{}{};\n", ind, generate_expr(expr))
@@ -662,8 +679,84 @@ fn generate_stmt(stmt: &HirStmt, indent: usize) -> String {
             out.push_str(&format!("{}}}\n", ind));
             out
         }
-        HirStmt::ForIn { .. } => format!("{}/* unsupported for-in loop */;\n", ind),
+        HirStmt::ForIn {
+            key_name,
+            value_name,
+            iterable,
+            body,
+            span,
+        } => generate_for_in(
+            key_name,
+            value_name.as_deref(),
+            iterable,
+            body,
+            span.start,
+            indent,
+        ),
     }
+}
+
+/// Lowers `for x in xs` / `for i, x in xs` over native lists. Iterables the
+/// native backend cannot lower produce a C `#error` so the build fails loudly
+/// instead of silently skipping the loop body.
+fn generate_for_in(
+    key_name: &str,
+    value_name: Option<&str>,
+    iterable: &HirExpr,
+    body: &[HirStmt],
+    id: usize,
+    indent: usize,
+) -> String {
+    let ind = " ".repeat(indent);
+    let (list_ty, elem_c_ty) = match iterable.ty() {
+        Type::List(inner) if inner.is_numeric() || inner.as_ref() == &Type::Unknown => {
+            let elem = if inner.as_ref() == &Type::Unknown {
+                "double".to_string()
+            } else {
+                c_type(inner)
+            };
+            ("agi_list_f64", elem)
+        }
+        Type::List(inner) if matches!(inner.as_ref(), Type::List(n) if n.is_numeric() || n.as_ref() == &Type::Unknown) => {
+            ("agi_list_list_f64", "agi_list_f64".to_string())
+        }
+        other => {
+            return format!(
+                "{ind}#error \"AGILANG native backend: for-in over `{other:?}` is not supported\"\n"
+            );
+        }
+    };
+    let iter_var = format!("agi_iter_{id}");
+    let index_var = format!("agi_index_{id}");
+    let mut out = format!("{ind}{{\n");
+    out.push_str(&format!(
+        "{ind}    {list_ty} {iter_var} = {};\n",
+        generate_expr(iterable)
+    ));
+    out.push_str(&format!(
+        "{ind}    for (size_t {index_var} = 0; {index_var} < {iter_var}.length; ++{index_var}) {{\n"
+    ));
+    let element = format!("({elem_c_ty})({iter_var}.data[{index_var}])");
+    match value_name {
+        Some(value_name) => {
+            out.push_str(&format!(
+                "{ind}        int64_t {key_name} = (int64_t){index_var};\n"
+            ));
+            out.push_str(&format!(
+                "{ind}        {elem_c_ty} {value_name} = {element};\n"
+            ));
+        }
+        None => {
+            out.push_str(&format!(
+                "{ind}        {elem_c_ty} {key_name} = {element};\n"
+            ));
+        }
+    }
+    for stmt in body {
+        out.push_str(&generate_stmt(stmt, indent + 8));
+    }
+    out.push_str(&format!("{ind}    }}\n{ind}}}\n"));
+    out
 }
 
 fn generate_expr(expr: &HirExpr) -> String {
@@ -701,7 +794,8 @@ fn generate_expr(expr: &HirExpr) -> String {
                     );
                 }
             }
-            "/* unsupported list literal */ 0".to_string()
+            "\n#error \"AGILANG native backend: unsupported list literal element type\"\n0"
+                .to_string()
         }
         HirExpr::ObjectLiteral(items, ty, _) => match ty {
             Type::Struct(name) => generate_struct_object_expr(items, name),
@@ -773,6 +867,21 @@ fn generate_expr(expr: &HirExpr) -> String {
         HirExpr::Binary {
             left, op, right, ..
         } => {
+            if matches!(left.ty(), Type::String) && matches!(right.ty(), Type::String) {
+                let l = generate_expr(left);
+                let r = generate_expr(right);
+                let cmp = |c_op: &str| format!("(agi_string_compare({l}, {r}) {c_op} 0)");
+                match op {
+                    HirBinaryOp::Add => return format!("agi_string_concat({l}, {r})"),
+                    HirBinaryOp::Equal => return cmp("=="),
+                    HirBinaryOp::NotEqual => return cmp("!="),
+                    HirBinaryOp::Less => return cmp("<"),
+                    HirBinaryOp::LessEqual => return cmp("<="),
+                    HirBinaryOp::Greater => return cmp(">"),
+                    HirBinaryOp::GreaterEqual => return cmp(">="),
+                    _ => {}
+                }
+            }
             let op_str = match op {
                 HirBinaryOp::Add => "+",
                 HirBinaryOp::Subtract => "-",
@@ -1169,6 +1278,22 @@ mod tests {
     }
 
     #[test]
+    fn test_codegen_string_concat_and_comparison_use_string_semantics() {
+        let source = SourceFile::new(
+            "strings.agi",
+            "fn greet(name: string) -> string:\n    return \"hello, \" + name\n\nfn main() -> i32:\n    let env = \"prod\"\n    if env != \"local\":\n        print(greet(env))\n    if env == \"prod\":\n        print(\"ok\")\n    return 0\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(c_code.contains("agi_string_concat(\"hello, \", name)"));
+        assert!(c_code.contains("(agi_string_compare(env, \"local\") != 0)"));
+        assert!(c_code.contains("(agi_string_compare(env, \"prod\") == 0)"));
+        assert!(!c_code.contains("(\"hello, \" + name)"));
+        assert!(!c_code.contains("(env != \"local\")"));
+    }
+
+    #[test]
     fn test_codegen_void_main_bridge_returns_zero() {
         let source = SourceFile::new(
             "void_main.agi",
@@ -1456,6 +1581,32 @@ mod tests {
         );
         fs::remove_dir_all(&dir).ok();
         Some(result)
+    }
+
+    #[test]
+    fn test_codegen_for_in_emits_real_loop_with_typed_bindings() {
+        let source = SourceFile::new(
+            "for_in.agi",
+            "fn total(values: array) -> f64:\n    let result: f64 = 0.0\n    for value in values:\n        result += value\n    return result\n\nfn last_index(values: array) -> i64:\n    let last: i64 = -1\n    for i, value in values:\n        last = i\n    return last\n\nfn main() -> i32:\n    return 0\n",
+        );
+        let hir = agilang_compiler::hir(&source).unwrap();
+        let c_code = generate(&hir);
+
+        assert!(!c_code.contains("unsupported for-in"));
+        assert!(c_code.contains("agi_list_f64 agi_iter_"));
+        assert!(c_code.contains("double value = (double)(agi_iter_"));
+        assert!(c_code.contains("int64_t i = (int64_t)agi_index_"));
+    }
+
+    #[test]
+    fn test_codegen_exec_for_in_sums_list() {
+        let Some((code, _stdout)) = compile_and_run_with_runtime_stub(
+            "for_in_exec.agi",
+            "fn main() -> i32:\n    let values: array = [1.0, 2.0, 3.0, 4.0]\n    let total: f64 = 0.0\n    for value in values:\n        total += value\n    let last: i64 = -1\n    let seen: f64 = 0.0\n    for i, value in values:\n        last = i\n        seen += value\n    if total == 10.0 and last == 3 and seen == 10.0:\n        return 0\n    return 1\n",
+        ) else {
+            return;
+        };
+        assert_eq!(code, 0);
     }
 
     #[test]

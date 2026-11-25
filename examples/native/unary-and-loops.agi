@@ -1,0 +1,21 @@
+# Self-checking example: negative literals, unary operators and for-in loops.
+# Exits 0 only when every computed value is correct.
+
+fn total(values: array) -> f64:
+    let result: f64 = 0.0
+    for value in values:
+        result += value
+    return result
+
+fn main() -> i32:
+    let values: array = [1.0, -2.0, 3.5]
+    let offset: i64 = -10
+    let flipped: i64 = -offset
+    let ready: bool = not false
+    let last: i64 = -1
+    for i, value in values:
+        last = i
+    if total(values) == 2.5 and flipped == 10 and ready and last == 2:
+        print("unary and loops: PASS")
+        return 0
+    return 1

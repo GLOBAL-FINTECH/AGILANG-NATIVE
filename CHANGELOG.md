@@ -3,6 +3,22 @@
 - Added an explicit production-readiness gate covering formatting, Clippy, compatibility audit, native-only policy, full workspace tests, release build, runtime diagnostics, and an actual `.agi` compile-and-execute smoke test.
 - Added macOS x86_64 and Apple Silicon native toolchain target support in the build/runtime manifest layer.
 - Updated the native hello-world smoke example to the current 0.7.0 runtime version.
+- Fixed native codegen for strings: `+` now concatenates (`agi_string_concat`) and `==`, `!=`, `<`, `<=`, `>`, `>=` compare contents (`agi_string_compare`) instead of emitting C pointer arithmetic and pointer comparison.
+- Fixed diagnostics from imported modules being rendered against the entry file (wrong path, line and caret). Spans now carry a file id and imported sources are registered for rendering.
+- Framework projects (an `agilang.toml` with a `[routes]` section, as created by `agilang new`) no longer try to compile `bootstrap/app.agi` as a standalone native program: `agilang check` and `agilang build` validate routes and views, and `agilang run` starts `agilang serve`. Passing an explicit file (`agilang build src/main.agi`) still compiles natively.
+- Fixed `agilang-package` failing to compile (missing semicolon), which broke `cargo test --workspace`.
+- Fixed Linux build of `agilang-build` (`installed_runtime_candidates` mutated a non-`mut` vector).
+- Health endpoint and LSP `serverInfo` now report the real toolchain version instead of a hardcoded `0.5.0`; the generated `ApplicationServiceTest` no longer asserts a version that contradicts its own service.
+- Synchronized `Cargo.lock` with the 0.8.0 workspace manifests.
+- Implemented native `for x in xs` and `for i, x in xs` loops. Codegen previously emitted `/* unsupported for-in loop */` and silently skipped the loop body, so `examples/native/arrays.agi` and `bootstrap-features.agi` computed wrong results. Loop variables are now typed (element type; `i64` index).
+- Added unary operators: `-x` (negative literals and negation) and `not x`. Previously `let x: i64 = -1` failed to parse.
+- Unsupported native codegen constructs (assignment targets, list literals, for-in iterables) now fail the build with a C `#error` instead of silently compiling to a no-op.
+- Bare `array` declarations keep the element type inferred from their initializer.
+- Framework server: enforce the per-user session cap with typed AGIDB user IDs, evict same-second sessions deterministically, and isolate integration tests that share global auth state.
+- WebRTC capability tests now assert the correct state for both default and `full-webrtc` builds, so `cargo test --all-features` passes.
+- Fixed `examples/native/bootstrap-tests.agi` using `//` comments (AGILANG comments use `#`).
+- Workspace is clean under `cargo clippy --all-targets --all-features -D warnings` (Rust 1.96).
+- Production-readiness gate now runs every self-checking `examples/native` program and a freshly generated framework project.
 
 # Changelog
 

@@ -2,10 +2,7 @@
 use agilang_runtime_core::{AgilangError, ErrorCode, RuntimeResult};
 use agilang_runtime_http::{HttpClient, HttpRequest};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RpcResponse {

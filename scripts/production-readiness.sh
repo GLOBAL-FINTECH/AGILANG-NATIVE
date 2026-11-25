@@ -35,5 +35,31 @@ echo "[8/8] Language smoke test"
 cargo run -p agilang-native-cli -- check examples/native/hello-native.agi
 cargo run -p agilang-native-cli -- run examples/native/hello-native.agi
 
+# Every self-checking native example must compile, run and exit 0. Examples
+# exit non-zero when a computed value is wrong, so this catches miscompiles
+# (not just compile errors). Examples that need live network access are skipped.
+AGILANG_BIN="$ROOT/target/release/agilang"
+[ -x "$AGILANG_BIN.exe" ] && AGILANG_BIN="$AGILANG_BIN.exe"
+NETWORK_EXAMPLES="http_test.agi"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+cp examples/native/*.agi "$work/"
+example_failures=0
+for example in "$work"/*.agi; do
+  name="$(basename "$example")"
+  case " $NETWORK_EXAMPLES " in *" $name "*) echo "SKIP (network): $name"; continue ;; esac
+  if (cd "$work" && "$AGILANG_BIN" run "$name" >"$name.log" 2>&1); then
+    echo "PASS: examples/native/$name"
+  else
+    echo "FAIL: examples/native/$name"; cat "$work/$name.log"; example_failures=$((example_failures+1))
+  fi
+done
+if (( example_failures )); then echo "FAIL: $example_failures native example(s)"; exit 1; fi
+
+# A freshly generated framework project must pass check and build.
+(cd "$work" && "$AGILANG_BIN" new readiness-app >/dev/null && cd readiness-app \
+  && "$AGILANG_BIN" check && "$AGILANG_BIN" build)
+echo "PASS: generated framework project checks and builds"
+
 echo
 echo "PASS: AGILANG Native production-readiness gates completed."

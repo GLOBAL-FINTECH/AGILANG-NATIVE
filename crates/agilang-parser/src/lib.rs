@@ -9,6 +9,7 @@ pub fn parse(tokens: &[Token]) -> Result<Program, Vec<Diagnostic>> {
         tokens,
         cursor: 0,
         errors: vec![],
+        file: tokens.first().map(|t| t.span.file).unwrap_or(0),
     }
     .program()
 }
@@ -16,8 +17,12 @@ struct Parser<'a> {
     tokens: &'a [Token],
     cursor: usize,
     errors: Vec<Diagnostic>,
+    file: agilang_source::FileId,
 }
 impl<'a> Parser<'a> {
+    fn span(&self, start: usize, end: usize) -> Span {
+        Span::new(start, end).in_file(self.file)
+    }
     fn program(mut self) -> Result<Program, Vec<Diagnostic>> {
         let mut module_name = None;
         let mut imports = vec![];
@@ -91,7 +96,7 @@ impl<'a> Parser<'a> {
         self.line_end();
         Some(Item::Module(ModuleDecl {
             path,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         }))
     }
     fn import_item(&mut self) -> Option<Item> {
@@ -100,7 +105,7 @@ impl<'a> Parser<'a> {
         self.line_end();
         Some(Item::Import(ImportDecl {
             path,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         }))
     }
     fn struct_item(&mut self) -> Option<Item> {
@@ -134,7 +139,7 @@ impl<'a> Parser<'a> {
         Some(Item::Struct(StructDecl {
             name,
             fields,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         }))
     }
     fn enum_item(&mut self) -> Option<Item> {
@@ -165,7 +170,7 @@ impl<'a> Parser<'a> {
         Some(Item::Enum(EnumDecl {
             name,
             variants,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         }))
     }
     fn type_alias_item(&mut self) -> Option<Item> {
@@ -181,7 +186,7 @@ impl<'a> Parser<'a> {
         Some(Item::Alias(TypeAliasDecl {
             name,
             target,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         }))
     }
     fn class_item(&mut self) -> Option<Vec<Function>> {
@@ -297,7 +302,7 @@ impl<'a> Parser<'a> {
             params,
             return_type,
             body,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         })
     }
     fn statement(&mut self) -> Option<Stmt> {
@@ -316,12 +321,12 @@ impl<'a> Parser<'a> {
         if self.at(&TokenKind::Throw) {
             let start = self.advance().span.start;
             let value = self.expression()?;
-            let span = Span::new(start, value.span().end);
+            let span = self.span(start, value.span().end);
             self.line_end();
             return Some(Stmt::Expr(Expr::Call {
                 callee: Box::new(Expr::Identifier(
                     "throw".to_string(),
-                    Span::new(start, start + 5),
+                    self.span(start, start + 5),
                 )),
                 args: vec![value],
                 span,
@@ -345,7 +350,7 @@ impl<'a> Parser<'a> {
                 ty,
                 value,
                 mutable,
-                span: Span::new(start, end),
+                span: self.span(start, end),
             });
         }
         if self.at(&TokenKind::Return) {
@@ -363,7 +368,7 @@ impl<'a> Parser<'a> {
             self.line_end();
             return Some(Stmt::Return {
                 value,
-                span: Span::new(start, end),
+                span: self.span(start, end),
             });
         }
         if self.at(&TokenKind::Break) {
@@ -435,7 +440,7 @@ impl<'a> Parser<'a> {
             condition,
             then_body,
             else_body,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         })
     }
     fn match_statement(&mut self) -> Option<Stmt> {
@@ -472,7 +477,7 @@ impl<'a> Parser<'a> {
             arms.push(MatchArm {
                 pattern,
                 body,
-                span: Span::new(pattern_span.start, end),
+                span: self.span(pattern_span.start, end),
             });
         }
         let end = self
@@ -482,7 +487,7 @@ impl<'a> Parser<'a> {
         Some(Stmt::Match {
             subject,
             arms,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         })
     }
     fn match_pattern(&mut self) -> Option<MatchPattern> {
@@ -499,7 +504,7 @@ impl<'a> Parser<'a> {
         Some(MatchPattern::EnumVariant {
             enum_name: name,
             variant,
-            span: Span::new(first_span.start, variant_span.end),
+            span: self.span(first_span.start, variant_span.end),
         })
     }
     fn for_in_statement(&mut self) -> Option<Stmt> {
@@ -528,7 +533,7 @@ impl<'a> Parser<'a> {
             value_name: second_name,
             iterable,
             body,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         })
     }
     fn elif_clause(&mut self) -> Option<Stmt> {
@@ -562,7 +567,7 @@ impl<'a> Parser<'a> {
             condition,
             then_body,
             else_body,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         })
     }
     fn while_statement(&mut self) -> Option<Stmt> {
@@ -582,7 +587,7 @@ impl<'a> Parser<'a> {
         Some(Stmt::While {
             condition,
             body,
-            span: Span::new(start, end),
+            span: self.span(start, end),
         })
     }
     fn block_statements(&mut self) -> Option<Vec<Stmt>> {
@@ -696,7 +701,7 @@ impl<'a> Parser<'a> {
     }
 
     fn multiplicative(&mut self) -> Option<Expr> {
-        let mut left = self.postfix()?;
+        let mut left = self.unary()?;
         loop {
             let op = if self.eat(&TokenKind::Star).is_some() {
                 Some(BinaryOp::Multiply)
@@ -706,7 +711,7 @@ impl<'a> Parser<'a> {
                 None
             };
             if let Some(op) = op {
-                let right = self.postfix()?;
+                let right = self.unary()?;
                 let span = left.span().join(right.span());
                 left = Expr::Binary {
                     left: Box::new(left),
@@ -719,6 +724,29 @@ impl<'a> Parser<'a> {
             }
         }
         Some(left)
+    }
+
+    /// `-x` and `not x`. Negated numeric literals fold to negative literals.
+    fn unary(&mut self) -> Option<Expr> {
+        let op = if self.at(&TokenKind::Minus) {
+            UnaryOp::Negate
+        } else if self.at(&TokenKind::Not) {
+            UnaryOp::Not
+        } else {
+            return self.postfix();
+        };
+        let op_start = self.advance().span.start;
+        let operand = self.unary()?;
+        let span = self.span(op_start, operand.span().end);
+        Some(match (op, operand) {
+            (UnaryOp::Negate, Expr::Integer(value, _)) => Expr::Integer(value.wrapping_neg(), span),
+            (UnaryOp::Negate, Expr::Float(value, _)) => Expr::Float(-value, span),
+            (op, operand) => Expr::Unary {
+                op,
+                operand: Box::new(operand),
+                span,
+            },
+        })
     }
 
     fn postfix(&mut self) -> Option<Expr> {
@@ -741,7 +769,7 @@ impl<'a> Parser<'a> {
                     .expect(&TokenKind::RBracket, "E123", "expected `]`")?
                     .span
                     .end;
-                let span = Span::new(expr.span().start, end);
+                let span = self.span(expr.span().start, end);
                 expr = Expr::Index {
                     object: Box::new(expr),
                     index: Box::new(index),
@@ -764,7 +792,7 @@ impl<'a> Parser<'a> {
                     .expect(&TokenKind::RParen, "E122", "expected `)`")?
                     .span
                     .end;
-                let span = Span::new(expr.span().start, end);
+                let span = self.span(expr.span().start, end);
                 expr = Expr::Call {
                     callee: Box::new(expr),
                     args,
@@ -805,7 +833,7 @@ impl<'a> Parser<'a> {
                     .expect(&TokenKind::RBracket, "E124", "expected `]`")?
                     .span
                     .end;
-                Some(Expr::ListLiteral(items, Span::new(t.span.start, end)))
+                Some(Expr::ListLiteral(items, self.span(t.span.start, end)))
             }
             TokenKind::LBrace => {
                 let mut items = vec![];
@@ -840,7 +868,7 @@ impl<'a> Parser<'a> {
                     .expect(&TokenKind::RBrace, "E127", "expected `}`")?
                     .span
                     .end;
-                Some(Expr::ObjectLiteral(items, Span::new(t.span.start, end)))
+                Some(Expr::ObjectLiteral(items, self.span(t.span.start, end)))
             }
             TokenKind::LParen => {
                 let x = self.expression()?;
@@ -1090,6 +1118,35 @@ mod tests {
         );
         let p = parse(&lex(&s).unwrap()).unwrap();
         assert_eq!(p.functions[0].body.len(), 3);
+    }
+
+    #[test]
+    fn parses_unary_negation_and_not() {
+        let s = SourceFile::new(
+            "x.agi",
+            "fn main() -> i32:\n    let a: i64 = -1\n    let b: f64 = -2.5\n    let c: i64 = -a * 3\n    let d: bool = not true\n    return 0\n",
+        );
+        let p = parse(&lex(&s).unwrap()).unwrap();
+        let body = &p.functions[0].body;
+        let value = |i: usize| match &body[i] {
+            Stmt::Let { value, .. } => value.clone(),
+            other => panic!("expected let, got {other:?}"),
+        };
+        assert!(matches!(value(0), Expr::Integer(-1, _)));
+        assert!(matches!(value(1), Expr::Float(v, _) if v == -2.5));
+        // Unary binds tighter than `*`: (-a) * 3
+        assert!(matches!(
+            value(2),
+            Expr::Binary { op: BinaryOp::Multiply, ref left, .. }
+                if matches!(**left, Expr::Unary { op: UnaryOp::Negate, .. })
+        ));
+        assert!(matches!(
+            value(3),
+            Expr::Unary {
+                op: UnaryOp::Not,
+                ..
+            }
+        ));
     }
 
     #[test]

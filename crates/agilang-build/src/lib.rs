@@ -304,7 +304,8 @@ fn installed_runtime_candidates(exe_path: &Path) -> Vec<PathBuf> {
     let Some(bin_dir) = exe_path.parent() else {
         return Vec::new();
     };
-    let candidates = vec![
+    #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
+    let mut candidates = vec![
         bin_dir.join(RUNTIME_LIB_NAME),
         bin_dir.join("..").join("lib").join(RUNTIME_LIB_NAME),
         bin_dir.join("..").join("runtime").join(RUNTIME_LIB_NAME),

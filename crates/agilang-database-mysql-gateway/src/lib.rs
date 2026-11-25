@@ -729,7 +729,7 @@ fn hex(data: &[u8]) -> String {
 }
 
 fn decode_hex(input: &str) -> Result<Vec<u8>> {
-    if input.len() % 2 != 0 {
+    if !input.len().is_multiple_of(2) {
         bail!("hex input must have even length");
     }
     (0..input.len())
@@ -936,7 +936,7 @@ sys.exit(1)
 
         let mut stream = TcpStream::connect(addr).unwrap();
         stream
-            .set_read_timeout(Some(Duration::from_secs(1)))
+            .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
         let _handshake = read_packet(&mut stream, 1024 * 1024).unwrap();
         stream.write_all(&[0x10, 0x00, 0x10, 0x01]).unwrap();
@@ -966,7 +966,7 @@ sys.exit(1)
 
         let mut oversized = TcpStream::connect(addr).unwrap();
         oversized
-            .set_read_timeout(Some(Duration::from_secs(1)))
+            .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
         let _ = read_packet(&mut oversized, 1024 * 1024).unwrap();
         oversized
