@@ -334,8 +334,8 @@
       "canonical_execution_error": null,
       "canonical_exit_code": 0,
       "canonical_status": "executed",
-      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.48s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_ags_compiler-4d18993b4a79dba5.exe)\n   Doc-tests agilang_ags_compiler",
-      "canonical_stdout": "running 7 tests\ntest tests::missing_initial_state_loads_immediately_without_discarding_runtime_errors ... ok\ntest tests::rejects_unknown_sibaq_field ... ok\ntest tests::compiles_full_html_template_through_directive_pipeline ... ok\ntest tests::live_state_machine_rejects_impossible_states_and_preserves_data ... ok\ntest tests::hydration_does_not_duplicate_initial_fetch ... ok\ntest tests::compiles_sibaq_dashboard_end_to_end ... ok\ntest tests::lowers_reactive_state_blocks ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.32s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_ags_compiler-4d18993b4a79dba5.exe)\n   Doc-tests agilang_ags_compiler",
+      "canonical_stdout": "running 7 tests\ntest tests::live_state_machine_rejects_impossible_states_and_preserves_data ... ok\ntest tests::hydration_does_not_duplicate_initial_fetch ... ok\ntest tests::missing_initial_state_loads_immediately_without_discarding_runtime_errors ... ok\ntest tests::compiles_full_html_template_through_directive_pipeline ... ok\ntest tests::rejects_unknown_sibaq_field ... ok\ntest tests::compiles_sibaq_dashboard_end_to_end ... ok\ntest tests::lowers_reactive_state_blocks ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
       "capabilities": [
         "iterators.for_loop"
       ],
@@ -347,8 +347,8 @@
       "native_execution_error": null,
       "native_exit_code": 0,
       "native_status": "pass",
-      "native_stderr": "Finished `release` profile [optimized] target(s) in 0.42s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_ags_compiler-4d18993b4a79dba5.exe)\n   Doc-tests agilang_ags_compiler",
-      "native_stdout": "running 7 tests\ntest tests::live_state_machine_rejects_impossible_states_and_preserves_data ... ok\ntest tests::missing_initial_state_loads_immediately_without_discarding_runtime_errors ... ok\ntest tests::compiles_sibaq_dashboard_end_to_end ... ok\ntest tests::rejects_unknown_sibaq_field ... ok\ntest tests::compiles_full_html_template_through_directive_pipeline ... ok\ntest tests::hydration_does_not_duplicate_initial_fetch ... ok\ntest tests::lowers_reactive_state_blocks ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "native_stderr": "Finished `release` profile [optimized] target(s) in 4.69s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_ags_compiler-4d18993b4a79dba5.exe)\n   Doc-tests agilang_ags_compiler",
+      "native_stdout": "running 7 tests\ntest tests::live_state_machine_rejects_impossible_states_and_preserves_data ... ok\ntest tests::compiles_full_html_template_through_directive_pipeline ... ok\ntest tests::hydration_does_not_duplicate_initial_fetch ... ok\ntest tests::rejects_unknown_sibaq_field ... ok\ntest tests::missing_initial_state_loads_immediately_without_discarding_runtime_errors ... ok\ntest tests::lowers_reactive_state_blocks ... ok\ntest tests::compiles_sibaq_dashboard_end_to_end ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
       "normalization_applied": true,
       "parity_status": "pass"
     },
@@ -356,8 +356,8 @@
       "canonical_execution_error": null,
       "canonical_exit_code": 0,
       "canonical_status": "executed",
-      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.46s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_database_agidb-a709b03e4e0b9974.exe)\n   Doc-tests agilang_database_agidb",
-      "canonical_stdout": "running 4 tests\ntest tests::test_single_writer_process_lock ... ok\ntest tests::persists_inserted_rows ... ok\ntest tests::rolls_back_transaction_snapshot ... ok\ntest tests::concurrent_writes_keep_valid_json_and_preserve_rows ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.28s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_database_agidb-a709b03e4e0b9974.exe)\n   Doc-tests agilang_database_agidb",
+      "canonical_stdout": "running 4 tests\ntest tests::test_single_writer_process_lock ... ok\ntest tests::persists_inserted_rows ... ok\ntest tests::concurrent_writes_keep_valid_json_and_preserve_rows ... ok\ntest tests::rolls_back_transaction_snapshot ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
       "capabilities": [
         "collections.map"
       ],
@@ -369,8 +369,8 @@
       "native_execution_error": null,
       "native_exit_code": 0,
       "native_status": "pass",
-      "native_stderr": "Finished `release` profile [optimized] target(s) in 0.44s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_database_agidb-a709b03e4e0b9974.exe)\n   Doc-tests agilang_database_agidb",
-      "native_stdout": "running 4 tests\ntest tests::test_single_writer_process_lock ... ok\ntest tests::persists_inserted_rows ... ok\ntest tests::rolls_back_transaction_snapshot ... ok\ntest tests::concurrent_writes_keep_valid_json_and_preserve_rows ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "native_stderr": "Finished `release` profile [optimized] target(s) in 0.30s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_database_agidb-a709b03e4e0b9974.exe)\n   Doc-tests agilang_database_agidb",
+      "native_stdout": "running 4 tests\ntest tests::test_single_writer_process_lock ... ok\ntest tests::persists_inserted_rows ... ok\ntest tests::concurrent_writes_keep_valid_json_and_preserve_rows ... ok\ntest tests::rolls_back_transaction_snapshot ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
       "normalization_applied": true,
       "parity_status": "pass"
     },
@@ -400,7 +400,7 @@
       "canonical_execution_error": null,
       "canonical_exit_code": 0,
       "canonical_status": "executed",
-      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.39s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_compute-6f2f30b2b7b39451.exe)",
+      "canonical_stderr": "Finished `release` profile [optimized] target(s) in 0.30s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_compute-6f2f30b2b7b39451.exe)",
       "canonical_stdout": "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s",
       "capabilities": [
         "numbers.bigint"
@@ -413,7 +413,7 @@
       "native_execution_error": null,
       "native_exit_code": 0,
       "native_status": "pass",
-      "native_stderr": "Finished `release` profile [optimized] target(s) in 0.51s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_compute-6f2f30b2b7b39451.exe)",
+      "native_stderr": "Finished `release` profile [optimized] target(s) in 0.45s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_compute-6f2f30b2b7b39451.exe)",
       "native_stdout": "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s",
       "normalization_applied": true,
       "parity_status": "pass"
@@ -422,7 +422,7 @@
       "canonical_execution_error": null,
       "canonical_exit_code": 0,
       "canonical_status": "executed",
-      "canonical_stderr": "warning: variable does not need to be mutable\n  --> crates\\agilang-runtime-accelerator\\src\\lib.rs:68:9\n   |\n68 |     let mut devices = vec![DeviceInfo {\n   |         ----^^^^^^^\n   |         |\n   |         help: remove this `mut`\n   |\n   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default\n\nwarning: `agilang-runtime-accelerator` (lib) generated 1 warning (run `cargo fix --lib -p agilang-runtime-accelerator` to apply 1 suggestion)\n    Finished `release` profile [optimized] target(s) in 0.61s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-05b1c0bd25ebb49b.exe)",
+      "canonical_stderr": "warning: variable does not need to be mutable\n  --> crates\\agilang-runtime-accelerator\\src\\lib.rs:68:9\n   |\n68 |     let mut devices = vec![DeviceInfo {\n   |         ----^^^^^^^\n   |         |\n   |         help: remove this `mut`\n   |\n   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default\n\nwarning: `agilang-runtime-accelerator` (lib) generated 1 warning (run `cargo fix --lib -p agilang-runtime-accelerator` to apply 1 suggestion)\n    Finished `release` profile [optimized] target(s) in 0.62s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-05b1c0bd25ebb49b.exe)",
       "canonical_stdout": "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s",
       "capabilities": [
         "numbers.mixed_arithmetic"
@@ -435,7 +435,7 @@
       "native_execution_error": null,
       "native_exit_code": 0,
       "native_status": "pass",
-      "native_stderr": "warning: variable does not need to be mutable\n  --> crates\\agilang-runtime-accelerator\\src\\lib.rs:68:9\n   |\n68 |     let mut devices = vec![DeviceInfo {\n   |         ----^^^^^^^\n   |         |\n   |         help: remove this `mut`\n   |\n   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default\n\nwarning: `agilang-runtime-accelerator` (lib) generated 1 warning (run `cargo fix --lib -p agilang-runtime-accelerator` to apply 1 suggestion)\n    Finished `release` profile [optimized] target(s) in 0.66s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-05b1c0bd25ebb49b.exe)",
+      "native_stderr": "warning: variable does not need to be mutable\n  --> crates\\agilang-runtime-accelerator\\src\\lib.rs:68:9\n   |\n68 |     let mut devices = vec![DeviceInfo {\n   |         ----^^^^^^^\n   |         |\n   |         help: remove this `mut`\n   |\n   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default\n\nwarning: `agilang-runtime-accelerator` (lib) generated 1 warning (run `cargo fix --lib -p agilang-runtime-accelerator` to apply 1 suggestion)\n    Finished `release` profile [optimized] target(s) in 0.55s\n     Running unittests src\\lib.rs (target\\release\\deps\\agilang_runtime_abi-05b1c0bd25ebb49b.exe)",
       "native_stdout": "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s",
       "normalization_applied": true,
       "parity_status": "pass"

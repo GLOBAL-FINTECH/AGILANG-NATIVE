@@ -641,10 +641,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-debugger"
+version = "0.8.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "agilang-diagnostics"
 version = "0.8.0"
 dependencies = [
  "agilang-source",
+]
+
+[[package]]
+name = "agilang-fmt"
+version = "0.8.0"
+dependencies = [
+ "anyhow",
 ]
 
 [[package]]
@@ -857,6 +873,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "agilang-module-resolver"
+version = "0.8.0"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
 name = "agilang-native-cli"
 version = "0.8.0"
 dependencies = [
@@ -884,6 +907,14 @@ dependencies = [
  "anyhow",
  "chrono",
  "serde_json",
+]
+
+[[package]]
+name = "agilang-ownership"
+version = "0.8.0"
+dependencies = [
+ "agilang-diagnostics",
+ "agilang-ir",
 ]
 
 [[package]]
