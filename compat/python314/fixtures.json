@@ -1,0 +1,289 @@
+{
+  "schema": "AGI-PARITY-1",
+  "expected_fixture_count": 25,
+  "expected_parity_fixture_count": 25,
+  "coverage_target_fixture_count": 100,
+  "min_capability_covered_count": 14,
+  "capability_registry": [
+    "numbers.bigint",
+    "numbers.mixed_arithmetic",
+    "numbers.precedence",
+    "strings.unicode",
+    "strings.slicing",
+    "collections.list",
+    "collections.map",
+    "collections.nesting",
+    "functions.defaults",
+    "functions.recursion",
+    "functions.closures",
+    "objects.methods",
+    "objects.inheritance",
+    "exceptions.finally",
+    "exceptions.propagation",
+    "modules.relative_import",
+    "modules.import_resolution",
+    "generators.yield",
+    "iterators.for_loop"
+  ],
+  "notes": "Set AGILANG_CANONICAL_CMD to override canonical execution globally.",
+  "fixtures": [
+    {
+      "id": "agi-main-i32",
+      "category": "syntax",
+      "path": "compat/fixtures/verified/main_i32.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["numbers.mixed_arithmetic"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "agi-functions",
+      "category": "functions",
+      "path": "compat/fixtures/verified/functions.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["functions.defaults"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "agi-array-index-error",
+      "category": "collections",
+      "path": "compat/fixtures/target/collections.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["collections.list"],
+      "expected": {
+        "exit_code": 1,
+        "stderr_contains": ["list index must be integer"]
+      }
+    },
+    {
+      "id": "agi-missing-return-error",
+      "category": "errors",
+      "path": "compat/fixtures/negative/main_i32_missing_return.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["exceptions.propagation"],
+      "expected": {
+        "exit_code": 1,
+        "stderr_contains": ["missing return statement"]
+      }
+    },
+    {
+      "id": "agi-objects-struct",
+      "category": "objects",
+      "path": "compat/python314/fixtures/objects_struct.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- run {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- run {fixture}",
+      "capabilities": ["objects.methods"],
+      "expected": {
+        "exit_code": 0,
+        "stdout_contains": ["3"]
+      }
+    },
+    {
+      "id": "agi-modules-imports",
+      "category": "modules",
+      "path": "compat/fixtures/target/include_entrypoint.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["modules.import_resolution"],
+      "expected": {
+        "exit_code": 1,
+        "stderr_contains": ["undefined symbol `include`"]
+      }
+    },
+    {
+      "id": "framework-routing-fixture",
+      "category": "framework",
+      "path": "compat/fixtures/target/web_routes.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["modules.relative_import"],
+      "expected": {
+        "exit_code": 1,
+        "stderr_contains": ["extraneous return value"]
+      }
+    },
+    {
+      "id": "ags-compiler-suite",
+      "category": "ags",
+      "path": "compat/fixtures/target/reactive_counter.ags",
+      "native_cmd": "cargo test -p agilang-ags-compiler --release --locked",
+      "canonical_cmd": "cargo test -p agilang-ags-compiler --release --locked",
+      "capabilities": ["iterators.for_loop"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "database-agidb-suite",
+      "category": "database",
+      "path": "compat/fixtures/target/auth_policy.agi",
+      "native_cmd": "cargo test -p agilang-database-agidb --release --locked",
+      "canonical_cmd": "cargo test -p agilang-database-agidb --release --locked",
+      "capabilities": ["collections.map"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "scientific-native-stats",
+      "category": "scientific",
+      "path": "test_native_math_stats.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- run {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- run {fixture}",
+      "capabilities": ["numbers.precedence"],
+      "expected": {
+        "exit_code": 0,
+        "stdout_contains": ["2.7182818284590451", "1.4142135623730951"]
+      }
+    },
+    {
+      "id": "ml-runtime-compute",
+      "category": "ml",
+      "path": "test_native_math_stats.agi",
+      "native_cmd": "cargo test -p agilang-runtime-compute --release --locked native_model_training_reduces_loss -- --exact",
+      "canonical_cmd": "cargo test -p agilang-runtime-compute --release --locked native_model_training_reduces_loss -- --exact",
+      "capabilities": ["numbers.bigint"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "ml-runtime-abi",
+      "category": "ml",
+      "path": "test_native_math_stats.agi",
+      "native_cmd": "cargo test -p agilang-runtime-abi --release --locked native_linear_model_training_reduces_loss_through_abi -- --exact",
+      "canonical_cmd": "cargo test -p agilang-runtime-abi --release --locked native_linear_model_training_reduces_loss_through_abi -- --exact",
+      "capabilities": ["numbers.mixed_arithmetic"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "agi-typed-values",
+      "category": "numbers_operators",
+      "path": "compat/fixtures/verified/typed_values.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["numbers.mixed_arithmetic"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "agi-main-return-zero",
+      "category": "numbers_operators",
+      "path": "compat/fixtures/positive/main_i32_return_zero.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["numbers.precedence"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "agi-main-wrong-return-type",
+      "category": "diagnostics_negative",
+      "path": "compat/fixtures/negative/main_i32_wrong_return_type.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["exceptions.propagation"],
+      "expected": { "exit_code": 1 }
+    },
+    {
+      "id": "native-arrays",
+      "category": "arrays_lists",
+      "path": "examples/native/arrays.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["collections.list", "collections.nesting"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "native-hello",
+      "category": "strings_unicode",
+      "path": "examples/native/hello.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["strings.unicode"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "native-hello-native",
+      "category": "strings_unicode",
+      "path": "examples/native/hello-native.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["strings.unicode"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "native-bootstrap-features",
+      "category": "functions_arguments",
+      "path": "examples/native/bootstrap-features.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["functions.defaults"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "native-bootstrap-tests",
+      "category": "diagnostics_negative",
+      "path": "examples/native/bootstrap-tests.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["exceptions.finally"],
+      "expected": {
+        "exit_code": 1,
+        "stderr_contains": ["expected `fn`"]
+      }
+    },
+    {
+      "id": "native-modern-features",
+      "category": "functions_arguments",
+      "path": "test_modern_features_native.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["functions.closures"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "target-control-flow",
+      "category": "control_flow",
+      "path": "compat/fixtures/target/control_flow.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["iterators.for_loop"],
+      "expected": {
+        "exit_code": 1,
+        "stderr_contains": ["expected `:`"]
+      }
+    },
+    {
+      "id": "target-loops",
+      "category": "control_flow",
+      "path": "compat/fixtures/target/loops.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["iterators.for_loop"],
+      "expected": {
+        "exit_code": 1,
+        "stderr_contains": ["list index must be integer"]
+      }
+    },
+    {
+      "id": "agi-routes-api-status",
+      "category": "modules_imports",
+      "path": "examples/agi/routes_api_status.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["modules.relative_import"],
+      "expected": {
+        "exit_code": 1,
+        "stderr_contains": ["unexpected character \"@\""]
+      }
+    },
+    {
+      "id": "agi-sibaq-status",
+      "category": "modules_imports",
+      "path": "examples/agi/sibaq_status.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "capabilities": ["modules.import_resolution"],
+      "expected": {
+        "exit_code": 1,
+        "stderr_contains": ["unexpected character \"?\""]
+      }
+    }
+  ]
+}

@@ -861,8 +861,22 @@ mod tests {
         }
     }
 
+    fn python_with_pymysql_available() -> bool {
+        let check = Command::new("python")
+            .arg("-c")
+            .arg("import pymysql")
+            .output();
+        matches!(check, Ok(output) if output.status.success())
+    }
+
     #[test]
     fn pymysql_can_authenticate_and_query_agidb() {
+        if !python_with_pymysql_available() {
+            eprintln!(
+                "skipping pymysql_can_authenticate_and_query_agidb: python/pymysql unavailable"
+            );
+            return;
+        }
         let db_path = temp_path("db", "agidb");
         let status_path = temp_path("status", "json");
         seed_db(&db_path);
@@ -900,6 +914,10 @@ conn.close()
 
     #[test]
     fn invalid_credentials_fail() {
+        if !python_with_pymysql_available() {
+            eprintln!("skipping invalid_credentials_fail: python/pymysql unavailable");
+            return;
+        }
         let db_path = temp_path("badcreds", "agidb");
         let status_path = temp_path("badcreds-status", "json");
         seed_db(&db_path);
@@ -978,6 +996,10 @@ sys.exit(1)
 
     #[test]
     fn unreachable_port_fails() {
+        if !python_with_pymysql_available() {
+            eprintln!("skipping unreachable_port_fails: python/pymysql unavailable");
+            return;
+        }
         let script = r#"
 import pymysql, sys
 try:
