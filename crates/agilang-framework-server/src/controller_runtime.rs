@@ -138,11 +138,55 @@ fn dispatch_controller(
         _ => {}
     }
 
-    if let Some(response) = dispatch_agi_controller(project_root, route)? {
-        return Ok(response);
+    // Routes backed by a generated model always use the resource dispatcher,
+    // which persists data and enforces authorization. Hand-written `.agi`
+    // controllers only handle routes that are not generated resources.
+    if !is_generated_resource(project_root, route) {
+        if let Some(response) = dispatch_agi_controller(project_root, req, route)? {
+            return Ok(response);
+        }
     }
 
     dispatch_generated_resource(project_root, req, route, &route_match.params)
+}
+
+/// True when the route's controller maps to a generated model, either in the
+/// framework manifest or as `app/Models/<Resource>.agi`.
+fn is_generated_resource(project_root: &Path, route: &Route) -> bool {
+    let Some(resource_name) = route.controller.strip_suffix("Controller") else {
+        return false;
+    };
+    if let Ok(Some(manifest)) = load_framework_manifest(project_root) {
+        if manifest.models.contains_key(resource_name) {
+            return true;
+        }
+    }
+    project_root
+        .join("app/Models")
+        .join(format!("{resource_name}.agi"))
+        .is_file()
+}
+
+/// Mutating actions require an authenticated admin session with a valid CSRF
+/// token. Shared by every dispatch path so none can bypass it.
+fn require_mutation_auth(
+    project_root: &Path,
+    req: &Request,
+    action: &str,
+) -> Result<(), DispatchError> {
+    if !matches!(action, "store" | "update" | "destroy" | "restore") {
+        return Ok(());
+    }
+    let auth_state = load_auth_state(project_root, req)
+        .map_err(|error| DispatchError::new(500, error.to_string()))?;
+    let Some((session, user)) = auth_state.as_ref() else {
+        return Err(DispatchError::new(403, "Forbidden"));
+    };
+    verify_csrf(req, session)?;
+    if user.role != "admin" {
+        return Err(DispatchError::new(403, "Forbidden"));
+    }
+    Ok(())
 }
 
 /// Executes a hand-written `.agi` controller action whose body returns
@@ -151,6 +195,7 @@ fn dispatch_controller(
 /// through to the generated-resource dispatcher, preserving existing behaviour.
 fn dispatch_agi_controller(
     project_root: &Path,
+    req: &Request,
     route: &Route,
 ) -> Result<Option<Response>, DispatchError> {
     let Some(controller_path) = find_controller_file(
@@ -159,6 +204,7 @@ fn dispatch_agi_controller(
     ) else {
         return Ok(None);
     };
+    require_mutation_auth(project_root, req, &route.action)?;
     match crate::evaluate_controller_action(&controller_path, &route.action) {
         Ok(crate::ControllerResult::Render(view, data)) => {
             render_view(project_root, &view, data).map(Some)
@@ -250,21 +296,7 @@ fn dispatch_generated_resource(
         .transpose()
         .map_err(|error| DispatchError::new(500, error.to_string()))?;
 
-    let auth_state = load_auth_state(project_root, req)
-        .map_err(|error| DispatchError::new(500, error.to_string()))?;
-    let requires_mutation_auth = matches!(
-        route.action.as_str(),
-        "store" | "update" | "destroy" | "restore"
-    );
-    if requires_mutation_auth {
-        let Some((session, user)) = auth_state.as_ref() else {
-            return Err(DispatchError::new(403, "Forbidden"));
-        };
-        verify_csrf(req, session)?;
-        if user.role != "admin" {
-            return Err(DispatchError::new(403, "Forbidden"));
-        }
-    }
+    require_mutation_auth(project_root, req, &route.action)?;
 
     let config = load_database_config(project_root)
         .map_err(|error| DispatchError::new(500, error.to_string()))?;

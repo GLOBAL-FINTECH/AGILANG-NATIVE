@@ -218,11 +218,19 @@
     },
     {
       "id": "native-bootstrap-tests",
-      "category": "diagnostics_negative",
+      "category": "functions",
       "path": "examples/native/bootstrap-tests.agi",
       "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
       "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
       "capabilities": ["exceptions.finally"],
+      "expected": { "exit_code": 0 }
+    },
+    {
+      "id": "negative-slash-comment",
+      "category": "diagnostics_negative",
+      "path": "compat/fixtures/negative/slash_comment.agi",
+      "native_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
+      "canonical_cmd": "cargo run -q -p agilang-native-cli -- check {fixture}",
       "expected": {
         "exit_code": 1,
         "stderr_contains": ["expected `fn`"]

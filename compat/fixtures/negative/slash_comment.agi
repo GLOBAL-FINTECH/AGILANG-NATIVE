@@ -1,0 +1,4 @@
+# Negative fixture: AGILANG comments use `#`; a C-style `//` comment is a syntax error.
+// this line must be rejected
+fn main() -> i32:
+    return 0

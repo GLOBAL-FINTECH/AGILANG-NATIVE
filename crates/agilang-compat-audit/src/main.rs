@@ -271,12 +271,13 @@ fn normalize_cargo_test_stdout(text: &str) -> String {
     normalized.join("\n")
 }
 
+/// Normalizes cargo's own progress output so build-cache state (which crates
+/// were recompiled, indentation of the first remaining line, timings) never
+/// produces a parity mismatch. AGILANG diagnostics are compared unchanged.
 fn normalize_cargo_test_stderr(text: &str) -> String {
     text.lines()
-        .filter(|line| {
-            let trimmed = line.trim_start();
-            !trimmed.starts_with("Compiling ")
-        })
+        .map(str::trim)
+        .filter(|line| !line.starts_with("Compiling ") && !line.is_empty())
         .map(|line| {
             if let Some(pos) = line.find("target(s) in ") {
                 let prefix = &line[..pos + "target(s) in ".len()];
